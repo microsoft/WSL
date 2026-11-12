@@ -340,7 +340,7 @@ public:
         _In_ PSID userSid,
         _In_ DWORD sessionId,
         _Inout_ wsl::windows::service::PluginManager& pluginManager,
-        std::shared_ptr<wsl::windows::common::usb::Manager> usbManager);
+        _Inout_ wsl::windows::common::usb::Manager& usbManager);
     virtual ~LxssUserSessionImpl();
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
@@ -971,7 +971,7 @@ private:
 
     wsl::windows::service::PluginManager& m_pluginManager;
 
-    const std::shared_ptr<wsl::windows::common::usb::Manager> m_usbManager;
+    wsl::windows::common::usb::Manager& m_usbManager;
 
     /// <summary>
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.

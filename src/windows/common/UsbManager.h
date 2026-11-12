@@ -26,15 +26,17 @@ public:
 
     static void CleanupReservations() noexcept;
 
-    std::vector<ListedDevice> List(PSID UserSid);
+    void Start();
+    void Cancel() noexcept;
     void Stop() noexcept;
+
+    std::vector<ListedDevice> List(PSID UserSid);
 
     DeviceReservation Reserve(PSID UserSid, const PortId& Port, RemovalCallback OnRemoval);
     void Commit(PSID UserSid, const GUID& ReservationId);
     void Release(PSID UserSid, const GUID& ReservationId, bool WaitForReappearance = false);
     GUID GetReservationId(PSID UserSid, const PortId& Port);
     bool IsValid(PSID UserSid, const GUID& ReservationId);
-    void Cancel() noexcept;
 
 private:
     // Records include pending attachments and incomplete cleanup.
@@ -91,6 +93,7 @@ private:
     NotificationHandle m_interfaceNotification;
     NotificationHandle m_instanceNotification;
     std::thread m_worker;
+    wil::srwlock m_lifecycleLock;
 };
 
 } // namespace wsl::windows::common::usb

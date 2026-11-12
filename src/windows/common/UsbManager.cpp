@@ -39,51 +39,11 @@ namespace {
 
 } // namespace
 
-Manager::Manager() : m_journal(CreateJournalKey())
+Manager::Manager()
 {
     m_stop.create(wil::EventOptions::ManualReset);
     m_changed.create();
     m_work.create();
-
-    // Recover and release reservations left by a previous service run.
-    {
-        auto lock = m_lock.lock_exclusive();
-        m_records = LoadReservationRecords(m_journal.get());
-
-        for (auto record = m_records.begin(); record != m_records.end();)
-        {
-            try
-            {
-                ReleaseReservation(*record, m_journal.get());
-                record = m_records.erase(record);
-            }
-            catch (...)
-            {
-                // Keep failed cleanup records available for later recovery.
-                LOG_CAUGHT_EXCEPTION();
-                ++record;
-            }
-        }
-    }
-
-    // Watch USB interfaces for arrivals and removals.
-    CM_NOTIFY_FILTER filter{};
-    filter.cbSize = sizeof(filter);
-    filter.FilterType = CM_NOTIFY_FILTER_TYPE_DEVICEINTERFACE;
-    filter.u.DeviceInterface.ClassGuid = GUID_DEVINTERFACE_USB_DEVICE;
-    THROW_IF_WIN32_ERROR(CM_MapCrToWin32Err(
-        CM_Register_Notification(&filter, this, OnDeviceNotification, m_interfaceNotification.put()), ERROR_GEN_FAILURE));
-
-    // Watch instance events for readiness and removal; the callback filters out non-USB devices.
-    filter = {};
-    filter.cbSize = sizeof(filter);
-    filter.FilterType = CM_NOTIFY_FILTER_TYPE_DEVICEINSTANCE;
-    filter.Flags = CM_NOTIFY_FILTER_FLAG_ALL_DEVICE_INSTANCES;
-    THROW_IF_WIN32_ERROR(CM_MapCrToWin32Err(
-        CM_Register_Notification(&filter, this, OnDeviceNotification, m_instanceNotification.put()), ERROR_GEN_FAILURE));
-
-    // Keep removal cleanup out of PnP notification callbacks.
-    m_worker = std::thread([this]() { RunNotificationWorker(); });
 }
 
 Manager::~Manager()
@@ -154,6 +114,87 @@ bool Manager::MatchesRecordedReservation(const Record& Value) const
     const auto reservation = m_registry.ReadReservation(Value.Reservation);
     return reservation && OwnsReservation(Value.Reservation.Id, *reservation) && m_registry.MappingMatches(Value.Reservation);
 }
+
+void Manager::Start()
+{
+    auto lifecycleLock = m_lifecycleLock.lock_exclusive();
+    ThrowIfStopping();
+    if (m_worker.joinable())
+    {
+        return;
+    }
+
+    m_journal = CreateJournalKey();
+
+    {
+        auto lock = m_lock.lock_exclusive();
+        m_records = LoadReservationRecords(m_journal.get());
+    }
+
+    NotificationHandle interfaceNotification;
+    NotificationHandle instanceNotification;
+
+    // Watch USB interfaces for arrivals and removals.
+    CM_NOTIFY_FILTER filter{};
+    filter.cbSize = sizeof(filter);
+    filter.FilterType = CM_NOTIFY_FILTER_TYPE_DEVICEINTERFACE;
+    filter.u.DeviceInterface.ClassGuid = GUID_DEVINTERFACE_USB_DEVICE;
+    THROW_IF_WIN32_ERROR(CM_MapCrToWin32Err(
+        CM_Register_Notification(&filter, this, OnDeviceNotification, interfaceNotification.put()), ERROR_GEN_FAILURE));
+
+    // Watch instance events for readiness and removal; the callback filters out non-USB devices.
+    filter = {};
+    filter.cbSize = sizeof(filter);
+    filter.FilterType = CM_NOTIFY_FILTER_TYPE_DEVICEINSTANCE;
+    filter.Flags = CM_NOTIFY_FILTER_FLAG_ALL_DEVICE_INSTANCES;
+    THROW_IF_WIN32_ERROR(CM_MapCrToWin32Err(
+        CM_Register_Notification(&filter, this, OnDeviceNotification, instanceNotification.put()), ERROR_GEN_FAILURE));
+
+    ThrowIfStopping();
+
+    // Keep removal cleanup out of PnP notification callbacks.
+    m_worker = std::thread([this]() { RunNotificationWorker(); });
+    m_interfaceNotification = std::move(interfaceNotification);
+    m_instanceNotification = std::move(instanceNotification);
+}
+
+void Manager::Cancel() noexcept
+{
+    m_stopping.store(true);
+    m_stop.SetEvent();
+}
+
+void Manager::Stop() noexcept
+try
+{
+    // Cancel readiness waits before waiting for callbacks and the worker to finish.
+    Cancel();
+    auto lifecycleLock = m_lifecycleLock.lock_exclusive();
+    m_interfaceNotification.reset();
+    m_instanceNotification.reset();
+
+    if (m_worker.joinable())
+    {
+        m_worker.join();
+    }
+
+    // Release remaining reservations before service teardown completes.
+    auto lock = m_lock.lock_exclusive();
+    for (auto record = m_records.begin(); record != m_records.end();)
+    {
+        try
+        {
+            ReleaseReservation(*record, m_journal.get());
+            record = m_records.erase(record);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            ++record;
+        }
+    }
+}
+CATCH_LOG()
 
 std::vector<ListedDevice> Manager::List(PSID UserSid)
 {
@@ -461,37 +502,6 @@ try
 }
 CATCH_LOG()
 
-void Manager::Stop() noexcept
-try
-{
-    // Cancel readiness waits before waiting for callbacks and the worker to finish.
-    Cancel();
-    m_interfaceNotification.reset();
-    m_instanceNotification.reset();
-
-    if (m_worker.joinable())
-    {
-        m_worker.join();
-    }
-
-    // Release remaining reservations before service teardown completes.
-    auto lock = m_lock.lock_exclusive();
-    for (auto record = m_records.begin(); record != m_records.end();)
-    {
-        try
-        {
-            ReleaseReservation(*record, m_journal.get());
-            record = m_records.erase(record);
-        }
-        catch (...)
-        {
-            LOG_CAUGHT_EXCEPTION();
-            ++record;
-        }
-    }
-}
-CATCH_LOG()
-
 DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCallback OnRemoval)
 {
     THROW_HR_IF(E_INVALIDARG, !OnRemoval);
@@ -622,12 +632,6 @@ bool Manager::IsValid(PSID UserSid, const GUID& ReservationId)
 
     THROW_HR_IF(E_ACCESSDENIED, record->OwnerSid != sid);
     return ValidateReservation(*record);
-}
-
-void Manager::Cancel() noexcept
-{
-    m_stopping.store(true);
-    m_stop.SetEvent();
 }
 
 std::list<Manager::Record>::iterator Manager::FindReservationRecord(const GUID& ReservationId)

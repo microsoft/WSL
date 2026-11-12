@@ -635,8 +635,8 @@ LxssUserSessionImpl::LxssUserSessionImpl(
     _In_ PSID userSid,
     _In_ DWORD sessionId,
     _Inout_ wsl::windows::service::PluginManager& pluginManager,
-    std::shared_ptr<wsl::windows::common::usb::Manager> usbManager) :
-    m_sessionId(sessionId), m_pluginManager(pluginManager), m_usbManager(std::move(usbManager))
+    _Inout_ wsl::windows::common::usb::Manager& usbManager) :
+    m_sessionId(sessionId), m_pluginManager(pluginManager), m_usbManager(usbManager)
 {
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
@@ -2684,8 +2684,8 @@ HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_
         !wsl::windows::common::usb::UxdRegistry::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
-    const auto devices = m_usbManager->List(&m_userSid.Sid);
+    m_usbManager.Start();
+    const auto devices = m_usbManager.List(&m_userSid.Sid);
     auto result = wil::make_unique_cotaskmem<WSL_USB_DEVICE[]>(devices.size());
     auto cleanup = wil::scope_exit([&]() {
         for (size_t index = 0; index < devices.size(); ++index)
@@ -2716,19 +2716,18 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
         !wsl::windows::common::usb::UxdRegistry::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    m_usbManager.Start();
     const auto port = wsl::windows::common::usb::PortId{Port};
     _CreateVm();
 
-    auto reservation = m_usbManager->Reserve(&m_userSid.Sid, port, [session = weak_from_this()](const GUID& reservationId) {
+    auto reservation = m_usbManager.Reserve(&m_userSid.Sid, port, [session = weak_from_this()](const GUID& reservationId) {
         if (const auto owner = session.lock())
         {
             owner->OnUsbDeviceRemoved(reservationId);
         }
     });
     const auto reservationId = reservation.Id;
-    auto releaseOnFailure =
-        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_usbManager->Release(&m_userSid.Sid, reservationId); });
+    auto releaseOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_usbManager.Release(&m_userSid.Sid, reservationId); });
     const auto [entry, inserted] = m_usbAttachments.emplace(reservationId, UsbAttachment{std::move(reservation)});
     THROW_HR_IF(E_UNEXPECTED, !inserted);
     releaseOnFailure.release();
@@ -2737,7 +2736,7 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
     {
         m_utilityVm->AttachUsbDevice(entry->second.Reservation.DeviceInstanceId);
         entry->second.Attached = true;
-        m_usbManager->Commit(&m_userSid.Sid, reservationId);
+        m_usbManager.Commit(&m_userSid.Sid, reservationId);
         entry->second.Requested = true;
     }
     catch (...)
@@ -2762,12 +2761,12 @@ HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
         !wsl::windows::common::usb::UxdRegistry::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_READY), !m_usbManager);
+    m_usbManager.Start();
     const auto port = wsl::windows::common::usb::PortId{Port};
     const auto attachment =
         std::ranges::find_if(m_usbAttachments, [&](const auto& entry) { return entry.second.Reservation.Port == port; });
     const auto reservationId =
-        attachment == m_usbAttachments.end() ? m_usbManager->GetReservationId(&m_userSid.Sid, port) : attachment->first;
+        attachment == m_usbAttachments.end() ? m_usbManager.GetReservationId(&m_userSid.Sid, port) : attachment->first;
     _ReleaseUsbAttachment(reservationId, true);
     return S_OK;
 }
@@ -4788,7 +4787,7 @@ void LxssUserSessionImpl::_ReleaseUsbAttachment(const GUID& ReservationId, bool 
         }
     }
 
-    m_usbManager->Release(&m_userSid.Sid, ReservationId, WaitForReappearance);
+    m_usbManager.Release(&m_userSid.Sid, ReservationId, WaitForReappearance);
     if (entry != m_usbAttachments.end())
     {
         m_usbAttachments.erase(entry);
@@ -4818,7 +4817,7 @@ void LxssUserSessionImpl::_ReplayUsbAttachments() noexcept
         const auto reservationId = attachment.Reservation.Id;
         try
         {
-            if (!attachment.Requested || !m_usbManager->IsValid(&m_userSid.Sid, reservationId))
+            if (!attachment.Requested || !m_usbManager.IsValid(&m_userSid.Sid, reservationId))
             {
                 _ReleaseUsbAttachment(reservationId);
                 continue;
@@ -4826,7 +4825,7 @@ void LxssUserSessionImpl::_ReplayUsbAttachments() noexcept
 
             m_utilityVm->AttachUsbDevice(attachment.Reservation.DeviceInstanceId);
             attachment.Attached = true;
-            m_usbManager->Commit(&m_userSid.Sid, reservationId);
+            m_usbManager.Commit(&m_userSid.Sid, reservationId);
         }
         catch (...)
         {
