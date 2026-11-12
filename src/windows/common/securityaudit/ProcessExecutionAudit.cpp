@@ -11,6 +11,26 @@
 
 namespace wsl::windows::common::securityaudit {
 
+namespace {
+    std::string EscapeEventParameters(std::string_view text)
+    {
+        std::string escaped;
+        escaped.reserve(text.size());
+        for (const char character : text)
+        {
+            if (character == '%')
+            {
+                escaped += "\\u0025"; // Prevent Event Viewer parameter-message expansion.
+            }
+            else
+            {
+                escaped += character;
+            }
+        }
+        return escaped;
+    }
+} // namespace
+
 static_assert(MSG_PROCESS_EXECUTED_DETAILS <= UINT16_MAX);
 
 bool ProcessExecutionEnabled()
@@ -119,22 +139,7 @@ std::wstring FormatProcessExecution(gsl::span<gsl::byte> bytes, bool includeComm
             data["truncatedFields"].push_back(name);
         }
     }
-    const auto serialize = [&] {
-        const auto json = data.dump(-1, ' ', true);
-        std::string escaped;
-        for (const char character : json)
-        {
-            if (character == '%')
-            {
-                escaped += "\\u0025"; // Prevent Event Viewer parameter-message expansion.
-            }
-            else
-            {
-                escaped += character;
-            }
-        }
-        return escaped;
-    };
+    const auto serialize = [&] { return EscapeEventParameters(data.dump(-1, ' ', true)); };
     auto json = serialize();
     // Keep a conservative insertion-string budget without losing the entire observation.
     constexpr size_t c_maxLogCharacters = 12 * 1024;
@@ -155,6 +160,68 @@ std::wstring FormatProcessExecution(gsl::span<gsl::byte> bytes, bool includeComm
     return wsl::shared::string::MultiByteToWide(json);
 }
 
+std::wstring FormatProcessExecutionDisplay(std::wstring_view details)
+{
+    using Json = nlohmann::json;
+    // Use the final JSON so policy, invalid-field and size omissions are identical in both representations.
+    const auto data = Json::parse(wsl::shared::string::WideToMultiByte(std::wstring(details)));
+    THROW_HR_IF(E_INVALIDARG, !data.is_object());
+    const auto namespaces = data.value("namespaceIds", Json::object());
+    THROW_HR_IF(E_INVALIDARG, !namespaces.is_object());
+    const auto field = [](const Json& object, const char* name) -> std::wstring {
+        const auto value = object.find(name);
+        if (value == object.end())
+        {
+            return L"-";
+        }
+        auto text = value->dump(-1, ' ', true);
+        if (value->is_string())
+        {
+            text = text.substr(1, text.size() - 2);
+        }
+        return wsl::shared::string::MultiByteToWide(EscapeEventParameters(text));
+    };
+
+    auto text = wsl::shared::Localization::MessageSecurityAuditProcessExecutionDisplay(
+        field(data, "distro"),
+        field(data, "distroId"),
+        field(data, "pid"),
+        field(data, "tid"),
+        field(data, "ppid"),
+        field(data, "executable"),
+        field(data, "executablePath"),
+        field(data, "argv"),
+        field(data, "cwd"),
+        field(data, "timestampNs"),
+        field(data, "uid"),
+        field(data, "euid"),
+        field(data, "gid"),
+        field(data, "egid"),
+        field(namespaces, "pid"),
+        field(namespaces, "mount"),
+        field(namespaces, "network"));
+    if (data.contains("truncatedFields") || data.contains("omittedFields") || data.contains("invalidFields"))
+    {
+        text += L"\n\n" + wsl::shared::Localization::MessageSecurityAuditCollectionStatus(
+                              field(data, "truncatedFields"), field(data, "omittedFields"), field(data, "invalidFields"));
+    }
+
+    std::wstring display;
+    for (const auto character : text)
+    {
+        if (character == L'\r')
+        {
+            continue;
+        }
+        if (character == L'\n')
+        {
+            display += L'\r';
+        }
+        display += character;
+    }
+    return display;
+}
+
 void ReportProcessExecution(EventSource& source, uint32_t pid)
 {
     THROW_HR_IF(E_INVALIDARG, pid == 0);
@@ -168,8 +235,11 @@ void ReportProcessExecution(EventSource& source, uint32_t pid)
 void ReportProcessExecutionDetails(EventSource& source, uint32_t pid, std::wstring_view details)
 {
     THROW_HR_IF(E_INVALIDARG, pid == 0);
-    std::array<std::wstring, 3> fields{
-        std::to_wstring(pid), wsl::shared::Localization::MessageSecurityAuditProcessExecution(), std::wstring(details)};
+    std::array<std::wstring, 4> fields{
+        std::to_wstring(pid),
+        wsl::shared::Localization::MessageSecurityAuditProcessExecution(),
+        std::wstring(details),
+        FormatProcessExecutionDisplay(details)};
     source.Report(MSG_PROCESS_EXECUTED_DETAILS, fields);
 }
 

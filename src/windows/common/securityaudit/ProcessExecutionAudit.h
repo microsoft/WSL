@@ -22,6 +22,7 @@ bool ProcessExecutionEnabled();
 bool IncludeProcessCommandLine();
 // Unmatched namespaces, including VM-root and nested namespaces, omit distribution fields.
 std::wstring FormatProcessExecution(gsl::span<gsl::byte> bytes, bool includeCommandLine, const ProcessExecutionDistribution* distribution = nullptr);
+std::wstring FormatProcessExecutionDisplay(std::wstring_view details);
 void ReportProcessExecution(EventSource& source, uint32_t pid);
 void ReportProcessExecutionDetails(EventSource& source, uint32_t pid, std::wstring_view details);
 

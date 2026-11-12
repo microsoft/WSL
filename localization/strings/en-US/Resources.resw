@@ -4237,4 +4237,38 @@ On first run, creates the file with all settings commented out at their defaults
     <value>A Linux program was executed successfully in WSL.</value>
     <comment>{Locked="WSL"}Description of a successfully observed Linux program execution.</comment>
   </data>
+  <data name="MessageSecurityAuditProcessExecutionDisplay" xml:space="preserve">
+    <value>Distribution Information:
+&#9;Name:&#9;{}
+&#9;ID:&#9;{}
+
+Process Information:
+&#9;Process ID (VM):&#9;{}
+&#9;Thread ID (VM):&#9;{}
+&#9;Parent Process ID (VM):&#9;{}
+&#9;Executable:&#9;{}
+&#9;Executable Path:&#9;{}
+&#9;Arguments:&#9;{}
+&#9;Working Directory:&#9;{}
+&#9;Timestamp (monotonic ns):&#9;{}
+
+Linux Credentials:
+&#9;UID:&#9;{}
+&#9;Effective UID:&#9;{}
+&#9;GID:&#9;{}
+&#9;Effective GID:&#9;{}
+
+Namespaces:
+&#9;PID:&#9;{}
+&#9;Mount:&#9;{}
+&#9;Network:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Grouped process execution details in Event Viewer. Preserve line breaks and tabs. Values are escaped for display; a dash means unavailable or not collected. PID values refer to the WSL virtual machine, and timestamp is Linux monotonic time in nanoseconds.</comment>
+  </data>
+  <data name="MessageSecurityAuditCollectionStatus" xml:space="preserve">
+    <value>Collection Status:
+&#9;Truncated fields:&#9;{}
+&#9;Omitted fields:&#9;{}
+&#9;Invalid fields:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Field lists contain JSON property names and must not be translated. Preserve line breaks and tabs. A dash means no fields of that kind.</comment>
+  </data>
 </root>
