@@ -33,7 +33,6 @@ struct UxdReservationIdentity
 };
 
 std::wstring GetUxdPortRegistryValueName(uint32_t Port);
-uint32_t ParseUxdPortRegistryValueName(const std::wstring& Name);
 Reservation MakeReservation(const GUID& Owner);
 Reservation DecodeReservation(std::span<const BYTE> Bytes);
 bool OwnsReservation(const GUID& Owner, const Reservation& Value) noexcept;
@@ -48,7 +47,7 @@ public:
     bool MappingMatches(const UxdReservationIdentity& Value) const;
     void PublishReservation(const UxdReservationIdentity& Value);
     bool RemoveReservation(const UxdReservationIdentity& Value);
-    std::optional<UxdReservationIdentity> FindReservation(const GUID& Id) const;
+    bool MappingReferenced(const UxdReservationIdentity& Value) const;
     void RemoveMapping(const UxdReservationIdentity& Value);
     void Flush() const;
     static bool IsSupported();

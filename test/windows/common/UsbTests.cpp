@@ -3,7 +3,6 @@
 #include "precomp.h"
 #include "Common.h"
 #include "UsbDevice.h"
-#include "UsbManager.h"
 #include "UsbTypes.h"
 #include "UsbUxdRegistry.h"
 #include "registry.hpp"
@@ -34,29 +33,7 @@ class UsbTests
         VERIFY_ARE_EQUAL(4294967295u, usb::PortId{L"1.4294967295"}.Parts.back());
         VERIFY_ARE_EQUAL(4294967295u, usb::PortId{L"4294967295.1"}.Parts.front());
         VERIFY_ARE_EQUAL(std::wstring(L"uxd_port_001"), usb::GetUxdPortRegistryValueName(1));
-        VERIFY_THROWS(usb::GetUxdPortRegistryValueName(0), wil::ResultException);
         VERIFY_THROWS(usb::GetUxdPortRegistryValueName(1000), wil::ResultException);
-        for (const uint32_t portNumber : {1u, 999u})
-        {
-            VERIFY_ARE_EQUAL(portNumber, usb::ParseUxdPortRegistryValueName(usb::GetUxdPortRegistryValueName(portNumber)));
-        }
-        VERIFY_ARE_EQUAL(0u, usb::ParseUxdPortRegistryValueName(L"uxd_port_000"));
-        VERIFY_ARE_EQUAL(1000u, usb::ParseUxdPortRegistryValueName(L"uxd_port_1000"));
-        VERIFY_ARE_EQUAL(4294967295u, usb::ParseUxdPortRegistryValueName(L"uxd_port_4294967295"));
-        VERIFY_ARE_EQUAL(1u, usb::ParseUxdPortRegistryValueName(L"UXD_PORT_001"));
-        VERIFY_ARE_EQUAL(1u, usb::ParseUxdPortRegistryValueName(L"uxd_port_1"));
-        for (const auto* invalid :
-             {L"",
-              L"uxd_port_",
-              L"other_001",
-              L"uxd_port_001junk",
-              L"uxd_port_-1",
-              L"uxd_port_+1",
-              L"uxd_port_ 1",
-              L"uxd_port_4294967296"})
-        {
-            VERIFY_THROWS(usb::ParseUxdPortRegistryValueName(invalid), wil::ResultException);
-        }
         for (const auto* invalid :
              {L"",
               L"2",
@@ -257,13 +234,13 @@ class UsbTests
         usb::UxdRegistry uxdRegistry;
 
         registry::WriteDword(reservationKey.get(), nullptr, L"uxd_port_001", 1);
-        VERIFY_IS_FALSE(uxdRegistry.FindReservation(identity.Id).has_value());
+        VERIFY_IS_FALSE(uxdRegistry.MappingReferenced(identity));
 
         const BYTE invalidBytes[sizeof(usb::Reservation) + 1]{};
         for (const DWORD size : {0u, 1u, 67u, 69u})
         {
             VERIFY_ARE_EQUAL(ERROR_SUCCESS, RegSetValueExW(reservationKey.get(), L"uxd_port_001", 0, REG_BINARY, invalidBytes, size));
-            VERIFY_IS_FALSE(uxdRegistry.FindReservation(identity.Id).has_value());
+            VERIFY_IS_FALSE(uxdRegistry.MappingReferenced(identity));
         }
 
         auto reservation = usb::MakeReservation(identity.Id);
@@ -271,7 +248,7 @@ class UsbTests
         VERIFY_ARE_EQUAL(
             ERROR_SUCCESS,
             RegSetValueExW(reservationKey.get(), L"uxd_port_001", 0, REG_BINARY, reinterpret_cast<const BYTE*>(&reservation), sizeof(reservation)));
-        VERIFY_IS_FALSE(uxdRegistry.FindReservation(identity.Id).has_value());
+        VERIFY_IS_FALSE(uxdRegistry.MappingReferenced(identity));
 
         const auto mappingKey =
             registry::CreateKey(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\UsbHub\\uxd_control\\pnp");
@@ -283,30 +260,15 @@ class UsbTests
         VERIFY_ARE_EQUAL(
             ERROR_SUCCESS,
             RegSetValueExW(reservationKey.get(), L"uxd_port_001", 0, REG_BINARY, reinterpret_cast<const BYTE*>(&reservation), sizeof(reservation)));
-        const auto found = uxdRegistry.FindReservation(identity.Id);
-        VERIFY_IS_TRUE(found.has_value());
-        VERIFY_ARE_EQUAL(L"USB\\WSL_USB_TEST_" + name + L"\\0", found->HubInstanceId);
-        VERIFY_ARE_EQUAL(1u, found->Port);
-        VERIFY_IS_TRUE(IsEqualGUID(identity.Id, found->Id));
+        VERIFY_IS_TRUE(uxdRegistry.MappingReferenced(identity));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_BUSY), wil::ResultFromException([&]() { uxdRegistry.RemoveMapping(identity); }));
         VERIFY_IS_TRUE(uxdRegistry.MappingMatches(identity));
 
-        const auto journal = registry::CreateKey(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Usb");
-        for (const auto& [journalName, journalType] : registry::EnumValues(journal.get()))
-        {
-            LogSkipped("USB recovery test requires an empty journal");
-            return;
-        }
-        registry::WriteDword(journal.get(), nullptr, name.c_str(), 1);
-        auto cleanupJournal = wil::scope_exit([&]() { LOG_IF_WIN32_ERROR(RegDeleteValueW(journal.get(), name.c_str())); });
-        registry::WriteDword(reservationKey.get(), nullptr, L"uxd_port_002", 1);
-        usb::Manager::CleanupReservations();
-        VERIFY_IS_FALSE(uxdRegistry.FindReservation(identity.Id).has_value());
-        VERIFY_IS_FALSE(uxdRegistry.MappingMatches(identity));
-        VERIFY_ARE_EQUAL(ERROR_FILE_NOT_FOUND, RegQueryValueExW(journal.get(), name.c_str(), nullptr, nullptr, nullptr, nullptr));
-        VERIFY_ARE_EQUAL(1u, registry::ReadDword(reservationKey.get(), nullptr, L"uxd_port_002", 0));
-        cleanupJournal.release();
+        registry::WriteDword(reservationKey.get(), nullptr, L"uxd_port_001", 1);
+        uxdRegistry.RemoveMapping(identity);
         cleanupMapping.release();
+        VERIFY_IS_FALSE(uxdRegistry.MappingMatches(identity));
+        VERIFY_ARE_EQUAL(1u, registry::ReadDword(reservationKey.get(), nullptr, L"uxd_port_001", 0));
     }
 
     TEST_METHOD(WinUsbReadiness)

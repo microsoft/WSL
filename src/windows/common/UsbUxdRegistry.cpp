@@ -6,7 +6,6 @@
 #include <cfgmgr32.h>
 #include <cstddef>
 #include <ktmw32.h>
-#include <limits>
 #include <setupapi.h>
 #include <type_traits>
 
@@ -120,19 +119,6 @@ std::wstring GetUxdPortRegistryValueName(uint32_t Port)
 {
     THROW_HR_IF(E_INVALIDARG, Port == 0 || Port > 999);
     return std::format(L"uxd_port_{:03}", Port);
-}
-
-uint32_t ParseUxdPortRegistryValueName(const std::wstring& Name)
-{
-    constexpr std::wstring_view c_prefix = L"uxd_port_";
-    THROW_HR_IF(
-        HRESULT_FROM_WIN32(ERROR_INVALID_DATA), !wsl::shared::string::StartsWith(Name, c_prefix, true) || Name.size() == c_prefix.size());
-    const auto* suffix = Name.c_str() + c_prefix.size();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), *suffix < L'0' || *suffix > L'9');
-    wchar_t* end = nullptr;
-    const auto port = wsl::shared::string::ToUInt64(suffix, &end);
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), end != Name.c_str() + Name.size() || port > std::numeric_limits<uint32_t>::max());
-    return static_cast<uint32_t>(port);
 }
 
 Reservation MakeReservation(const GUID& Owner)
@@ -258,7 +244,7 @@ bool UxdRegistry::RemoveReservation(const UxdReservationIdentity& Value)
     return true;
 }
 
-std::optional<UxdReservationIdentity> UxdRegistry::FindReservation(const GUID& Id) const
+bool UxdRegistry::MappingReferenced(const UxdReservationIdentity& Value) const
 {
     // Check all USB instances, including non-present devices, before allowing mapping deletion.
     const auto root = OpenRegistryKeyIfExists(HKEY_LOCAL_MACHINE, std::wstring(c_enumPath) + L"USB");
@@ -284,10 +270,9 @@ std::optional<UxdReservationIdentity> UxdRegistry::FindReservation(const GUID& I
                     try
                     {
                         const auto entry = ReadReservationRegistryValue(key.get(), name);
-                        if (entry && IsEqualGUID(entry->PnpGuid, Id))
+                        if (entry && IsEqualGUID(entry->PnpGuid, Value.Id))
                         {
-                            const auto port = ParseUxdPortRegistryValueName(name);
-                            return UxdReservationIdentity{L"USB\\" + hardwareName + L"\\" + instanceName, port, Id};
+                            return true;
                         }
                     }
                     catch (...)
@@ -300,12 +285,12 @@ std::optional<UxdReservationIdentity> UxdRegistry::FindReservation(const GUID& I
             }
         }
     }
-    return {};
+    return false;
 }
 
 void UxdRegistry::RemoveMapping(const UxdReservationIdentity& Value)
 {
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), FindReservation(Value.Id).has_value());
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), MappingReferenced(Value));
 
     const auto key = OpenRegistryKeyIfExists(HKEY_LOCAL_MACHINE, c_mappingPath, KEY_READ | KEY_WRITE);
     const auto name = GetMappingRegistryValueName(Value.Id);

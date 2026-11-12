@@ -63,6 +63,7 @@ private:
     static DWORD CALLBACK OnDeviceNotification(HCMNOTIFICATION, PVOID Context, CM_NOTIFY_ACTION Action, PCM_NOTIFY_EVENT_DATA Data, DWORD) noexcept;
     static std::wstring ConvertSidToString(PSID Sid);
     static std::optional<Device> FindDeviceAtPort(const Inventory& Current, const UxdReservationIdentity& Value);
+    static std::list<Record> LoadReservationRecords(HKEY Journal);
     static bool ReleaseReservation(Record& Value, HKEY Journal);
 
     UxdReservationIdentity ResolvePortId(const Inventory& Current, const PortId& Port) const;
@@ -70,6 +71,7 @@ private:
     bool MatchesRecordedReservation(const Record& Value) const;
     Device WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::wstring& Path);
     void WaitForDeviceReappearance(const UxdReservationIdentity& Value) noexcept;
+    void PersistReservationRecord(const Record& Value);
     void QueueDeviceRemoval(std::wstring Identifier, bool Instance);
     void ProcessDeviceRemovals();
     void ThrowIfStopping() const;
