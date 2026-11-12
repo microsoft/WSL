@@ -312,7 +312,7 @@ int MremapTestEntry(int Argc, char* Argv[])
 
         if (FailByte != PAGE_SIZE)
         {
-            LxtLogError("Case 7 second page memory doesn't match at byte %d!!! V: %d", FailByte);
+            LxtLogError("Case 7 second page memory doesn't match at byte %d!!! V: %d", FailByte, (unsigned char)RemappedMemory[PAGE_SIZE + FailByte]);
         }
     }
 

@@ -11,6 +11,7 @@ set(SOURCES
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
     WSLCContainer.cpp
+    WSLCContainerStateStore.cpp
     WSLCVirtualMachine.cpp
 
     # Process management
@@ -40,6 +41,7 @@ set(HEADERS
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WSLCContainerStateStore.h
     WSLCExitRequestState.h
     WSLCRestartTransaction.h
     WindowsCertStore.h

@@ -186,10 +186,11 @@ WslcContainer Container::ToHandle()
 
 void Container::Close()
 {
-    m_initProcess = nullptr;
-
+    // Release the container first: the shared IO callback holds a raw pointer to m_initProcess and must stop first.
     // Methods called after Close() will fail due to EnsureNotClosed().
     m_container.reset();
+
+    m_initProcess = nullptr;
 }
 
 void Container::final_release(std::unique_ptr<Container> self)
