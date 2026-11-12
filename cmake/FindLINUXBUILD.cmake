@@ -67,6 +67,12 @@ function(add_linux_executable target sources headers libraries)
 
     set(libs -lunwind -lc++abi -lc++)
     foreach(e ${libraries})
+        if(IS_ABSOLUTE "${e}")
+            list(APPEND libs "${e}")
+            list(APPEND lib_files "${e}")
+            continue()
+        endif()
+
         set(libs ${libs} -l${e})
 
         # Note: This makes the assumption that all libraries are static (.a and not .so).

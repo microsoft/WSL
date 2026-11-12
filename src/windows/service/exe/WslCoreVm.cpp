@@ -26,6 +26,7 @@ Abstract:
 #include "WslCoreFirewallSupport.h"
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
+#include "SecurityAudit.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -755,6 +756,21 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Perform additional initialization.
     InitializeGuest();
+
+    try
+    {
+        if (securityaudit::Enabled())
+        {
+            LX_MINI_INIT_START_SECURITY_AUDIT audit{};
+            audit.Header.MessageType = audit.Type;
+            audit.Header.MessageSize = sizeof(audit);
+            auto auditTransaction = m_miniInitChannel.StartTransaction();
+            auditTransaction.Send(audit);
+            auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
+            m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket));
+        }
+    }
+    CATCH_LOG();
 }
 
 WslCoreVm::~WslCoreVm() noexcept
@@ -849,6 +865,11 @@ WslCoreVm::~WslCoreVm() noexcept
     if (m_crashDumpCollectionThread.joinable())
     {
         m_crashDumpCollectionThread.join();
+    }
+
+    if (m_securityAuditThread.joinable())
+    {
+        m_securityAuditThread.join();
     }
 
     m_guestListener = VmGuestListener{};
@@ -2313,6 +2334,27 @@ void WslCoreVm::VerifyPlan9Servers()
                 m_drvfsToken.reset();
             }
         }
+    }
+}
+
+void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket)
+try
+{
+    auto self = wil::run_as_self();
+    securityaudit::EventSource source;
+    wsl::shared::SocketChannel channel{std::move(socket), "SecurityAudit", {m_terminatingEvent.get()}};
+    for (;;)
+    {
+        const auto& event = channel.ReceiveMessage<LX_INIT_PROCESS_EXECUTED>();
+        THROW_HR_IF(E_INVALIDARG, event.Header.MessageSize != sizeof(event));
+        source.ProcessExecuted(event.Pid);
+    }
+}
+catch (...)
+{
+    if (!m_terminatingEvent.is_signaled())
+    {
+        LOG_CAUGHT_EXCEPTION();
     }
 }
 

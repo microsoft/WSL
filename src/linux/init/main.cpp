@@ -2062,6 +2062,9 @@ Return Value:
         return -1;
     }
 
+    // Keep the initrd's eBPF resources available after the system-distro chroot.
+    UtilMount("/wsl-security-audit", SYSTEM_DISTRO_PATH "/wsl-security-audit", nullptr, MS_BIND, nullptr);
+
     //
     // Chroot to system distro mount point.
     //
@@ -3427,6 +3430,29 @@ try
         Config.EnableGuiApps = ConfigMessage->EnableGuiApps;
         return 0;
     }
+    case LxMiniInitMessageStartSecurityAudit:
+    {
+        try
+        {
+            THROW_ERRNO_IF(EINVAL, Buffer.size() != sizeof(LX_MINI_INIT_START_SECURITY_AUDIT));
+            auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true);
+            THROW_LAST_ERROR_IF(!socket);
+            StartWorkerProcess(
+                "wsl-audit",
+                [fd = socket.get()] {
+                    THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
+                    THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
+                    THROW_LAST_ERROR_IF(fcntl(fd, F_SETFD, 0) < 0);
+                    const auto argument = std::to_string(fd);
+                    execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), nullptr);
+                    THROW_LAST_ERROR();
+                },
+                {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket.get()});
+        }
+        CATCH_LOG();
+        return 0;
+    }
+
     case LxMiniInitMessageMount:
     case LxMiniInitMessageUnmount:
     case LxMiniInitMessageDetach:

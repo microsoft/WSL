@@ -148,6 +148,14 @@
 To force WSL2 to stop and detach the disk, run 'wsl.exe {}'.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageSecurityAuditProcessExecuted" xml:space="preserve">
+    <value>A Linux program was executed successfully in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Description of a successful process execution in the Windows Security event log.</comment>
+  </data>
+  <data name="MessageSecurityAuditProcessId" xml:space="preserve">
+    <value>Process ID (VM):</value>
+    <comment>Label preceding a numeric process identifier in the WSL virtual machine, not a Windows process identifier. VM means virtual machine.</comment>
+  </data>
   <data name="MessageDiskAlreadyAttached" xml:space="preserve">
     <value>The disk '{}' is already attached.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>

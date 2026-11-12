@@ -428,6 +428,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
     LxMessageWSLCMountModules,
+    LxMiniInitMessageStartSecurityAudit,
+    LxInitMessageProcessExecuted,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -547,6 +549,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
         X(LxMessageWSLCMountModules)
+        X(LxMiniInitMessageStartSecurityAudit)
+        X(LxInitMessageProcessExecuted)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1536,6 +1540,23 @@ typedef struct _LX_MINI_INIT_CHILD_EXIT_MESSAGE
 
     PRETTY_PRINT(FIELD(Header), FIELD(ChildPid), FIELD(InstanceId));
 } LX_MINI_INIT_CHILD_EXIT_MESSAGE, *PLX_MINI_INIT_CHILD_EXIT_MESSAGE;
+
+struct LX_MINI_INIT_START_SECURITY_AUDIT
+{
+    static inline auto Type = LxMiniInitMessageStartSecurityAudit;
+    MESSAGE_HEADER Header;
+
+    PRETTY_PRINT(FIELD(Header));
+};
+
+struct LX_INIT_PROCESS_EXECUTED
+{
+    static inline auto Type = LxInitMessageProcessExecuted;
+    MESSAGE_HEADER Header;
+    uint32_t Pid;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Pid));
+};
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
 {

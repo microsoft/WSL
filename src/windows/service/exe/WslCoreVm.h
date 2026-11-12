@@ -213,6 +213,8 @@ private:
 
     void VirtioFsWorker(VmGuestListener Listener);
 
+    void SecurityAuditWorker(wil::unique_socket socket);
+
     std::vector<char> ProcessVirtioFsRequest(_In_ gsl::span<gsl::byte> Request);
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
@@ -276,6 +278,7 @@ private:
     std::thread m_distroExitThread;
     std::thread m_virtioFsThread;
     std::thread m_crashDumpCollectionThread;
+    std::thread m_securityAuditThread;
 
     std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 
