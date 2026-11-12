@@ -87,7 +87,7 @@ private:
 class DECLSPEC_UUID("4877FEFC-4977-4929-A958-9F36AA1892A4") WSLCSession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCSession, IWSLCCompatSession, IFastRundown, ISupportErrorInfo>
 {
-    // WSLCContainer::Delete acquires a VmLease to keep the VM alive (and block idle
+    // WSLCContainer::DeleteImpl acquires a VmLease to keep the VM alive (and block idle
     // teardown) for the duration of a container deletion.
     friend class WSLCContainer;
     friend class ComposeReconciler;
@@ -340,7 +340,7 @@ private:
     __requires_lock_held(m_userHandlesLock) void CancelUserHandleIO();
     __requires_lock_held(m_userCOMCallbacksLock) void CancelUserCOMCallbacks();
 
-    void CreateContainerImpl(const WSLCContainerOptions* Options, IWSLCContainer** Container);
+    Microsoft::WRL::ComPtr<WSLCContainer> CreateContainerImpl(const WSLCContainerOptions* Options);
     HRESULT CreateNetworkImpl(const WSLCNetworkOptions* Options);
     HRESULT DeleteNetworkImpl(LPCSTR Name, std::optional<std::string_view> ExpectedComposeProject = std::nullopt);
 
@@ -408,9 +408,8 @@ private:
     void RecoverExistingNetworks();
     std::vector<common::docker_schema::ContainerInfo> ListDockerContainers(
         bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size = false);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> DiscoverComposeContainers(std::string_view projectKey);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(const ComposeSpec& spec);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> CreateComposeContainers(
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> DiscoverComposeContainers(std::string_view projectKey);
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> CreateComposeContainers(
         const ComposeSpec& spec, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter);
 
     void SaveImageImpl(std::pair<uint32_t, wil::unique_socket>& RequestCodePair, WSLCHandle OutputHandle, HANDLE CancelEvent);

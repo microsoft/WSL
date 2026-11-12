@@ -14,6 +14,7 @@
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
+class WSLCContainer;
 
 struct ComposeExecutionResult
 {
@@ -52,17 +53,17 @@ private:
     };
 
     std::shared_ptr<ProjectLock> ResolveProjectLock(std::string_view projectKey);
-    static std::vector<WSLCContainerEntry> ObserveContainers(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Create(
+    static std::vector<WSLCContainerEntry> ObserveContainers(const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers);
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> Create(
         const ComposeSpec& project, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter);
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Up(
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> Up(
         const ComposeSpec& project,
-        std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers,
+        std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> containers,
         const ComposeCancellation& cancellation,
         const ComposeProgressReporter& progressReporter);
-    static void Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter);
+    static void Start(const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter);
     static void Stop(
-        const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
+        const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers,
         ULONG timeout,
         const ComposeCancellation& cancellation,
         const ComposeProgressReporter& progressReporter,

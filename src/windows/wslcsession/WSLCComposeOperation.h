@@ -17,7 +17,7 @@ public:
     NON_MOVABLE(WSLCComposeOperation);
 
     WSLCComposeOperation(WSLCSession& session, const WSLCComposeOperationRequest& request, IComposeProgressCallback* progressCallback, HANDLE cancelEvent);
-    void Execute(WSLCComposeOperationResult& result);
+    void Execute(WSLCComposeOperationResult& result, const common::ExecutionContext& context);
 
 private:
     struct Request

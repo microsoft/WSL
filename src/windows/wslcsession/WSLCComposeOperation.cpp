@@ -2,7 +2,6 @@
 
 #include "precomp.h"
 #include "WSLCComposeOperation.h"
-#include "WSLCExecutionContext.h"
 #include "WSLCSession.h"
 
 namespace wsl::windows::service::wslc {
@@ -92,10 +91,8 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
     return result;
 }
 
-void WSLCComposeOperation::Execute(WSLCComposeOperationResult& output)
+void WSLCComposeOperation::Execute(WSLCComposeOperationResult& output, const common::ExecutionContext& context)
 {
-    WSLCExecutionContext context(&m_session);
-
     ComposeExecutionResult executionResult;
     std::string projectKey;
     std::optional<wsl::windows::common::Error> primaryError;

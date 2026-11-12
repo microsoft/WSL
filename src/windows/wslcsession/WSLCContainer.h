@@ -117,6 +117,7 @@ public:
     void DisconnectFromNetwork(LPCSTR NetworkName);
 
     void CopyTo(IWSLCContainer** Container) const;
+    Microsoft::WRL::ComPtr<WSLCContainer> GetComWrapper() const;
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
@@ -214,6 +215,7 @@ private:
     // restart they are part of.
     void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+    __requires_exclusive_lock_held(m_lock) void CreateInitProcess(std::unique_ptr<WSLCProcessIO> io);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
@@ -263,7 +265,7 @@ private:
     mutable std::mutex m_processesLock;
     __guarded_by(m_processesLock) std::vector<std::weak_ptr<DockerExecProcessControl>> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
-    __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
+    __guarded_by(m_processesLock) std::shared_ptr<DockerContainerProcessControl> m_initProcessControl;
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
@@ -346,6 +348,15 @@ public:
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
+
+    // Internal entry points share the caller's execution context.
+    HRESULT StartImpl(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
+    HRESULT StopImpl(WSLCSignal Signal, LONG TimeoutSeconds);
+    HRESULT DeleteImpl(WSLCDeleteFlags Flags);
+    HRESULT GetStateImpl(WSLCContainerState* State);
+    HRESULT GetIdImpl(WSLCContainerId Id);
+    HRESULT GetNameImpl(LPSTR* Name);
+    HRESULT GetImageImpl(LPSTR* Image);
 
     // Cache read-only properties so they remain accessible after the impl is disconnected.
     // Called from WSLCContainerImpl::PrepareDisconnectComWrapper() while m_lock is held exclusively.

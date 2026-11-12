@@ -2391,7 +2391,7 @@ try
 
     auto lock = AcquireLease();
 
-    auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
+    auto result = wil::ResultFromException([&]() { THROW_IF_FAILED(CreateContainerImpl(containerOptions).CopyTo(Container)); });
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
     WSL_LOG(
@@ -2456,7 +2456,8 @@ try
         std::ranges::any_of(
             m_composeSessions, [&](const auto& entry) { return entry.second->GetProjectName() == spec.ProjectName; }));
 
-    auto containers = CreateComposeContainers(spec);
+    const ComposeCancellation cancellation(m_sessionTerminatingEvent.get(), nullptr);
+    auto containers = CreateComposeContainers(spec, cancellation, {});
 
     Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, this, configPath.wstring(), spec, std::move(containers)));
@@ -2479,12 +2480,12 @@ try
     // Shutdown drains the invocation even while it has no VM lease or outgoing callback RPC.
     auto callRegistration = RegisterUserCOMCallback();
     WSLCComposeOperation operation(*this, *request, progressCallback, cancelEvent);
-    operation.Execute(*result);
+    operation.Execute(*result, context);
     return S_OK;
 }
 CATCH_RETURN();
 
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverComposeContainers(std::string_view projectKey)
+std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> WSLCSession::DiscoverComposeContainers(std::string_view projectKey)
 {
     const std::string projectKeyValue{projectKey};
     auto lease = AcquireLease();
@@ -2503,7 +2504,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
     {
         std::string Service;
         uint64_t ContainerNumber;
-        Microsoft::WRL::ComPtr<IWSLCContainer> Container;
+        Microsoft::WRL::ComPtr<WSLCContainer> Container;
     };
 
     std::vector<ComposeContainer> composeContainers;
@@ -2558,9 +2559,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
             existing = m_containers.emplace(container->ID(), std::move(container)).first;
         }
 
-        Microsoft::WRL::ComPtr<IWSLCContainer> container;
-        existing->second->CopyTo(&container);
-        composeContainers.emplace_back(service->second, parsedContainerNumber, std::move(container));
+        composeContainers.emplace_back(service->second, parsedContainerNumber, existing->second->GetComWrapper());
     }
 
     // Resource identity gives lifecycle execution and results a stable order across Docker enumerations.
@@ -2578,19 +2577,13 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::DiscoverCompose
         projectKeyValue.c_str(),
         duplicate == composeContainers.end() ? "" : std::format("{}:{}", duplicate->Service, duplicate->ContainerNumber).c_str());
 
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> result;
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> result;
     result.reserve(composeContainers.size());
     std::ranges::transform(composeContainers, std::back_inserter(result), [](auto& entry) { return std::move(entry.Container); });
     return result;
 }
 
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& spec)
-{
-    const ComposeCancellation cancellation(m_sessionTerminatingEvent.get(), nullptr);
-    return CreateComposeContainers(spec, cancellation, {});
-}
-
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(
+std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> WSLCSession::CreateComposeContainers(
     const ComposeSpec& spec, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
     // Record cancellation at checkpoints so cleanup follows the operation's failure cause.
@@ -2602,7 +2595,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     };
 
     checkCancelled();
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> containers;
     const std::string networkName = ComposeNormalizer::DefaultNetworkName(spec.ProjectName);
 
     // Create a network for the compose session.
@@ -2655,7 +2648,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
 
         for (const auto& container : containers)
         {
-            LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+            LOG_IF_FAILED(container->DeleteImpl(WSLCDeleteFlagsForce));
         }
 
         LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str(), spec.ProjectName));
@@ -2707,7 +2700,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
             }
         }
 
-        Microsoft::WRL::ComPtr<IWSLCContainer> container;
+        Microsoft::WRL::ComPtr<WSLCContainer> container;
         HRESULT result = wil::ResultFromException([&]() { container = launcher.Create(*this); });
         if (result == WSLC_E_IMAGE_NOT_FOUND)
         {
@@ -2733,7 +2726,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     return containers;
 }
 
-void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
+Microsoft::WRL::ComPtr<WSLCContainer> WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasEvents());
@@ -2807,7 +2800,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             std::rethrow_exception(pendingCreate->Exception);
         }
 
-        container->CopyTo(Container);
+        return container->GetComWrapper();
     }
     catch (const DockerHTTPException& e)
     {
@@ -4372,15 +4365,11 @@ MultiHandleWait WSLCSession::CreateIOContext(HANDLE CancelHandle)
             m_sessionTerminatingEvent.get(), [this]() { THROW_HR_MSG(E_ABORT, "Session %lu is terminating", m_id); }),
         io::MultiHandleWait::NeedNotComplete);
 
-    // Monitor caller exit for incoming COM requests. Service workers have no incoming caller context.
-    auto callingProcess = wslutil::OpenCallingProcess(SYNCHRONIZE);
-    if (callingProcess)
-    {
-        io.AddHandle(
-            std::make_unique<io::EventHandle>(
-                std::move(callingProcess), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }),
-            io::MultiHandleWait::NeedNotComplete);
-    }
+    // Cancel with E_ABORT if the client process exits.
+    io.AddHandle(
+        std::make_unique<io::EventHandle>(
+            wslutil::OpenCallingProcess(SYNCHRONIZE), [this]() { THROW_HR_MSG(E_ABORT, "Client process has exited"); }),
+        io::MultiHandleWait::NeedNotComplete);
 
     if (CancelHandle != nullptr)
     {
@@ -4485,7 +4474,7 @@ void WSLCSession::CancelUserCOMCallbacks()
 
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 {
-    // N.B. Invoked only from WSLCContainer::Delete, which already holds a VmLease (the shared
+    // N.B. Invoked only from WSLCContainer::DeleteImpl, which already holds a VmLease (the shared
     // session lock). The lease prevents a concurrent idle teardown from clearing m_containers,
     // so this only needs m_containersLock. It must NOT re-acquire the shared session lock here:
     // doing so while the idle worker is queued for the exclusive lock would deadlock (recursive

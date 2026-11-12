@@ -19,6 +19,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
+class WSLCContainer;
 
 class ServiceContainerLauncher : public common::WSLCContainerLauncher
 {
@@ -27,7 +28,7 @@ public:
     NON_MOVABLE(ServiceContainerLauncher);
     using WSLCContainerLauncher::WSLCContainerLauncher;
 
-    Microsoft::WRL::ComPtr<IWSLCContainer> Create(WSLCSession& Session);
+    Microsoft::WRL::ComPtr<WSLCContainer> Create(WSLCSession& Session);
 };
 
 } // namespace wsl::windows::service::wslc

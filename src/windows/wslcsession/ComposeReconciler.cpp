@@ -88,7 +88,7 @@ std::shared_ptr<ComposeReconciler::ProjectLock> ComposeReconciler::ResolveProjec
     return entry->second;
 }
 
-std::vector<WSLCContainerEntry> ComposeReconciler::ObserveContainers(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers)
+std::vector<WSLCContainerEntry> ComposeReconciler::ObserveContainers(const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers)
 {
     std::vector<WSLCContainerEntry> result;
     result.reserve(containers.size());
@@ -96,13 +96,13 @@ std::vector<WSLCContainerEntry> ComposeReconciler::ObserveContainers(const std::
     {
         WSLCContainerEntry entry{};
         wil::unique_cotaskmem_ansistring name;
-        THROW_IF_FAILED(container->GetName(&name));
-        THROW_IF_FAILED(container->GetId(entry.Id));
-        THROW_IF_FAILED(container->GetState(&entry.State));
+        THROW_IF_FAILED(container->GetNameImpl(&name));
+        THROW_IF_FAILED(container->GetIdImpl(entry.Id));
+        THROW_IF_FAILED(container->GetStateImpl(&entry.State));
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Name, name.get()) != 0);
 
         wil::unique_cotaskmem_ansistring image;
-        THROW_IF_FAILED(container->GetImage(&image));
+        THROW_IF_FAILED(container->GetImageImpl(&image));
         THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry.Image, image.get()) != 0);
         result.emplace_back(entry);
     }
@@ -110,15 +110,15 @@ std::vector<WSLCContainerEntry> ComposeReconciler::ObserveContainers(const std::
     return result;
 }
 
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Create(
+std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> ComposeReconciler::Create(
     const ComposeSpec& project, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
     return m_session.CreateComposeContainers(project, cancellation, progressReporter);
 }
 
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Up(
+std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> ComposeReconciler::Up(
     const ComposeSpec& project,
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers,
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> containers,
     const ComposeCancellation& cancellation,
     const ComposeProgressReporter& progressReporter)
 {
@@ -131,17 +131,17 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Up(
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
-            THROW_IF_FAILED(container->GetName(&name));
+            THROW_IF_FAILED(container->GetNameImpl(&name));
             progressReporter("remove", name.get(), index + 1, containers.size(), "container");
             cancellation.Check();
         }
 
-        const HRESULT result = container->Delete(WSLCDeleteFlagsForce);
+        const HRESULT result = container->DeleteImpl(WSLCDeleteFlagsForce);
         if (result == RPC_E_DISCONNECTED)
         {
             // A disconnected wrapper retains its terminal state; disconnection alone does not establish deletion.
             WSLCContainerState state{};
-            THROW_IF_FAILED(container->GetState(&state));
+            THROW_IF_FAILED(container->GetStateImpl(&state));
             THROW_HR_IF(result, state != WslcContainerStateDeleted);
         }
         THROW_IF_FAILED_EXCEPT(result, RPC_E_DISCONNECTED);
@@ -153,7 +153,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> ComposeReconciler::Up(
     return result;
 }
 
-void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
+void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
     for (size_t index = 0; index < containers.size(); ++index)
     {
@@ -162,19 +162,19 @@ void ComposeReconciler::Start(const std::vector<Microsoft::WRL::ComPtr<IWSLCCont
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
-            THROW_IF_FAILED(container->GetName(&name));
+            THROW_IF_FAILED(container->GetNameImpl(&name));
             progressReporter("start", name.get(), index + 1, containers.size(), "container");
             cancellation.Check();
         }
 
-        const HRESULT result = container->Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
+        const HRESULT result = container->StartImpl(WSLCContainerStartFlagsNone, nullptr);
         // Docker Compose start accepts containers that are already running.
         THROW_IF_FAILED_EXCEPT(result, WSLC_E_CONTAINER_IS_RUNNING);
     }
 }
 
 void ComposeReconciler::Stop(
-    const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
+    const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers,
     ULONG timeout,
     const ComposeCancellation& cancellation,
     const ComposeProgressReporter& progressReporter,
@@ -191,12 +191,12 @@ void ComposeReconciler::Stop(
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
-            THROW_IF_FAILED(container->GetName(&name));
+            THROW_IF_FAILED(container->GetNameImpl(&name));
             progressReporter("stop", name.get(), index + 1, containers.size(), "container");
             cancellation.Check();
         }
 
-        const HRESULT result = container->Stop(WSLCSignalNone, static_cast<LONG>(timeout));
+        const HRESULT result = container->StopImpl(WSLCSignalNone, static_cast<LONG>(timeout));
         // Docker Compose stop accepts containers that are already stopped.
         if (FAILED(result) && result != WSLC_E_CONTAINER_NOT_RUNNING && SUCCEEDED(firstFailure))
         {
