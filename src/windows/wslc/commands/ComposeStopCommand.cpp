@@ -43,7 +43,7 @@ std::wstring ComposeStopCommand::LongDescription() const
 
 void ComposeStopCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveComposeProject(ComposeProjectSelection::NameWithoutFiles) << ResolveSession << StopCompose;
+    context << ResolveSession << ResolveComposeProject(ComposeProjectSelection::NameWithoutFiles) << StopCompose;
 }
 
 } // namespace wsl::windows::wslc
