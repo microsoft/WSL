@@ -185,7 +185,6 @@ void WSLCComposeOperation::ReportStatus(WSLCComposeStatus status)
     event.SequenceNumber = ++m_sequenceNumber;
     event.Status = status;
 
-    auto callbackRegistration = m_session.RegisterUserCOMCallback();
     try
     {
         LOG_IF_FAILED(m_progressCallback->OnProgress(&event));
@@ -223,9 +222,6 @@ void WSLCComposeOperation::ReportProgress(std::string_view operation, std::strin
     event.Status = WSLCComposeStatusExecuting;
     event.Progress = &progress;
 
-    // A stalled resource callback holds the project lock and delays cancellation checkpoints and completion.
-    // TODO: Decouple observer delivery from execution and completion.
-    auto callbackRegistration = m_session.RegisterUserCOMCallback();
     try
     {
         LOG_IF_FAILED(m_progressCallback->OnProgress(&event));
