@@ -6,6 +6,7 @@
 #include "GnsPortTrackerChannel.h"
 #include "INetworkingEngine.h"
 #include "IVirtualMachineBackend.h"
+#include "WslCoreNetworkingSupport.h"
 
 namespace wsl::core {
 
@@ -34,6 +35,10 @@ private:
 
     void HandlePortNotification(SOCKADDR_INET addr, int protocol, bool allocate);
     void ModifyPort(bool loopbackDevice, const SOCKADDR_INET& hostAddress, int protocol, bool allocate);
+    static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID Context, NL_NETWORK_CONNECTIVITY_HINT Hint);
+    void RefreshDns() noexcept;
+    _Requires_lock_held_(m_dnsLock)
+    void UpdateDns();
 
     IVirtualMachineBackend& m_backend;
     VmDeviceId m_device;
@@ -43,6 +48,8 @@ private:
     GnsChannel m_gnsChannel;
     bool m_enableLocalhostRelay;
     bool m_enableDnsTunneling;
+    wil::srwlock m_dnsLock;
+    networking::unique_notify_handle m_networkNotifyHandle;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::map<PortKey, VmPortBindingId> m_portBindings;
     std::optional<GnsPortTrackerChannel> m_gnsPortTrackerChannel;

@@ -63,10 +63,12 @@ OpenVmmNatNetworking::OpenVmmNatNetworking(
 OpenVmmNatNetworking::~OpenVmmNatNetworking()
 {
     m_gnsChannel.Stop();
+    m_networkNotifyHandle.reset();
 }
 
 void OpenVmmNatNetworking::Initialize()
 {
+    auto lock = m_dnsLock.lock_exclusive();
     if (m_enableLocalhostRelay)
     {
         hns::HNSEndpoint loopbackEndpointProperties{};
@@ -104,21 +106,42 @@ void OpenVmmNatNetworking::Initialize()
     routeNotification.Settings = route;
     m_gnsChannel.SendHnsNotification(ToJsonW(routeNotification).c_str(), m_adapterId);
 
-    wsl::core::networking::DnsInfo dns;
+    UpdateDns();
+    if (!m_enableDnsTunneling)
+    {
+        THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&OpenVmmNatNetworking::OnNetworkConnectivityChange, this, true, &m_networkNotifyHandle));
+    }
+}
+
+void NETIOAPI_API_ OpenVmmNatNetworking::OnNetworkConnectivityChange(PVOID Context, NL_NETWORK_CONNECTIVITY_HINT)
+{
+    static_cast<OpenVmmNatNetworking*>(Context)->RefreshDns();
+}
+
+void OpenVmmNatNetworking::RefreshDns() noexcept
+try
+{
+    auto lock = m_dnsLock.lock_exclusive();
+    UpdateDns();
+}
+CATCH_LOG()
+
+void OpenVmmNatNetworking::UpdateDns()
+{
+    networking::DnsInfo dns;
     if (m_enableDnsTunneling)
     {
-        dns = wsl::core::networking::HostDnsInfo::GetDnsTunnelingSettings(c_gatewayIpv4Address);
+        dns = networking::HostDnsInfo::GetDnsTunnelingSettings(c_gatewayIpv4Address);
     }
     else
     {
-        dns = wsl::core::networking::HostDnsInfo::GetDnsSettings(
-            wsl::core::networking::DnsSettingsFlags::IncludeVpn | wsl::core::networking::DnsSettingsFlags::IncludeIpv6Servers);
+        dns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn | networking::DnsSettingsFlags::IncludeIpv6Servers);
     }
 
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> dnsNotification{};
     dnsNotification.RequestType = hns::ModifyRequestType::Update;
     dnsNotification.ResourceType = hns::GuestEndpointResourceType::DNS;
-    dnsNotification.Settings = wsl::core::networking::BuildDnsNotification(dns);
+    dnsNotification.Settings = networking::BuildDnsNotification(dns);
     m_gnsChannel.SendHnsNotification(ToJsonW(dnsNotification).c_str(), m_adapterId);
 }
 
@@ -204,37 +227,15 @@ void OpenVmmNatNetworking::HandlePortNotification(SOCKADDR_INET addr, int protoc
         return;
     }
 
-    // Only 127.0.0.1 is relayed. Linux drops inbound packets addressed to ::1 on non-loopback interfaces,
-    // so IPv6 loopback can't be relayed through loopback0.
-    if (loopback && (!m_enableLocalhostRelay || !ipv4 || addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK)))
+    // Linux drops inbound packets addressed to ::1 on non-loopback interfaces.
+    if (!m_enableLocalhostRelay || !ipv4 || (loopback && addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK)))
     {
         return;
     }
 
     auto lock = m_lock.lock_exclusive();
-
-    // Relay host loopback connections through loopback0, which delivers them to the guest's loopback address.
-    std::optional<SOCKADDR_INET> hostLoopback;
-    if (m_enableLocalhostRelay && ipv4)
-    {
-        hostLoopback = addr;
-        hostLoopback->Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        ModifyPort(true, hostLoopback.value(), protocol, allocate);
-    }
-
-    auto rollback = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-        if (allocate && hostLoopback.has_value())
-        {
-            ModifyPort(true, hostLoopback.value(), protocol, false);
-        }
-    });
-
-    if (!loopback)
-    {
-        ModifyPort(false, addr, protocol, allocate);
-    }
-
-    rollback.release();
+    addr.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ModifyPort(true, addr, protocol, allocate);
 }
 
 void OpenVmmNatNetworking::ModifyPort(bool loopbackDevice, const SOCKADDR_INET& hostAddress, int protocol, bool allocate)

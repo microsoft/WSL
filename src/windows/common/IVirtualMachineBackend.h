@@ -694,6 +694,8 @@ public:
     virtual std::optional<std::filesystem::path> GetCrashLogPath() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
+    // Callbacks may re-enter Terminate, but must defer destruction until active backend calls and
+    // the callback itself have returned. The owner must keep the backend alive until then.
     void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;

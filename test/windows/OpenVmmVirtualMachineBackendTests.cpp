@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
+#include <fstream>
 #include "Common.h"
 #include "OpenVmmNatNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
@@ -222,6 +223,73 @@ class OpenVmmVirtualMachineBackendTests
         request.BootDisks.push_back(CreateDisk(L"modules"));
         request.BootDisks[0].Disk.Source = VmVirtualDiskSource{L"C:\\images\\modules.img"};
         VERIFY_ARE_EQUAL(std::wstring{L"C:\\images\\modules.img"}, ValidateCreateRequest(request).BootDisks.at(L"modules").Path);
+    }
+
+    TEST_METHOD(BootDiskUsesVmOwnerToken)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        request.BootDisks.push_back(CreateDisk(L"disk"));
+        auto& token = request.BootDisks.front().Disk.UserToken;
+        token.emplace();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+        token = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        token = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        token.reset();
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+    }
+
+    TEST_METHOD(RetainsOnlyCompletedCrashDumps)
+    {
+        SKIP_TEST_ARM64();
+        GUID id{};
+        THROW_IF_FAILED(CoCreateGuid(&id));
+        const auto directory =
+            std::filesystem::temp_directory_path() /
+            (L"OpenVmmDumpTest-" + wsl::shared::string::GuidToString<wchar_t>(id, wsl::shared::string::GuidToStringFlags::None));
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(directory.c_str(), nullptr));
+        const auto oldDump = directory / L"saved-state-old.vmrs";
+        const auto newDump = directory / L"saved-state-new.vmrs";
+        const auto unrelated = directory / L"other.vmrs";
+        const auto hcsDump = directory / L"saved-state-hcs.vmrs";
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove(oldDump, error);
+            std::filesystem::remove(newDump, error);
+            std::filesystem::remove(unrelated, error);
+            std::filesystem::remove(hcsDump, error);
+            std::filesystem::remove(directory, error);
+        });
+        std::ofstream{oldDump} << "old";
+        std::ofstream{unrelated} << "unrelated";
+        std::ofstream{hcsDump} << "hcs";
+        THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(hcsDump.c_str(), FILE_ATTRIBUTE_TEMPORARY));
+        auto request = CreateRunnableRequest();
+        request.CrashCapture.emplace();
+        request.CrashCapture->SavedStateFolder = directory;
+        request.CrashCapture->MaxSavedStateCount = 1;
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        VERIFY_IS_TRUE(std::filesystem::exists(oldDump));
+        backend->Terminate();
+        VERIFY_IS_TRUE(std::filesystem::exists(oldDump));
+
+        const auto owner = GetNonElevatedToken(TokenImpersonation);
+        wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(newDump, 1, owner.get());
+        VERIFY_IS_TRUE(std::filesystem::exists(oldDump));
+
+        std::ofstream{newDump} << "new";
+        const auto now = std::filesystem::file_time_type::clock::now();
+        std::filesystem::last_write_time(oldDump, now - std::chrono::seconds{1});
+        std::filesystem::last_write_time(newDump, now);
+        wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(newDump, 1, owner.get());
+        VERIFY_IS_FALSE(std::filesystem::exists(oldDump));
+        VERIFY_IS_TRUE(std::filesystem::exists(newDump));
+        VERIFY_IS_TRUE(std::filesystem::exists(unrelated));
+        VERIFY_IS_TRUE(std::filesystem::exists(hcsDump));
+        wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(newDump, 0, owner.get());
+        VERIFY_IS_FALSE(std::filesystem::exists(newDump));
     }
 
     TEST_METHOD(DescribesCreationTimeNetworking)
@@ -473,6 +541,53 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
+    TEST_METHOD(EnforcesDiskIdentityAndUserOwnership)
+    {
+        SKIP_TEST_ARM64();
+        using wsl::windows::common::filesystem::TempFile;
+        auto request = CreateRunnableRequest();
+        TempFile file{GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS};
+        LARGE_INTEGER size{};
+        size.QuadPart = 2 * c_mib;
+        THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(file.Handle.get(), size, nullptr, FILE_BEGIN));
+        THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.Handle.get()));
+        file.Handle.reset();
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+        VmDiskRequest disk{};
+        disk.Source = VmVirtualDiskSource{file.Path};
+        disk.UserToken.emplace();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AttachDisk(disk); }));
+        disk.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AttachDisk(disk); }));
+        disk.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
+        const auto managed = backend->AttachDisk(disk);
+        VERIFY_ARE_EQUAL(managed.Id.Value, backend->AttachDisk(disk).Id.Value);
+
+        disk.UserDisk = true;
+        for (const bool readOnly : {false, true})
+        {
+            disk.ReadOnly = readOnly;
+            disk.Placement = VmScsiPlacement{{0, 3}};
+            VERIFY_ARE_EQUAL(WSL_E_DISK_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(disk); }));
+        }
+        backend->DetachDisk(managed.Id);
+        disk.Placement.reset();
+        const auto userDisk = backend->AttachDisk(disk);
+        disk.UserDisk = false;
+        for (const bool readOnly : {false, true})
+        {
+            disk.ReadOnly = readOnly;
+            disk.Placement = VmScsiPlacement{{0, 3}};
+            VERIFY_ARE_EQUAL(WSL_E_USER_VHD_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(disk); }));
+        }
+        disk.Placement.reset();
+        VERIFY_ARE_EQUAL(WSL_E_USER_VHD_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(disk); }));
+        backend->DetachDisk(userDisk.Id);
+        backend->Terminate();
+    }
+
     TEST_METHOD(RelaysIpv4MappedPortNotifications)
     {
         SKIP_TEST_ARM64();
@@ -511,6 +626,82 @@ class OpenVmmVirtualMachineBackendTests
         notification.Allocate = false;
         VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
 
+        notification.Af = AF_INET;
+        std::fill(std::begin(notification.Address32), std::end(notification.Address32), 0);
+        notification.Port = ReserveTcpPort();
+        notification.Allocate = true;
+        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+        wil::unique_socket otherLoopback{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+        THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !otherLoopback);
+        SOCKADDR_IN otherAddress{};
+        otherAddress.sin_family = AF_INET;
+        otherAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK + 1);
+        otherAddress.sin_port = htons(notification.Port);
+        VERIFY_ARE_EQUAL(0, bind(otherLoopback.get(), reinterpret_cast<const sockaddr*>(&otherAddress), sizeof(otherAddress)));
+        notification.Allocate = false;
+        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+
+        wsl::core::OpenVmmNatNetworking disabled{
+            *backend, adapters.at(L"eth0"), std::nullopt, wsl::core::GnsChannel{wil::unique_socket{}}, false, false};
+        auto [disabledClient, disabledServer] = MakeSocketPair();
+        disabled.StartPortTracker(std::move(disabledServer));
+        wsl::shared::SocketChannel disabledChannel{std::move(disabledClient), "DisabledPortTrackerTest"};
+        notification.Port = ReserveTcpPort();
+        notification.Allocate = true;
+        VERIFY_ARE_EQUAL(0, disabledChannel.Transaction(notification).Result);
+        wil::unique_socket loopback{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+        THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !loopback);
+        SOCKADDR_IN loopbackAddress{};
+        loopbackAddress.sin_family = AF_INET;
+        loopbackAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        loopbackAddress.sin_port = htons(notification.Port);
+        VERIFY_ARE_EQUAL(0, bind(loopback.get(), reinterpret_cast<const sockaddr*>(&loopbackAddress), sizeof(loopbackAddress)));
+        notification.Allocate = false;
+        VERIFY_ARE_EQUAL(0, disabledChannel.Transaction(notification).Result);
+
+        backend->Terminate();
+    }
+
+    TEST_METHOD(RefreshesDnsOnInitialConnectivityNotification)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRunnableRequest();
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false));
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        const auto& adapter = backend->GetDescription().NetworkAdapters.at(L"eth0");
+        auto [host, guest] = MakeSocketPair();
+        wil::unique_event refreshed{wil::EventOptions::ManualReset};
+        HRESULT receiverResult = E_FAIL;
+        std::vector<LX_MESSAGE_TYPE> messages;
+        std::thread receiver([&] {
+            receiverResult = wil::ResultFromException([&] {
+                wsl::shared::SocketChannel channel{std::move(guest), "DnsRefreshTest"};
+                for (int index = 0; index < 4; ++index)
+                {
+                    auto transaction = channel.ReceiveTransaction(30000);
+                    messages.push_back(transaction.Receive<MESSAGE_HEADER>().MessageType);
+                    LX_GNS_RESULT response{};
+                    response.Header.MessageType = LxGnsMessageResult;
+                    response.Header.MessageSize = sizeof(response);
+                    transaction.Send(response);
+                }
+                refreshed.SetEvent();
+            });
+        });
+        auto join = wil::scope_exit([&] { receiver.join(); });
+        {
+            wsl::core::OpenVmmNatNetworking networking{*backend, adapter, std::nullopt, wsl::core::GnsChannel{std::move(host)}, false, false};
+            networking.Initialize();
+            VERIFY_IS_TRUE(refreshed.wait(30000));
+        }
+        receiver.join();
+        join.release();
+        VERIFY_ARE_EQUAL(S_OK, receiverResult);
+        VERIFY_ARE_EQUAL(size_t{4}, messages.size());
+        VERIFY_ARE_EQUAL(LxGnsMessageInterfaceConfiguration, messages.at(0));
+        VERIFY_ARE_EQUAL(LxGnsMessageNotification, messages.at(1));
+        VERIFY_ARE_EQUAL(LxGnsMessageNotification, messages.at(2));
+        VERIFY_ARE_EQUAL(LxGnsMessageNotification, messages.at(3));
         backend->Terminate();
     }
 

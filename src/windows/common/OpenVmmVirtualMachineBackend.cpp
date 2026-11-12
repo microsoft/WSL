@@ -77,14 +77,28 @@ std::filesystem::path PrepareCrashDumpPath(const VmCrashCaptureRequest& Request,
 {
     auto runAsUser = wil::impersonate_token(Identity.UserToken.get());
     wsl::windows::common::filesystem::EnsureDirectory(Request.SavedStateFolder->c_str());
-    const auto predicate = [](const auto& entry) {
-        return entry.path().has_extension() && entry.path().extension() == c_savedStateExtension && entry.path().has_filename() &&
-               entry.path().filename().wstring().starts_with(c_savedStatePrefix) && entry.file_size() > 0;
-    };
-    wsl::windows::common::wslutil::EnforceFileLimit(Request.SavedStateFolder->c_str(), static_cast<size_t>(Request.MaxSavedStateCount), predicate);
-
     const auto vmId = wsl::shared::string::GuidToString<wchar_t>(Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
     return Request.SavedStateFolder.value() / std::format(L"{}{}-{}{}", c_savedStatePrefix, std::time(nullptr), vmId, c_savedStateExtension);
+}
+
+void ValidateOwnerToken(const std::optional<wil::shared_handle>& Token, HANDLE Owner)
+{
+    if (!Token)
+    {
+        return;
+    }
+
+    const auto token = Token->get();
+    THROW_HR_IF(E_INVALIDARG, !token);
+    if (token != Owner)
+    {
+        const auto tokenInfo = wil::get_token_information<TOKEN_STATISTICS>(token);
+        const auto ownerInfo = wil::get_token_information<TOKEN_STATISTICS>(Owner);
+        THROW_HR_IF_MSG(
+            c_notSupported,
+            tokenInfo.TokenId.HighPart != ownerInfo.TokenId.HighPart || tokenInfo.TokenId.LowPart != ownerInfo.TokenId.LowPart,
+            "OpenVMM uses the VM owner identity and does not support alternate user tokens");
+    }
 }
 
 std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPath, GuestServicePort Port)
@@ -108,6 +122,36 @@ void ValidateFileSystemToken(HANDLE Token, HANDLE Identity)
 }
 
 } // namespace
+
+void wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(const std::filesystem::path& DumpPath, std::uint32_t MaxCount, HANDLE UserToken)
+{
+    static wil::srwlock lock;
+    auto guard = lock.lock_exclusive();
+    auto runAsUser = wil::impersonate_token(UserToken);
+    if (!std::filesystem::exists(DumpPath) || std::filesystem::file_size(DumpPath) == 0)
+    {
+        return;
+    }
+
+    std::vector<std::pair<std::filesystem::file_time_type, std::filesystem::path>> dumps;
+    for (const auto& entry : std::filesystem::directory_iterator{DumpPath.parent_path()})
+    {
+        // HCS creates temporary saved-state files before writing them; they may still be in use.
+        const auto attributes = GetFileAttributesW(entry.path().c_str());
+        if (entry.is_regular_file() && entry.path().extension() == c_savedStateExtension &&
+            entry.path().filename().wstring().starts_with(c_savedStatePrefix) && attributes != INVALID_FILE_ATTRIBUTES &&
+            WI_IsFlagClear(attributes, FILE_ATTRIBUTE_TEMPORARY) && entry.file_size() > 0)
+        {
+            dumps.emplace_back(entry.last_write_time(), entry.path());
+        }
+    }
+
+    std::sort(dumps.begin(), dumps.end());
+    for (size_t index = 0; index < dumps.size() && dumps.size() - index > MaxCount; ++index)
+    {
+        LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(dumps[index].second.c_str()));
+    }
+}
 
 VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmCreateRequest& Request)
 {
@@ -180,6 +224,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         THROW_HR_IF(E_INVALIDARG, disk.Key.empty() || description.BootDisks.contains(disk.Key));
         description.BootDisks.emplace(disk.Key, VmDiskAttachment{});
         validation::ValidateDiskRequest(disk.Disk);
+        ValidateOwnerToken(disk.Disk.UserToken, Request.Identity.UserToken.get());
         if (disk.Disk.Placement)
         {
             const auto& placement = *disk.Disk.Placement;
@@ -352,8 +397,9 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_IF_FAILED(WslOpenVmmConfigSetHvSocketPath(config.get(), m_fileSystemResources.VsockPath.c_str()));
     if (Request.CrashCapture && Request.CrashCapture->SavedStateFolder)
     {
-        const auto crashDumpPath = PrepareCrashDumpPath(Request.CrashCapture.value(), Request.Identity);
-        THROW_IF_FAILED(WslOpenVmmConfigSetCrashDumpPath(config.get(), crashDumpPath.c_str()));
+        m_crashDumpPath = PrepareCrashDumpPath(Request.CrashCapture.value(), Request.Identity);
+        m_maxSavedStateCount = Request.CrashCapture->MaxSavedStateCount;
+        THROW_IF_FAILED(WslOpenVmmConfigSetCrashDumpPath(config.get(), m_crashDumpPath->c_str()));
     }
     for (const auto& [tag, attachment] : m_description.NetworkAdapters)
     {
@@ -489,7 +535,7 @@ try
     THROW_LAST_ERROR_IF(WaitForSingleObject(m_process.get(), INFINITE) == WAIT_FAILED);
     DWORD exitCode = 0;
     THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(m_process.get(), &exitCode));
-    // All I/O callbacks are gone. OnProcessExit may destroy this backend, so it must be the last access.
+    // All I/O callbacks are gone before the termination callback is invoked.
     OnProcessExit(exitCode);
 }
 CATCH_LOG()
@@ -499,6 +545,13 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
     const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
+    if (m_crashDumpPath)
+    {
+        LOG_IF_FAILED(wil::ResultFromException([&] {
+            wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(
+                *m_crashDumpPath, m_maxSavedStateCount, m_description.Identity.UserToken.get());
+        }));
+    }
     bool notify;
     {
         auto lock = m_lock.lock_exclusive();
@@ -608,6 +661,7 @@ void OpenVmmVirtualMachineBackend::Shutdown() noexcept
     const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmTerminateVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
+    std::thread processLogThread;
     {
         auto shutdownLock = m_shutdownLock.lock_exclusive();
         UniqueVm vm;
@@ -655,18 +709,7 @@ void OpenVmmVirtualMachineBackend::Shutdown() noexcept
             m_hostSockets.clear();
         }
 
-        if (m_processLogThread.joinable())
-        {
-            if (m_processLogThread.get_id() == std::this_thread::get_id())
-            {
-                // A natural-exit callback can destroy us on the log thread, after its last backend access.
-                m_processLogThread.detach();
-            }
-            else
-            {
-                m_processLogThread.join();
-            }
-        }
+        processLogThread = std::move(m_processLogThread);
         if (m_fileSystemResources.DirectoryCreated)
         {
             LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_fileSystemResources.SocketDirectory.c_str()));
@@ -676,6 +719,11 @@ void OpenVmmVirtualMachineBackend::Shutdown() noexcept
             "OpenVmmTerminateVmEnd",
             TraceLoggingValue(m_description.Identity.VmId, "vmId"),
             TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
+    }
+
+    if (processLogThread.joinable())
+    {
+        processLogThread.join();
     }
 
     // Explicit shutdown owns notification so the log thread can be drained without callback reentrancy.
@@ -815,6 +863,7 @@ void OpenVmmVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::OpenVmm);
+    ValidateOwnerToken(Request.UserToken, m_description.Identity.UserToken.get());
     const auto& path = validation::ValidateDiskSource(Request);
     THROW_HR_IF_MSG(
         c_notSupported,
@@ -832,9 +881,24 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     // tolerates this because it shares the underlying virtual disk object between attachments, but OpenVMM
     // opens the backing file exclusively and a second open fails with a sharing violation. Reuse the
     // existing attachment so the guest keeps a single block device for the disk.
-    const auto existing = std::find_if(m_attachedDisks.begin(), m_attachedDisks.end(), [&](const auto& entry) {
-        return entry.second.ReadOnly == Request.ReadOnly && wsl::windows::common::string::IsPathComponentEqual(entry.second.Path, path);
-    });
+    auto existing = m_attachedDisks.end();
+    for (auto disk = m_attachedDisks.begin(); disk != m_attachedDisks.end(); ++disk)
+    {
+        if (!wsl::windows::common::string::IsPathComponentEqual(disk->second.Path, path))
+        {
+            continue;
+        }
+
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSL_E_DISK_ALREADY_ATTACHED,
+            wsl::shared::Localization::MessageDiskAlreadyAttached(path.c_str()),
+            Request.UserDisk && !disk->second.UserDisk);
+        THROW_HR_IF(WSL_E_USER_VHD_ALREADY_ATTACHED, disk->second.UserDisk);
+        if (disk->second.ReadOnly == Request.ReadOnly)
+        {
+            existing = disk;
+        }
+    }
     if (!Request.Placement && existing != m_attachedDisks.end())
     {
         WSL_LOG(
@@ -936,21 +1000,7 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::OpenVmm);
-    if (Request.UserToken)
-    {
-        const auto token = Request.UserToken->get();
-        const auto owner = m_description.Identity.UserToken.get();
-        THROW_HR_IF(E_INVALIDARG, !token);
-        if (token != owner)
-        {
-            const auto tokenInfo = wil::get_token_information<TOKEN_STATISTICS>(token);
-            const auto ownerInfo = wil::get_token_information<TOKEN_STATISTICS>(owner);
-            THROW_HR_IF_MSG(
-                c_notSupported,
-                tokenInfo.TokenId.HighPart != ownerInfo.TokenId.HighPart || tokenInfo.TokenId.LowPart != ownerInfo.TokenId.LowPart,
-                "OpenVMM persistent memory uses the VM owner identity and does not support alternate user tokens");
-        }
-    }
+    ValidateOwnerToken(Request.UserToken, m_description.Identity.UserToken.get());
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);

@@ -22,8 +22,9 @@ struct WslOpenVmmVm;
 namespace wsl::windows::common::vm::openvmm {
 
 VmDescription ValidateCreateRequest(const VmCreateRequest& Request);
+void ApplyCrashDumpRetention(const std::filesystem::path& DumpPath, std::uint32_t MaxCount, HANDLE UserToken);
 
-}
+} // namespace wsl::windows::common::vm::openvmm
 
 class OpenVmmVirtualMachineBackend : public IVirtualMachineBackend
 {
@@ -152,6 +153,8 @@ private:
     wil::unique_handle m_job;
     std::thread m_processLogThread;
     SessionFileSystemResources m_fileSystemResources;
+    std::optional<std::filesystem::path> m_crashDumpPath;
+    std::uint32_t m_maxSavedStateCount = 0;
     wil::shared_event m_exitEvent{wil::EventOptions::ManualReset};
     wil::shared_event m_crashEvent{wil::EventOptions::ManualReset};
     _Guarded_by_(m_lock) VmState m_state = VmState::Unknown;
