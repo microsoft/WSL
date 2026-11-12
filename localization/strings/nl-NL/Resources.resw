@@ -4178,6 +4178,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan tijdstempel voor container '{}' niet herstellen</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Kan de permanente status van de container {} niet laden. Wijzigingen in de status worden niet opgeslagen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Kan de permanente status van container '{}' niet opslaan</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Kan de voortgang van het importeren van afbeeldingen niet parseren</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4213,8 +4221,8 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan de door de host vertrouwde basiscertificaten niet installeren in de VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC kon '{}' niet schrijven om lokale hostnaamomzetting te initialiseren (gastfout {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC kan '{}' niet schrijven in de gast (gastfout {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

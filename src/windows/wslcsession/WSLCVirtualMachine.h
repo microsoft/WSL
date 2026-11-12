@@ -198,8 +198,7 @@ public:
     void RemoveDirectory(_In_ const std::string& Path);
     std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
-    // Returns 0 or the guest errno, and throws if the VM can't be reached.
-    int WriteGuestFile(_In_ const std::string& Path, _In_ std::string_view Content, _In_ unsigned int Flags = WSLCWriteFileFlagsNone);
+    void WriteGuestFile(_In_ const std::string& Path, _In_ std::string_view Content, _In_ unsigned int Flags = WSLCWriteFileFlagsNone);
 
     // Throws HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) if the file doesn't exist, and
     // HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE) if it is larger than MaxSize.

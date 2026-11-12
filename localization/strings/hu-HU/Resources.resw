@@ -4178,6 +4178,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Nem sikerült visszaállítani a(z) {} tároló időbélyegét</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Nem sikerült betölteni a(z) '{}' tároló megőrzött állapotát. Az állapot módosításai nem lesznek mentve.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Nem sikerült menteni a(z) '{}' tároló megőrzött állapotát</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Nem sikerült feldolgozni a képimportálás folyamatát</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4213,8 +4221,8 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Nem sikerült telepíteni a gazdagép megbízható főtanúsítványait a virtuális gépre: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>A WSLC nem tudta kiírni a(z) {} értéket a helyi állomásnév-feloldás inicializálásához (vendéggéphiba: {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC could not write '{}' in the guest (guest error {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

@@ -51,10 +51,7 @@ WSLCPersistedContainerState LoadContainerState(WSLCSessionRuntime& Runtime, cons
 HRESULT WriteContainerState(WSLCSessionRuntime& Runtime, const std::string& Path, const WSLCPersistedContainerState& State) noexcept
 try
 {
-    const auto error =
-        Vm(Runtime).WriteGuestFile(Path, wsl::shared::ToJson(State), WSLCWriteFileFlagsAtomic | WSLCWriteFileFlagsNoCreateParents);
-    RETURN_HR_IF_MSG(E_FAIL, error != 0, "Failed to write '%hs', errno: %d", Path.c_str(), error);
-
+    Vm(Runtime).WriteGuestFile(Path, wsl::shared::ToJson(State), WSLCWriteFileFlagsAtomic | WSLCWriteFileFlagsNoCreateParents);
     return S_OK;
 }
 CATCH_RETURN()
