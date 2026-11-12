@@ -827,6 +827,7 @@ void wsl::windows::common::helpers::RegisterSwapFile(_In_ HKEY LxssKey, _In_ LPC
 {
     const auto key = registry::CreateKey(LxssKey, c_swapFilesRegistryKey);
     registry::WriteString(key.get(), nullptr, VmId, Path);
+    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
 }
 
 void wsl::windows::common::helpers::UnregisterSwapFile(_In_ HKEY LxssKey, _In_ LPCWSTR VmId)
