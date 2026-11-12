@@ -292,7 +292,30 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
     const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmDestroyVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
-    Shutdown();
+    Terminate();
+    // Terminate waits for exit publication, not callback completion. Drain the callback before destroying its context.
+    if (m_processExitWait)
+    {
+        SetThreadpoolWait(m_processExitWait.get(), nullptr, nullptr);
+        WaitForThreadpoolWaitCallbacks(m_processExitWait.get(), FALSE);
+        m_processExitWait.reset();
+    }
+
+    if (m_processLogThread.joinable())
+    {
+        m_processLogThread.join();
+    }
+
+    m_vm.reset();
+    m_job.reset();
+    for (const auto& [id, socket] : m_hostSockets)
+    {
+        DeleteOwnedFile(socket.Path);
+    }
+    if (m_fileSystemResources.DirectoryCreated)
+    {
+        LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_fileSystemResources.SocketDirectory.c_str()));
+    }
     WSL_LOG(
         "OpenVmmDestroyVmEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -477,6 +500,9 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     m_process = process.Start();
     logPipeWrite.reset();
     m_processLogThread = std::thread(&OpenVmmVirtualMachineBackend::ReadProcessLog, this, std::move(logPipeRead));
+    m_processExitWait.reset(CreateThreadpoolWait(&OpenVmmVirtualMachineBackend::OnProcessSignaled, this, nullptr));
+    THROW_LAST_ERROR_IF(!m_processExitWait);
+    SetThreadpoolWait(m_processExitWait.get(), m_process.get(), nullptr);
     WSL_LOG(
         "OpenVmmProcessStarted",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -504,6 +530,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     }
     {
         auto lock = m_lock.lock_exclusive();
+        THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), m_state == VmState::Stopped);
         m_state = VmState::Created;
     }
 }
@@ -512,39 +539,40 @@ void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexce
 try
 {
     const auto context = CreateExecutionContext(Context::OpenVmm);
-    try
-    {
-        wsl::windows::common::io::MultiHandleWait io;
-        io.AddHandle(std::make_unique<wsl::windows::common::io::LineBasedReadHandle>(
-            std::move(Pipe),
-            [this](const gsl::span<char>& Line) {
-                const std::string entry{Line.begin(), Line.end()};
-                WSL_LOG(
-                    "OpenVmmLog",
-                    TraceLoggingGuid(m_description.Identity.VmId, "VmId"),
-                    TraceLoggingValue(entry.c_str(), "Content"));
-            },
-            false));
-        io.AddHandle(
-            std::make_unique<wsl::windows::common::io::EventHandle>(m_process.get(), []() {}),
-            wsl::windows::common::io::MultiHandleWait::Flags::CancelOnCompleted);
-        io.Run(std::nullopt);
-    }
-    CATCH_LOG()
-
-    THROW_LAST_ERROR_IF(WaitForSingleObject(m_process.get(), INFINITE) == WAIT_FAILED);
-    DWORD exitCode = 0;
-    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(m_process.get(), &exitCode));
-    // All I/O callbacks are gone before the termination callback is invoked.
-    OnProcessExit(exitCode);
+    wsl::windows::common::io::MultiHandleWait io;
+    io.AddHandle(std::make_unique<wsl::windows::common::io::LineBasedReadHandle>(
+        std::move(Pipe),
+        [this](const gsl::span<char>& Line) {
+            const std::string entry{Line.begin(), Line.end()};
+            WSL_LOG(
+                "OpenVmmLog", TraceLoggingGuid(m_description.Identity.VmId, "VmId"), TraceLoggingValue(entry.c_str(), "Content"));
+        },
+        false));
+    io.AddHandle(
+        std::make_unique<wsl::windows::common::io::EventHandle>(m_process.get(), []() {}),
+        wsl::windows::common::io::MultiHandleWait::Flags::CancelOnCompleted);
+    io.Run(std::nullopt);
 }
 CATCH_LOG()
 
-void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
+void CALLBACK OpenVmmVirtualMachineBackend::OnProcessSignaled(PTP_CALLBACK_INSTANCE, void* Context, PTP_WAIT, TP_WAIT_RESULT) noexcept
+try
+{
+    const auto backend = static_cast<OpenVmmVirtualMachineBackend*>(Context);
+    DWORD exitCode = 0;
+    const bool gotExitCode = GetExitCodeProcess(backend->m_process.get(), &exitCode);
+    LOG_LAST_ERROR_IF(!gotExitCode);
+    backend->OnProcessExit(gotExitCode ? std::optional<DWORD>{exitCode} : std::nullopt);
+}
+CATCH_LOG()
+
+void OpenVmmVirtualMachineBackend::OnProcessExit(std::optional<DWORD> ExitCode) noexcept
 {
     const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
-        "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
+        "OpenVmmProcessExited",
+        TraceLoggingValue(m_description.Identity.VmId, "vmId"),
+        TraceLoggingValue(ExitCode.value_or(STILL_ACTIVE), "exitCode"));
     if (m_crashDumpPath)
     {
         LOG_IF_FAILED(wil::ResultFromException([&] {
@@ -552,23 +580,21 @@ void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
                 *m_crashDumpPath, m_maxSavedStateCount, m_description.Identity.UserToken.get());
         }));
     }
-    bool notify;
     {
         auto lock = m_lock.lock_exclusive();
         m_state = VmState::Stopped;
-        m_terminationInformation.Reason = ExitCode == ERROR_SUCCESS ? VmTerminationReason::Shutdown : VmTerminationReason::Crashed;
-        m_terminationInformation.Details = std::format(L"OpenVMM process exited with code {}", ExitCode);
-        notify = !m_shutdownStarted;
+        m_terminationInformation.Reason = !ExitCode                    ? VmTerminationReason::Unknown
+                                          : *ExitCode == ERROR_SUCCESS ? VmTerminationReason::Shutdown
+                                                                       : VmTerminationReason::Crashed;
+        m_terminationInformation.Details = ExitCode ? std::format(L"OpenVMM process exited with code {}", *ExitCode)
+                                                    : L"Failed to query OpenVMM process exit code";
     }
-    if (ExitCode != ERROR_SUCCESS)
+    if (ExitCode && *ExitCode != ERROR_SUCCESS)
     {
         m_crashEvent.SetEvent();
     }
     m_exitEvent.SetEvent();
-    if (notify)
-    {
-        NotifyTerminated(m_description.Identity);
-    }
+    NotifyTerminated(m_description.Identity);
 }
 
 VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
@@ -634,7 +660,7 @@ void OpenVmmVirtualMachineBackend::Start()
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmStartVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     auto lock = m_lock.lock_exclusive();
-    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
     const auto result = WslOpenVmmVmResume(m_vm.get());
     WSL_LOG(
         "OpenVmmStartVmEnd",
@@ -645,7 +671,7 @@ void OpenVmmVirtualMachineBackend::Start()
     m_state = VmState::Running;
 }
 
-void OpenVmmVirtualMachineBackend::Terminate()
+void OpenVmmVirtualMachineBackend::Terminate() noexcept
 {
     // Termination callbacks may re-enter this method.
     if (m_exitEvent.is_signaled())
@@ -653,81 +679,52 @@ void OpenVmmVirtualMachineBackend::Terminate()
         return;
     }
 
-    Shutdown();
-}
-
-void OpenVmmVirtualMachineBackend::Shutdown() noexcept
-{
     const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmTerminateVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
-    std::thread processLogThread;
     {
-        auto shutdownLock = m_shutdownLock.lock_exclusive();
+        auto terminationLock = m_terminationLock.lock_exclusive();
         UniqueVm vm;
         {
             auto lock = m_lock.lock_exclusive();
-            if (m_shutdownStarted)
-            {
-                return;
-            }
-
-            m_shutdownStarted = true;
             vm = std::move(m_vm);
         }
 
-        if (vm && WaitForSingleObject(m_process.get(), 0) == WAIT_TIMEOUT)
+        DWORD waitResult = WAIT_FAILED;
+        if (vm && m_process)
         {
-            LOG_IF_FAILED(WslOpenVmmVmTeardown(vm.get()));
-            LOG_IF_FAILED(WslOpenVmmVmQuit(vm.get()));
-            const auto waitResult = WaitForSingleObject(m_process.get(), c_rpcTimeoutMs);
+            waitResult = WaitForSingleObject(m_process.get(), 0);
             LOG_LAST_ERROR_IF(waitResult == WAIT_FAILED);
-            LOG_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), waitResult == WAIT_TIMEOUT);
+            if (waitResult == WAIT_TIMEOUT)
+            {
+                LOG_IF_FAILED(WslOpenVmmVmTeardown(vm.get()));
+                LOG_IF_FAILED(WslOpenVmmVmQuit(vm.get()));
+                waitResult = WaitForSingleObject(m_process.get(), c_rpcTimeoutMs);
+                LOG_LAST_ERROR_IF(waitResult == WAIT_FAILED);
+                LOG_HR_IF(HRESULT_FROM_WIN32(WAIT_TIMEOUT), waitResult == WAIT_TIMEOUT);
+            }
         }
 
-        // Also handles partial initialization and forces exit if graceful shutdown failed.
+        // The kill-on-close job handles partial initialization and failed or timed-out graceful shutdown.
         m_job.reset();
-        if (m_process)
+        if (m_processExitWait)
         {
+            // The process handle signals before the observer records exit information. The observer signals this
+            // event before invoking the callback, so a reentrant Terminate returns without taking m_terminationLock.
+            LOG_LAST_ERROR_IF(WaitForSingleObject(m_exitEvent.get(), INFINITE) == WAIT_FAILED);
+        }
+        else if (m_process && waitResult != WAIT_OBJECT_0)
+        {
+            // Initialization can fail before the observer is registered; still wait for the process to exit.
             LOG_LAST_ERROR_IF(WaitForSingleObject(m_process.get(), INFINITE) == WAIT_FAILED);
         }
         vm.reset();
-
-        {
-            auto lock = m_lock.lock_exclusive();
-            m_state = VmState::Stopped;
-            m_attachedDisks.clear();
-            m_persistentMemoryDevices.clear();
-            m_fileSystemShares.clear();
-            m_fileSystemDevices.clear();
-            m_portBindings.clear();
-            m_networkAdapters.clear();
-            for (const auto& [id, socket] : m_hostSockets)
-            {
-                DeleteOwnedFile(socket.Path);
-            }
-            m_hostSockets.clear();
-        }
-
-        processLogThread = std::move(m_processLogThread);
-        if (m_fileSystemResources.DirectoryCreated)
-        {
-            LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_fileSystemResources.SocketDirectory.c_str()));
-        }
-        m_exitEvent.SetEvent();
-        WSL_LOG(
-            "OpenVmmTerminateVmEnd",
-            TraceLoggingValue(m_description.Identity.VmId, "vmId"),
-            TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
     }
 
-    if (processLogThread.joinable())
-    {
-        processLogThread.join();
-    }
-
-    // Explicit shutdown owns notification so the log thread can be drained without callback reentrancy.
-    NotifyTerminated(m_description.Identity);
+    WSL_LOG(
+        "OpenVmmTerminateVmEnd",
+        TraceLoggingValue(m_description.Identity.VmId, "vmId"),
+        TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
 }
 
 VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)

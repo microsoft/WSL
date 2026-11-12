@@ -45,7 +45,7 @@ public:
     wil::shared_event GetCrashEvent() const override;
     std::optional<std::filesystem::path> GetCrashLogPath() const override;
     void Start() override;
-    void Terminate() override;
+    void Terminate() noexcept override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
     wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) override;
@@ -86,10 +86,10 @@ private:
     NON_COPYABLE(OpenVmmVirtualMachineBackend);
     NON_MOVABLE(OpenVmmVirtualMachineBackend);
 
-    void OnProcessExit(DWORD ExitCode) noexcept;
+    static void CALLBACK OnProcessSignaled(PTP_CALLBACK_INSTANCE Instance, void* Context, PTP_WAIT Wait, TP_WAIT_RESULT Result) noexcept;
+    void OnProcessExit(std::optional<DWORD> ExitCode) noexcept;
     void ReadProcessLog(wil::unique_hfile Pipe) noexcept;
     void Initialize(const VmCreateRequest& Request);
-    void Shutdown() noexcept;
 
     static void DestroyVm(WslOpenVmmVm* Vm) noexcept;
     using UniqueVm = wil::unique_any<WslOpenVmmVm*, decltype(&DestroyVm), DestroyVm>;
@@ -146,12 +146,12 @@ private:
     _Guarded_by_(m_lock) std::map<std::uint64_t, VmHostSocket> m_hostSockets;
     _Guarded_by_(m_lock) std::uint64_t m_nextHostSocketId = 1;
     _Guarded_by_(m_lock) std::uint32_t m_nextPersistentMemoryIndex = 0;
-    wil::srwlock m_shutdownLock;
-    _Guarded_by_(m_lock) bool m_shutdownStarted = false;
+    wil::srwlock m_terminationLock;
     UniqueVm m_vm;
     wil::unique_handle m_process;
     wil::unique_handle m_job;
     std::thread m_processLogThread;
+    wil::unique_threadpool_wait m_processExitWait;
     SessionFileSystemResources m_fileSystemResources;
     std::optional<std::filesystem::path> m_crashDumpPath;
     std::uint32_t m_maxSavedStateCount = 0;
