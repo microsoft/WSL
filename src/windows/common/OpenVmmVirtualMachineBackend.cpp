@@ -264,6 +264,10 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
 
     for (const auto& adapter : Request.NetworkAdapters)
     {
+        THROW_HR_IF_MSG(
+            E_INVALIDARG,
+            adapter.Tag.empty() || description.NetworkAdapters.contains(adapter.Tag),
+            "Invalid or duplicate network adapter tag");
         // OpenVMM serves its NIC with a built-in user-mode NAT and has no host network stack to
         // attach an endpoint created on the host to.
         THROW_HR_IF_MSG(
@@ -369,6 +373,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     auto id = wsl::shared::string::GuidToString<wchar_t>(Request.Identity.VmId, wsl::shared::string::GuidToStringFlags::None);
     std::erase(id, L'-');
     // An exclusive directory creation prevents shortened path IDs from aliasing another VM.
+    // TODO: Use a short socket root when the user's temp path exceeds the AF_UNIX UTF-8 path limit.
     const auto socketRoot = filesystem::GetTempFolderPath(Request.Identity.UserToken.get());
     {
         const auto runAsUser = wil::impersonate_token(Request.Identity.UserToken.get());
@@ -866,9 +871,6 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         c_notSupported,
         std::holds_alternative<VmPhysicalDiskSource>(Request.Source),
         "OpenVMM physical-disk support is not available");
-
-    // OpenVMM reports backing-file open failures as a generic error, so surface the Win32 error up front.
-    THROW_LAST_ERROR_IF(GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES);
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);

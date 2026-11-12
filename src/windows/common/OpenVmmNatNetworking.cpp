@@ -38,6 +38,47 @@ VmNetworkAdapterRequest wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest()
     return {L"loopback0", std::move(network)};
 }
 
+void wsl::core::MapHostLoopbackDnsServers(networking::DnsInfo& Dns, IVirtualMachineBackend& Backend, VmDeviceId Adapter)
+{
+    for (auto& server : Dns.Servers)
+    {
+        const auto address = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(server));
+        IpAddress destination{};
+        if (address.si_family == AF_INET && IN4_IS_ADDR_LOOPBACK(&address.Ipv4.sin_addr))
+        {
+            destination.family = IpAddressFamily_V4;
+            std::memcpy(destination.bytes, &address.Ipv4.sin_addr, sizeof(address.Ipv4.sin_addr));
+        }
+        else if (address.si_family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&address.Ipv6.sin6_addr))
+        {
+            IN_ADDR mapped{};
+            std::memcpy(&mapped, &address.Ipv6.sin6_addr.u.Byte[12], sizeof(mapped));
+            if (!IN4_IS_ADDR_LOOPBACK(&mapped))
+            {
+                continue;
+            }
+            destination.family = IpAddressFamily_V4;
+            std::memcpy(destination.bytes, &mapped, sizeof(mapped));
+        }
+        else if (address.si_family == AF_INET6 && IN6_IS_ADDR_LOOPBACK(&address.Ipv6.sin6_addr))
+        {
+            destination.family = IpAddressFamily_V6;
+            std::memcpy(destination.bytes, &address.Ipv6.sin6_addr, sizeof(address.Ipv6.sin6_addr));
+        }
+        else
+        {
+            continue;
+        }
+
+        const auto mapped = Backend.CreateVirtualAddress(Adapter, destination);
+        server = wsl::shared::string::WideToMultiByte(wsl::windows::common::string::IpAddressToWstring(mapped));
+        if (mapped.family == IpAddressFamily_V6)
+        {
+            server += "%eth0";
+        }
+    }
+}
+
 OpenVmmNatNetworking::OpenVmmNatNetworking(
     IVirtualMachineBackend& Backend,
     const VmNetworkAttachment& Adapter,
@@ -136,6 +177,7 @@ void OpenVmmNatNetworking::UpdateDns()
     else
     {
         dns = networking::HostDnsInfo::GetDnsSettings(networking::DnsSettingsFlags::IncludeVpn | networking::DnsSettingsFlags::IncludeIpv6Servers);
+        MapHostLoopbackDnsServers(dns, m_backend, m_device);
     }
 
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> dnsNotification{};

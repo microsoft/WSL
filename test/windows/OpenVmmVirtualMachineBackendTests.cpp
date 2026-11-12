@@ -6,6 +6,7 @@
 #include "OpenVmmNatNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
 #include "VirtualMachineBackendTestHelpers.h"
+#include "WslCoreHostDnsInfo.h"
 #include "vsock.hpp"
 
 using wsl::windows::common::vm::openvmm::ValidateCreateRequest;
@@ -119,19 +120,28 @@ class OpenVmmVirtualMachineBackendTests
             "virtioFsAggregateShares=false\n";
 
         auto token = GetNonElevatedToken(TokenImpersonation);
-        const auto configure = [&](std::string_view Override) {
+        const auto configure = [&](std::string_view Override, bool* OpenVmmEnabled = nullptr) {
             TempFile file{GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS};
             const auto content = std::string{Override} + std::string{validConfig};
             DWORD written = 0;
             THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.Handle.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
             VERIFY_ARE_EQUAL(content.size(), static_cast<size_t>(written));
             file.Handle.reset();
-            return OperationResult([&] { wsl::core::Config config{file.Path.c_str(), token.get()}; });
+            return OperationResult([&] {
+                wsl::core::Config config{file.Path.c_str(), token.get()};
+                if (OpenVmmEnabled)
+                {
+                    *OpenVmmEnabled = config.EnableOpenVmm;
+                }
+            });
         };
 
         VERIFY_ARE_EQUAL(S_OK, configure(""));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nnetworkingMode=none\nfirewall=true\ndnsTunneling=true\nipv6=true\n"));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[experimental]\nopenVmm=false\n[wsl2]\ngpuSupport=true\n"));
+        bool openVmmEnabled = true;
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nsafeMode=true\n", &openVmmEnabled));
+        VERIFY_IS_FALSE(openVmmEnabled);
         for (const auto* setting : {
                  "\n[wsl2]\ngpuSupport=true\n",
                  "\n[wsl2]\nguiApplications=true\n",
@@ -322,6 +332,15 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(adapter.Id.Value, other.Id.Value);
         VERIFY_IS_FALSE(IsEqualGUID(adapter.Id.Owner.VmId, other.Id.Owner.VmId));
         VERIFY_IS_FALSE(IsEqualGUID(adapter.GuestInstanceId.value(), other.GuestInstanceId.value()));
+
+        auto second = CreateNetworkRequest();
+        second.Tag = L"eth1";
+        request.NetworkAdapters.push_back(second);
+        VERIFY_ARE_EQUAL(size_t{2}, ValidateCreateRequest(request).NetworkAdapters.size());
+        request.NetworkAdapters.back().Tag = L"eth0";
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+        request.NetworkAdapters.back().Tag.clear();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
     }
 
     TEST_METHOD(ValidatesExplicitBootDiskPlacements)
@@ -702,6 +721,13 @@ class OpenVmmVirtualMachineBackendTests
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         const auto description = backend->GetDescription();
         const auto& adapter = description.NetworkAdapters.at(L"eth0");
+        wsl::core::networking::DnsInfo dns{{"127.0.0.1", "127.0.0.2", "::1", "::ffff:127.0.0.1", "1.1.1.1"}, {}};
+        wsl::core::MapHostLoopbackDnsServers(dns, *backend, adapter.Id);
+        VERIFY_ARE_NOT_EQUAL(std::string{"127.0.0.1"}, dns.Servers[0]);
+        VERIFY_ARE_NOT_EQUAL(dns.Servers[0], dns.Servers[1]);
+        VERIFY_IS_TRUE(dns.Servers[2].ends_with("%eth0"));
+        VERIFY_ARE_EQUAL(dns.Servers[0], dns.Servers[3]);
+        VERIFY_ARE_EQUAL(std::string{"1.1.1.1"}, dns.Servers[4]);
         auto [host, guest] = MakeSocketPair();
         wil::unique_event refreshed{wil::EventOptions::ManualReset};
         HRESULT receiverResult = E_FAIL;

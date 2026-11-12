@@ -429,6 +429,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableNestedVirtualization, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableHardwarePerformanceCounters, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGpuSupport, false);
+        VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableOpenVmm, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableVirtio, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGuiApps, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, SwapSizeBytes, 0);

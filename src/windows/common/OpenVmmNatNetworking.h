@@ -10,8 +10,13 @@
 
 namespace wsl::core {
 
+namespace networking {
+    struct DnsInfo;
+}
+
 VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling);
 VmNetworkAdapterRequest CreateOpenVmmLoopbackNetworkAdapterRequest();
+void MapHostLoopbackDnsServers(networking::DnsInfo& Dns, IVirtualMachineBackend& Backend, VmDeviceId Adapter);
 
 class OpenVmmNatNetworking : public INetworkingEngine
 {
