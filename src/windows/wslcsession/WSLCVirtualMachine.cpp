@@ -1275,7 +1275,11 @@ try
     m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
 
     auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        lock.lock();
+        if (!lock.owns_lock())
+        {
+            lock.lock();
+        }
+
         auto mountIt = m_mountedWindowsFolders.find(LinuxPath);
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
