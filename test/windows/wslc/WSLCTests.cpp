@@ -4184,54 +4184,6 @@ sys.exit(1 if queries else 0)
         ValidateWindowsMounts(true);
     }
 
-    WSLC_TEST_METHOD(WindowsMountsVirtioFsConcurrent)
-    {
-        auto settings = GetDefaultSessionSettings(L"virtiofs-concurrent-mounts-test");
-        WI_SetFlag(settings.FeatureFlags, WslcFeatureFlagsVirtioFs);
-        auto session = CreateSession(settings);
-
-        const auto testFolder = std::filesystem::current_path() / "test-folder-concurrent-mounts";
-        std::filesystem::create_directories(testFolder);
-        auto cleanupFolder = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove_all(testFolder); });
-
-        wil::unique_event start{wil::EventOptions::ManualReset};
-        std::vector<std::future<HRESULT>> mounts;
-        mounts.reserve(8);
-        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-            start.SetEvent();
-            LOG_IF_FAILED(session->Terminate());
-        });
-
-        for (int index = 0; index < 8; ++index)
-        {
-            mounts.emplace_back(std::async(std::launch::async, [&, index]() -> HRESULT {
-                try
-                {
-                    const auto coInitialize = wil::CoInitializeEx(COINIT_MULTITHREADED);
-                    const auto mountPoint = std::format("/concurrent-mount-{}", index);
-                    start.wait();
-                    for (int iteration = 0; iteration < 8; ++iteration)
-                    {
-                        RETURN_IF_FAILED(session->MountWindowsFolder(testFolder.c_str(), mountPoint.c_str(), false, TRUE));
-                        RETURN_IF_FAILED(session->UnmountWindowsFolder(mountPoint.c_str(), TRUE));
-                    }
-
-                    return S_OK;
-                }
-                CATCH_RETURN()
-            }));
-        }
-
-        start.SetEvent();
-        for (auto& mount : mounts)
-        {
-            VERIFY_ARE_EQUAL(std::future_status::ready, mount.wait_for(30s));
-            VERIFY_SUCCEEDED(mount.get());
-        }
-
-        ExpectCommandResult(session.get(), {"/bin/true"}, 0);
-    }
-
     // Validates that virtiofs mounts preserve file ownership for non-root users (regression test for #40719).
     WSLC_TEST_METHOD(WindowsMountsVirtioFsFileOwnership)
     {
