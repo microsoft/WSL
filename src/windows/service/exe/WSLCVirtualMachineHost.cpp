@@ -525,8 +525,7 @@ try
 
     std::lock_guard lock(m_lock);
 
-    RETURN_HR_IF(
-        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
     const auto& consomme = static_cast<wsl::core::ConsommeNetworking&>(*m_networkingEngine);
     return consomme.MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
 }
@@ -539,8 +538,7 @@ try
 
     std::lock_guard lock(m_lock);
 
-    RETURN_HR_IF(
-        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
     const auto& consomme = static_cast<wsl::core::ConsommeNetworking&>(*m_networkingEngine);
     return consomme.UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
 }
