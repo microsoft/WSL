@@ -208,9 +208,40 @@ void ConsommeNetworking::StartPortTracker(wil::unique_socket&& socket)
 
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
-        [&](const SOCKADDR_INET& addr, int protocol, bool allocate) {
+        [&, guestOnlyPorts = std::set<std::tuple<std::string, uint16_t, int>>{}](const SOCKADDR_INET& addr, int protocol, bool allocate) mutable {
             const auto result = wil::ResultFromException([&]() {
-                HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
+                const auto port = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
+                const auto key = std::tuple(wsl::windows::common::string::SockAddrInetToString(addr), port, protocol);
+                if (!allocate && guestOnlyPorts.erase(key) != 0)
+                {
+                    return;
+                }
+
+                const auto result = wil::ResultFromException([&]() { HandlePortNotification(addr, protocol, port, allocate); });
+
+                // If the bind address is not available on the host, let the bind flow through so the kernel can decide if it is
+                // valid. Keep track of bind requests that are not available on the host so we don't try to unbind them later.
+                if (allocate && result == HRESULT_FROM_WIN32(WSAEADDRNOTAVAIL))
+                {
+                    auto family = addr.si_family;
+                    const void* ipAddress = family == AF_INET ? static_cast<const void*>(&addr.Ipv4.sin_addr)
+                                                              : static_cast<const void*>(&addr.Ipv6.sin6_addr);
+
+                    if (family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&addr.Ipv6.sin6_addr))
+                    {
+                        family = AF_INET;
+                        ipAddress = &addr.Ipv6.sin6_addr.u.Byte[12];
+                    }
+
+                    if (!INET_IS_ADDR_UNSPECIFIED(family, ipAddress) && !INET_IS_ADDR_LOOPBACK(family, ipAddress))
+                    {
+                        // Guest-only addresses need no host forwarding. Let Linux validate the bind.
+                        guestOnlyPorts.insert(key);
+                        return;
+                    }
+                }
+
+                THROW_IF_FAILED(result);
             });
 
             LOG_IF_FAILED_MSG(
