@@ -775,7 +775,9 @@ class WSLCCLIExecutionUnitTests
             std::vector<std::wstring>{
                 L"compose", L"-p", L"proj", L"-f", L"a.yml", L"--file", L"b.yml", L"--dry-run", L"up", L"compose.yml"}};
 
-        invocation.ParseCommandLine(context);
+        VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_NOTIMPL;
+        });
 
         VERIFY_ARE_EQUAL(std::wstring{L"up"}, invocation.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"proj"}, context.Args.GetValue<ArgType::ComposeProjectName>());
@@ -810,7 +812,9 @@ class WSLCCLIExecutionUnitTests
         CommandInvocation invocation{
             std::make_unique<RootCommand>(), std::vector<std::wstring>{L"compose", L"up", L"--dry-run", L"compose.yml"}};
 
-        invocation.ParseCommandLine(context);
+        VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_NOTIMPL;
+        });
 
         VERIFY_IS_TRUE(context.Args.GetValue<ArgType::ComposeDryRun>());
         VERIFY_IS_FALSE(context.Args.Contains(ArgType::ComposeGlobalDryRun));
@@ -825,7 +829,7 @@ class WSLCCLIExecutionUnitTests
         VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), ArgumentException, [](const auto&) { return true; });
     }
 
-    TEST_METHOD(ComposeOptions_NotImplementedFailBeforeSession)
+    TEST_METHOD(ComposeOptions_NotImplementedFailDuringParse)
     {
         const std::vector<std::vector<std::wstring>> commandLines = {
             {L"compose", L"--all-resources", L"up", L"compose.yml"},
@@ -846,9 +850,8 @@ class WSLCCLIExecutionUnitTests
         {
             CLIExecutionContext context;
             CommandInvocation invocation{std::make_unique<RootCommand>(), std::vector<std::wstring>{commandLine}};
-            invocation.ParseCommandLine(context);
 
-            VERIFY_THROWS_SPECIFIC(invocation.Execute(context), wil::ResultException, [](const wil::ResultException& e) {
+            VERIFY_THROWS_SPECIFIC(invocation.ParseCommandLine(context), wil::ResultException, [](const wil::ResultException& e) {
                 return e.GetErrorCode() == E_NOTIMPL;
             });
         }
