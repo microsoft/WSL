@@ -25,6 +25,7 @@ struct ComposeCommand final : public Command
     {
     }
 
+    std::vector<Argument> GetGlobalArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -40,7 +41,6 @@ struct ComposeAttachCommand final : public Command
     {
     }
 
-    std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -55,7 +55,6 @@ struct ComposeCreateCommand final : public Command
     {
     }
 
-    std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -70,7 +69,6 @@ struct ComposeStartCommand final : public Command
     {
     }
 
-    std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
@@ -100,7 +98,6 @@ struct ComposeUpCommand final : public Command
     {
     }
 
-    std::vector<Argument> GetArguments() const override;
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 

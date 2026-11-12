@@ -30,6 +30,15 @@ std::vector<std::unique_ptr<Command>> ComposeCommand::CreateCommands() const
     return commands;
 }
 
+std::vector<Argument> ComposeCommand::GetGlobalArguments() const
+{
+    return {
+        CreateGlobalArgument(ArgType::ComposeFile, {.Limit = Limit::Unlimited}),
+        CreateGlobalArgument(ArgType::ComposeProjectDirectory),
+        CreateGlobalArgument(ArgType::ComposeProjectName),
+    };
+}
+
 std::wstring ComposeCommand::ShortDescription() const
 {
     return Localization::WSLCCLI_ComposeCommandDesc();
