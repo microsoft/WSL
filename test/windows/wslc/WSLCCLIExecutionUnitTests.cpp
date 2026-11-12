@@ -779,7 +779,7 @@ class WSLCCLIExecutionUnitTests
 
         VERIFY_ARE_EQUAL(std::wstring{L"up"}, invocation.Selected().Name());
         VERIFY_ARE_EQUAL(std::wstring{L"proj"}, context.Args.GetValue<ArgType::ComposeProjectName>());
-        VERIFY_ARE_EQUAL(2u, context.Args.GetValue<ArgType::ComposeFile>().size());
+        VERIFY_ARE_EQUAL(2u, context.Args.GetAllValues<ArgType::ComposeFile>().size());
         VERIFY_IS_TRUE(context.Args.GetValue<ArgType::ComposeGlobalDryRun>());
         VERIFY_IS_FALSE(context.Args.Contains(ArgType::ComposeDryRun));
     }
