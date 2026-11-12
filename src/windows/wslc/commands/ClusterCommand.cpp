@@ -41,7 +41,7 @@ std::wstring ClusterCommand::ShortDescription() const
 
 std::wstring ClusterCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_DeveloperClusterDesktopCommandLongDesc();
+    return Localization::WSLCCLI_DeveloperClusterDevCtlCommandLongDesc();
 }
 
 void ClusterCommand::ExecuteInternal(CLIExecutionContext& context) const

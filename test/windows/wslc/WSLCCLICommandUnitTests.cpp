@@ -22,6 +22,7 @@ Abstract:
 #include "Command.h"
 #include "ClusterCommand.h"
 #include "DeveloperClusterCommand.h"
+#include "Exceptions.h"
 #include "RootCommand.h"
 #include "ContainerCommand.h"
 #include "ImageCommand.h"
@@ -116,11 +117,16 @@ class WSLCCLICommandUnitTests
 
         VERIFY_IS_TRUE(hasType(ArgType::ClusterEnableGpu));
         VERIFY_IS_TRUE(hasType(ArgType::ClusterDeveloper));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksDevCtlPath));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksDesktopPath));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperAksEdgePath));
-        VERIFY_IS_TRUE(hasType(ArgType::DeveloperAgentRepo));
-        VERIFY_IS_TRUE(hasType(ArgType::DeveloperCni));
+        VERIFY_IS_FALSE(hasType(ArgType::DeveloperAgentRepo));
+        VERIFY_IS_FALSE(hasType(ArgType::DeveloperCni));
+        VERIFY_IS_FALSE(hasType(ArgType::ClusterDistro));
+        VERIFY_IS_FALSE(hasType(ArgType::DeveloperMerge));
+        VERIFY_IS_FALSE(hasType(ArgType::DeveloperMergeInto));
         VERIFY_IS_TRUE(hasType(ArgType::DeveloperKubernetesVersion));
+        VERIFY_IS_TRUE(hasType(ArgType::DeveloperNvidiaGpuSharing));
     }
 
     TEST_METHOD(ClusterCommand_RetainsSubcommands)
@@ -139,6 +145,114 @@ class WSLCCLICommandUnitTests
         args.Add<ArgType::ClusterDeveloper>(true);
         args.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
         ValidateDeveloperClusterArguments(DeveloperClusterOperation::Create, args);
+    }
+
+    TEST_METHOD(DeveloperCluster_MapsCreateAndGpuSharingToDevCtl)
+    {
+        argument::ArgMap args;
+        args.Add<ArgType::ClusterDeveloper>(true);
+        args.Add<ArgType::DeveloperName>(std::wstring{L"gpu-dev"});
+        args.Add<ArgType::DeveloperKubernetesVersion>(std::wstring{L"v1.36.5"});
+        args.Add<ArgType::ClusterDistribution>(std::wstring{L"K8s"});
+        args.Add<ArgType::DeveloperNvidiaGpuSharing>(std::wstring{L"4"});
+        args.Add<ArgType::ClusterOutput>(std::wstring{LR"(C:\cluster configs\gpu.yaml)"});
+        args.Add<ArgType::ClusterEnableGpu>(true);
+        args.Add<ArgType::DeveloperOverwrite>(true);
+        ValidateDeveloperClusterArguments(DeveloperClusterOperation::Create, args);
+        const std::vector<std::wstring> expected{
+            L"cluster",
+            L"create",
+            L"--output",
+            L"json",
+            L"--name",
+            L"gpu-dev",
+            L"--kubernetes-version",
+            L"v1.36.5",
+            L"--kubernetes-distribution",
+            L"K8s",
+            L"--nvidia-gpu-sharing",
+            L"4",
+            L"--kubeconfig-file",
+            LR"(C:\cluster configs\gpu.yaml)",
+            L"--enable-gpu",
+            L"--overwrite"};
+        VERIFY_IS_TRUE(expected == BuildDeveloperClusterCommand(DeveloperClusterOperation::Create, args));
+    }
+
+    TEST_METHOD(DeveloperCluster_MapsCredentialsAndDiagnosticsToDevCtl)
+    {
+        argument::ArgMap credentials;
+        credentials.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        credentials.Add<ArgType::ClusterOutput>(std::wstring{L"dev.yaml"});
+        credentials.Add<ArgType::DeveloperOverwriteExisting>(true);
+        const std::vector<std::wstring> expectedCredentials{
+            L"cluster", L"get-credentials", L"--name", L"dev", L"--file", L"dev.yaml", L"--overwrite-existing"};
+        VERIFY_IS_TRUE(expectedCredentials == BuildDeveloperClusterCommand(DeveloperClusterOperation::Kubeconfig, credentials));
+
+        argument::ArgMap diagnostics;
+        diagnostics.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        diagnostics.Add<ArgType::DeveloperDiagnosticsOutput>(std::wstring{L"support.tar.gz"});
+        diagnostics.Add<ArgType::DeveloperDiagnosticsSince>(std::wstring{L"2h"});
+        diagnostics.Add<ArgType::DeveloperRedact>(true);
+        const std::vector<std::wstring> expectedDiagnostics{
+            L"cluster",
+            L"get-logs",
+            L"--name",
+            L"dev",
+            L"--output-file",
+            L"support.tar.gz",
+            L"--since",
+            L"2h",
+            L"--redact-network-details"};
+        VERIFY_IS_TRUE(expectedDiagnostics == BuildDeveloperClusterCommand(DeveloperClusterOperation::Diagnostics, diagnostics));
+    }
+
+    TEST_METHOD(DeveloperCluster_MapsStatusAndCatalogsToDevCtl)
+    {
+        argument::ArgMap args;
+        args.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        const std::vector<std::wstring> expectedStatus{L"cluster", L"show", L"--name", L"dev"};
+        VERIFY_IS_TRUE(expectedStatus == BuildDeveloperClusterCommand(DeveloperClusterOperation::Status, args));
+        const std::vector<std::wstring> expectedVersions{L"cluster", L"get-versions"};
+        VERIFY_IS_TRUE(expectedVersions == BuildDeveloperClusterCommand(DeveloperClusterOperation::Versions, args));
+        const std::vector<std::wstring> expectedDistributions{L"cluster", L"get-distributions"};
+        VERIFY_IS_TRUE(expectedDistributions == BuildDeveloperClusterCommand(DeveloperClusterOperation::Distributions, args));
+        VERIFY_IS_TRUE(expectedDistributions == BuildDeveloperClusterCommand(DeveloperClusterOperation::Cnis, args));
+    }
+
+    TEST_METHOD(DeveloperCluster_DeleteRequiresNameAndExplicitConfirmationBypass)
+    {
+        argument::ArgMap missingName;
+        missingName.Add<ArgType::ClusterDeveloper>(true);
+        VERIFY_THROWS(ValidateDeveloperClusterArguments(DeveloperClusterOperation::Delete, missingName), ArgumentException);
+
+        argument::ArgMap args;
+        args.Add<ArgType::ClusterDeveloper>(true);
+        args.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        ValidateDeveloperClusterArguments(DeveloperClusterOperation::Delete, args);
+        const std::vector<std::wstring> expected{L"cluster", L"delete", L"--output", L"json", L"--name", L"dev"};
+        VERIFY_IS_TRUE(expected == BuildDeveloperClusterCommand(DeveloperClusterOperation::Delete, args));
+
+        argument::ArgMap confirmed;
+        confirmed.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        confirmed.Add<ArgType::DeveloperYes>(true);
+        auto expectedConfirmed = expected;
+        expectedConfirmed.emplace_back(L"--yes");
+        VERIFY_IS_TRUE(expectedConfirmed == BuildDeveloperClusterCommand(DeveloperClusterOperation::Delete, confirmed));
+    }
+
+    TEST_METHOD(DeveloperCluster_RejectsConflictingSdkPathsAndImplicitFileOverwrite)
+    {
+        argument::ArgMap conflictingPaths;
+        conflictingPaths.Add<ArgType::DeveloperAksDevCtlPath>(std::wstring{L"aks-devctl.exe"});
+        conflictingPaths.Add<ArgType::DeveloperAksDesktopPath>(std::wstring{L"aks-desktop.exe"});
+        VERIFY_THROWS(ValidateDeveloperClusterArguments(DeveloperClusterOperation::Versions, conflictingPaths), ArgumentException);
+
+        argument::ArgMap overwrite;
+        overwrite.Add<ArgType::ClusterDeveloper>(true);
+        overwrite.Add<ArgType::DeveloperName>(std::wstring{L"dev"});
+        overwrite.Add<ArgType::DeveloperOverwrite>(true);
+        VERIFY_THROWS(ValidateDeveloperClusterArguments(DeveloperClusterOperation::Create, overwrite), ArgumentException);
     }
 
     TEST_METHOD(RootCommand_ContainsEventsCommand)

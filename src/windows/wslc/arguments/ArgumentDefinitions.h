@@ -55,8 +55,9 @@ _(Command,          "command",              NO_ALIAS,         Kind::Positional, 
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
 _(DeveloperAgentRepo, "agent-repo",         NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAgentRepoArgDescription()) \
-_(DeveloperAksDesktopPath, "aks-desktop-path", NO_ALIAS,      Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksDesktopPathArgDescription()) \
-_(DeveloperAksEdgePath, "aksedge-path",     NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperAksDesktopPathArgDescription()) \
+_(DeveloperAksDevCtlPath, "aks-devctl-path", NO_ALIAS,        Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDevCtlPathArgDescription()) \
+_(DeveloperAksDesktopPath, "aks-desktop-path", NO_ALIAS,      Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDevCtlPathArgDescription()) \
+_(DeveloperAksEdgePath, "aksedge-path",     NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDevCtlPathArgDescription()) \
 _(DeveloperApiPort, "api-port",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperApiPortArgDescription()) \
 _(DeveloperCni,     "cni",                  NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperCniArgDescription()) \
 _(DeveloperDiagnosticsOutput, "output",     L"o",             Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperDiagnosticsOutputArgDescription()) \
@@ -70,9 +71,13 @@ _(DeveloperName,    "name",                 L"n",             Kind::Value,      
 _(DeveloperNetwork, "network",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperNetworkArgDescription()) \
 _(DeveloperNodeIp,  "node-ip",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperNodeIpArgDescription()) \
 _(DeveloperNodeName, "node-name",           NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperNodeNameArgDescription()) \
+_(DeveloperNvidiaGpuSharing, "nvidia-gpu-sharing", NO_ALIAS,  Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperNvidiaGpuSharingArgDescription()) \
+_(DeveloperOverwrite, "overwrite",         NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DeveloperOverwriteArgDescription()) \
+_(DeveloperOverwriteExisting, "overwrite-existing", NO_ALIAS, Kind::Flag,     NoConversion, Localization::WSLCCLI_DeveloperOverwriteExistingArgDescription()) \
 _(DeveloperPodCidr, "pod-cidr",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_DeveloperPodCidrArgDescription()) \
 _(DeveloperPruneKubeconfigFile, "prune-kubeconfig-file", NO_ALIAS, Kind::Value, NoConversion, Localization::WSLCCLI_DeveloperPruneKubeconfigFileArgDescription()) \
 _(DeveloperRedact,  "redact",               NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DeveloperRedactArgDescription()) \
+_(DeveloperYes,     "yes",                  NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DeveloperDeleteYesArgDescription()) \
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \
 _(Detach,           "detach",               L"d",             Kind::Flag,       NoConversion, Localization::WSLCCLI_DetachArgDescription()) \
 _(Details,          "details",              NO_ALIAS,         Kind::Flag,       NoConversion, Localization::WSLCCLI_DetailsArgDescription()) \

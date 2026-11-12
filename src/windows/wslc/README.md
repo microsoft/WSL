@@ -12,8 +12,8 @@ included.
 - Branch:
   [`user/ptrivedi/wslc-developer-prototype`](https://github.com/microsoft/WSL/tree/user/ptrivedi/wslc-developer-prototype)
 
-The current implementation still delegates to the external AKS Desktop SDK
-`aks-desktop.exe` executable using its WSL driver. It has not yet been converted to
+The current implementation delegates to the external AKS Developer CLI
+`aks-devctl.exe` (SDK 0.3.8) using its WSL provider. It has not yet been converted to
 run the agent inside the regular WSLC utility VM.
 
 Clusters are disposable development environments. In-place upgrades and
@@ -51,23 +51,42 @@ The SDK executable is intentionally not committed to the WSL repository and
 must be obtained separately:
 
 ```text
-aks-desktop.exe
+aks-devctl.exe
 ```
 
 Place it beside `bin\x64\Debug\wslc.exe`, or configure its full path:
 
 ```powershell
-$env:AKS_DESKTOP_BIN = "C:\path\to\aks-desktop.exe"
+$env:AKS_DEVCTL_BIN = "C:\path\to\aks-devctl.exe"
 ```
 
-The executable can also be selected with `--aks-desktop-path`. The legacy
-`--aksedge-path` and `AKSEDGE_BIN` overrides remain accepted. Do not specify
-both path flags. Discovery prefers the path flag, then `AKS_DESKTOP_BIN`,
-then `AKSEDGE_BIN`, then a sibling `aks-desktop.exe`, and finally
-`aks-desktop.exe` on PATH. An invalid explicit path is an error.
-AKS Desktop downloads and installs BMAgent from its default public package
-repository. No local `.deb` is required. Use `--agent-repo` to override the
-repository; the old `--agent-deb` option is no longer supported.
+The executable can also be selected with `--aks-devctl-path`. The legacy
+`--aks-desktop-path`, `--aksedge-path`, `AKS_DESKTOP_BIN`, and `AKSEDGE_BIN`
+overrides remain accepted, but must point to the new SDK. Specify only one
+path flag. Discovery prefers the path flag, then `AKS_DEVCTL_BIN`,
+`AKS_DESKTOP_BIN`, `AKSEDGE_BIN`, a sibling `aks-devctl.exe`, and finally
+`aks-devctl.exe` on PATH. An invalid explicit path is an error.
+Older `aks-desktop.exe` SDK command contracts are no longer supported.
+The new SDK also requires its own WSL instance ownership metadata. Clusters
+created by the old SDK are not automatically adopted: operations such as
+status refuse an existing instance that is not owned by `aks-devctl`. Keep
+using the old SDK to manage those clusters, or create a new cluster with a
+different name. Updating this wrapper does not migrate or delete them.
+
+The SDK creates `aks-devctl.settings.json` beside its executable when missing.
+That directory must be writable. Do not copy another user's settings file;
+use generated defaults or configure the SDK explicitly:
+
+```powershell
+& .\bin\x64\Debug\aks-devctl.exe setting get --all
+& .\bin\x64\Debug\aks-devctl.exe setting schema
+& .\bin\x64\Debug\aks-devctl.exe setting set --help
+```
+
+Provider settings, including agent installation, connectivity, and CNI
+configuration, now live in that file rather than WSLC command flags.
+The SDK downloads the Ubuntu image and management-agent packages as needed.
+No local `.deb` is required.
 
 ## Create
 
@@ -75,64 +94,96 @@ repository; the old `--agent-deb` option is no longer supported.
 & $wslc cluster create `
   --developer `
   --name dev-cluster `
-  --distro Ubuntu-24.04 `
   --distribution K8s `
-  --cni cilium `
-  --k8s-version <version> `
-  --merge
+  --k8s-version v1.36.5 `
+  --output .\dev-kubeconfig.yaml
 ```
 
 Available options:
 
 ```text
 --name <cluster-name>
---distro <wsl-distro>
---host-name <host-name>
---node-name <node-name>
---node-ip <ip-address>
---agent-repo <apt-source>
---api-port <port>
 --k8s-version <version>
 --pod-cidr <cidr>
 --distribution <K8s|K3s>
---cni <cilium|none>
 --enable-gpu
 --gpu-vendor <vendor>
---network <network>
+--nvidia-gpu-sharing <0|2|4>
 --output <kubeconfig-file>
---merge
---merge-into <kubeconfig-file>
---aks-desktop-path <path>
+--overwrite
+--overwrite-existing
+--aks-devctl-path <path>
 ```
 
-This SDK's WSL driver requires `Ubuntu-24.04`; the distro is disposable.
-The SDK defaults include API port `6443` and pod CIDR `10.244.0.0/16`.
-Use either `--merge` or `--merge-into`, not both.
+On Windows, the cluster name is also the WSL instance name and the Kubernetes
+node name. The SDK uses Ubuntu 24.04 and rejects an existing instance with the
+same name; it never reuses or overwrites it.
+Omitting the version selects the highest non-deprecated version in the SDK's
+embedded catalog.
 
-Create and delete stream the SDK's raw JSON-lines progress events directly
+Without `--output`, credentials are merged into `%USERPROFILE%\.kube\config`;
+the SDK ignores `KUBECONFIG`. Use `--overwrite-existing` to replace conflicting
+entries. With `--output`, the parent directory must exist and an existing file
+requires `--overwrite`, which replaces the entire file.
+
+The old `--distro`, `--host-name`, `--node-name`, `--node-ip`, `--agent-repo`,
+`--api-port`, `--cni`, `--network`, `--merge`, and `--merge-into` flags are no
+longer accepted. Use the cluster name, SDK settings, and output options above.
+WSLC retains `--k8s-version` and `--distribution`, translating them to the SDK's
+`--kubernetes-version` and `--kubernetes-distribution`.
+
+Create and delete select the SDK's JSON output and stream its progress events
 to the terminal.
 
 No Azure subscription, tenant, authentication, or Fleet options are accepted.
 
+## NVIDIA GPU sharing
+
+```powershell
+& $wslc cluster create `
+  --developer `
+  --name gpu-dev `
+  --nvidia-gpu-sharing 4 `
+  --output .\gpu-dev.yaml
+```
+
+`--enable-gpu` configures guest GPU support and installs the device plugin.
+`--gpu-vendor nvidia` explicitly selects NVIDIA when GPU support is enabled.
+`--nvidia-gpu-sharing` accepts `0` (sharing disabled), `2`, or `4` time-slicing
+slots per physical GPU. A nonzero value enables NVIDIA GPU support and sharing
+without requiring a separate `--enable-gpu`.
+Time-slicing does not provide memory or compute isolation.
+GPU operation requires compatible NVIDIA hardware and a Windows driver with
+WSL GPU support; enabling the flag does not emulate a GPU.
+
+After creation, inspect the advertised resources:
+
+```powershell
+kubectl --kubeconfig .\gpu-dev.yaml get nodes `
+  -o 'custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu'
+```
+
 ## Delete
 
 ```powershell
-& $wslc cluster delete --developer --name dev-cluster
+& $wslc cluster delete --developer --name dev-cluster --yes
 ```
 
-`remove` and `rm` are aliases for `delete`. Optional arguments are `--distro`,
-`--prune-kubeconfig-file`, and `--aks-desktop-path`.
+`remove` and `rm` are aliases for `delete`. The name is required. Omit `--yes`
+to require interactive confirmation before deletion.
 
-Deletion requests guest removal and kubeconfig pruning from the SDK.
-Cluster-local data is disposable.
+Deletion permanently removes the named WSL instance and prunes its entries
+from the default kubeconfig. Separate kubeconfig files are not changed.
+The old `--prune-kubeconfig-file` flag is no longer accepted.
+Cluster-local data is disposable. The new SDK does not shut down other WSL
+instances during deletion.
 
 ## Supporting utilities
 
 ```powershell
-& $wslc cluster status --developer
+& $wslc cluster status --developer --name dev-cluster
 & $wslc cluster kubeconfig --developer --name dev-cluster --output .\kubeconfig
-& $wslc cluster kubeconfig --developer --name dev-cluster --merge
-& $wslc cluster kubeconfig --developer --name dev-cluster --merge-into .\kubeconfig
+& $wslc cluster kubeconfig --developer --name dev-cluster --overwrite-existing
 
 & $wslc cluster diagnostics `
   --developer `
@@ -146,9 +197,18 @@ Cluster-local data is disposable.
 & $wslc cluster cnis --developer
 ```
 
-Status accepts `--distro`. Kubeconfig and diagnostics also accept `--distro`;
-diagnostics accepts an optional cluster name. All SDK-backed commands accept
-`--aks-desktop-path` (or legacy `--aksedge-path`).
+Status reports environment and agent availability, not Kubernetes readiness.
+Kubeconfig retrieval merges into the default host kubeconfig unless `--output`
+selects a separate file. Existing contexts or files require
+`--overwrite-existing`; an explicitly selected file is replaced in full.
+Unlike create, credential retrieval creates missing parent directories.
+Kubeconfig YAML on standard output is no longer supported.
+
+Diagnostics requires both `--name` and `--output`. The output is a `.tar.gz`
+support bundle; the destination may be a file path or an existing directory.
+The `cnis` utility now shows the combined distribution/CNI catalog, just like
+`distributions`.
+All SDK-backed commands accept `--aks-devctl-path` (or a legacy path alias).
 
 ## Help
 

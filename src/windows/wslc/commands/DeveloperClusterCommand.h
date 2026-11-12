@@ -30,6 +30,7 @@ enum class DeveloperClusterOperation
 
 std::vector<Argument> GetDeveloperClusterArguments(DeveloperClusterOperation operation);
 void ValidateDeveloperClusterArguments(DeveloperClusterOperation operation, ArgMap& args);
+std::vector<std::wstring> BuildDeveloperClusterCommand(DeveloperClusterOperation operation, ArgMap& args);
 void ExecuteDeveloperCluster(DeveloperClusterOperation operation, CLIExecutionContext& context);
 std::wstring DeveloperClusterShortDescription(DeveloperClusterOperation operation);
 std::wstring DeveloperClusterLongDescription(DeveloperClusterOperation operation);

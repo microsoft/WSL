@@ -3789,6 +3789,46 @@ On first run, creates the file with all settings commented out at their defaults
   <data name="WSLCCLI_DeveloperClusterCommandDesc" xml:space="preserve">
     <value>Manage standalone developer clusters on WSL.</value>
   </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlCommandLongDesc" xml:space="preserve">
+    <value>Create, inspect, and delete local single-node Kubernetes clusters through the AKS Developer CLI.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperDevCtlPathArgDescription" xml:space="preserve">
+    <value>Path to aks-devctl.exe; overrides AKS_DEVCTL_BIN, legacy SDK environment variables, and automatic discovery</value>
+  </data>
+  <data name="WSLCCLI_DeveloperNvidiaGpuSharingArgDescription" xml:space="preserve">
+    <value>NVIDIA time-slicing slots per physical GPU: 0 (disabled), 2, or 4; nonzero enables NVIDIA GPU support without memory or compute isolation</value>
+  </data>
+  <data name="WSLCCLI_DeveloperOverwriteArgDescription" xml:space="preserve">
+    <value>Replace the entire explicitly selected kubeconfig output file during cluster creation</value>
+  </data>
+  <data name="WSLCCLI_DeveloperOverwriteExistingArgDescription" xml:space="preserve">
+    <value>Replace conflicting kubeconfig entries; credential retrieval replaces an explicitly selected output file in full</value>
+  </data>
+  <data name="WSLCCLI_DeveloperDeleteYesArgDescription" xml:space="preserve">
+    <value>Skip confirmation and permanently delete the cluster, its WSL instance, and default kubeconfig entries</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlNotFound" xml:space="preserve">
+    <value>Could not find aks-devctl.exe. Install it beside wslc.exe, set AKS_DEVCTL_BIN, add it to PATH, or use --aks-devctl-path.</value>
+    <comment>{Locked="--aks-devctl-path."}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlExecutableConflict" xml:space="preserve">
+    <value>Specify only one SDK executable path option.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterOverwriteRequiresOutput" xml:space="preserve">
+    <value>Replacing a kubeconfig file during cluster creation requires an explicit output file.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlCancelCleanup" xml:space="preserve">
+    <value>Cancellation requested. Waiting briefly for aks-devctl to clean up the current operation.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlKubeconfigLongDesc" xml:space="preserve">
+    <value>Retrieves administrator credentials and merges them into the default host kubeconfig, or writes a separate file. Existing contexts or files require explicit overwrite permission.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlVersionsLongDesc" xml:space="preserve">
+    <value>Lists Kubernetes versions in the AKS Developer CLI's embedded catalog.</value>
+  </data>
+  <data name="WSLCCLI_DeveloperClusterDevCtlCnisLongDesc" xml:space="preserve">
+    <value>Lists Kubernetes distributions and their supported CNIs from the AKS Developer CLI catalog.</value>
+  </data>
   <data name="WSLCCLI_DeveloperClusterDesktopCommandLongDesc" xml:space="preserve">
     <value>Create, inspect, and delete local single-node Kubernetes clusters through AKS Desktop.</value>
   </data>
