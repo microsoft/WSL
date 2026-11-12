@@ -340,6 +340,17 @@ class MountTests
         // Unmount the disk
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), (DWORD)0);
         WaitForDiskReady();
+
+        // Mount over a nonempty directory
+        keepAlive.Set();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir " + mountTarget), (DWORD)0);
+        auto cleanup = wil::scope_exit([&]() { LxsstuLaunchWsl(L"rm -rf " + mountTarget); });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"touch " + mountTarget + L"/canary"), (DWORD)0);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(mountCommand + L" --partition 1"), (DWORD)0);
+
+        // Validate that unmount succeeds even when mountpoint cleanup fails
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), (DWORD)0);
+        WaitForDiskReady();
     }
 
     WSL2_TEST_METHOD(SpecifyInvalidMountName)
@@ -544,6 +555,37 @@ class MountTests
         VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
 
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + symlink.wstring()), (DWORD)0);
+    }
+
+    WSL2_TEST_METHOD(MountedVhdRestoresWhenBootDiskCountChanges)
+    {
+        SKIP_UNSUPPORTED_ARM64_MOUNT_TEST();
+#ifdef WSL_DEV_INSTALL_PATH
+        const auto kernelPath = std::filesystem::path{WSL_DEV_INSTALL_PATH} / L"kernel";
+#else
+        const auto kernelPath = GetInstalledWslToolsPath() / L"kernel";
+#endif
+        WslConfigChange config{LxssGenerateTestConfig({.kernel = kernelPath.native()})};
+        // Mount before starting the distro so the modules disk will displace this LUN on restore.
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--mount " + VhdDevice + L" --vhd --bare"), DWORD{0});
+        WslKeepAlive keepAlive;
+        const auto disk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(disk));
+        const auto [originalAddress, originalError] = LxsstuLaunchWslAndCaptureOutput(L"lsblk -dn -o HCTL " + disk);
+        VERIFY_IS_TRUE(originalError.empty());
+        VERIFY_IS_FALSE(originalAddress.empty());
+
+        WaitForVmTimeout(keepAlive);
+        // Change the boot disks without restarting the service, which would clear the saved mounts.
+        LxssWriteWslConfig(LxssGenerateTestConfig());
+
+        const auto restoredDisk = GetBlockDeviceInWsl(c_testDiskSize);
+        VERIFY_IS_TRUE(IsBlockDevicePresent(restoredDisk));
+        const auto [restoredAddress, restoredError] = LxsstuLaunchWslAndCaptureOutput(L"lsblk -dn -o HCTL " + restoredDisk);
+        VERIFY_IS_TRUE(restoredError.empty());
+        VERIFY_IS_FALSE(restoredAddress.empty());
+        VERIFY_ARE_NOT_EQUAL(originalAddress, restoredAddress);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--unmount " + VhdDevice), DWORD{0});
     }
 
     // Attach a disk, but don't mount it

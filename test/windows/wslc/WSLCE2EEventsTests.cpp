@@ -574,6 +574,84 @@ class WSLCE2EEventsTests
         }
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Events_ImageLifecycleAndJsonFormat)
+    {
+        GUID runId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&runId));
+        const auto suffix = wsl::shared::string::GuidToString<wchar_t>(runId, wsl::shared::string::GuidToStringFlags::None);
+        const auto image = L"wslc-events-image-" + suffix + L":v1";
+        const auto pruneLabel = L"wslc-events-image-prune-" + suffix;
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RunWslc(std::format(L"image delete {}", image)); });
+
+        const auto since = EpochSeconds();
+        auto result = RunWslc(std::format(L"image tag {} {}", DebianImage.NameAndTag(), image));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"image delete {}", image));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        cleanup.release();
+
+        result = RunWslc(std::format(L"image prune --force --filter label={}=yes", pruneLabel));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        std::vector<nlohmann::json> events;
+        const auto imageName = wsl::shared::string::WideToMultiByte(image);
+        std::vector<nlohmann::json>::const_iterator tagEvent;
+        std::vector<nlohmann::json>::const_iterator untagEvent;
+        std::vector<nlohmann::json>::const_iterator pruneEvent;
+        std::string imageId;
+
+        // Docker records the events asynchronously, so retry until this test's tag, untag and prune are visible in order.
+        const auto queryEvents = [&]() {
+            const auto query =
+                RunWslc(std::format(L"events --since {} --until {} --filter type=image --format json", since, EpochSeconds() + 1));
+            THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
+
+            events = ParseNdjsonOutput(query);
+            tagEvent = std::ranges::find_if(events, [&](const nlohmann::json& event) {
+                return event.at("Action").get<std::string>() == "tag" &&
+                       event.at("Actor").at("Attributes").at("name").get<std::string>() == imageName;
+            });
+            THROW_HR_IF(E_ABORT, tagEvent == events.cend());
+
+            imageId = tagEvent->at("Actor").at("ID").get<std::string>();
+            untagEvent = std::find_if(tagEvent + 1, events.cend(), [&](const nlohmann::json& event) {
+                return event.at("Action").get<std::string>() == "untag" && event.at("Actor").at("ID").get<std::string>() == imageId;
+            });
+            THROW_HR_IF(E_ABORT, untagEvent == events.cend());
+
+            pruneEvent = std::find_if(untagEvent + 1, events.cend(), [](const nlohmann::json& event) {
+                return event.at("Action").get<std::string>() == "prune" && event.at("Actor").at("ID").get<std::string>().empty();
+            });
+            THROW_HR_IF(E_ABORT, pruneEvent == events.cend());
+        };
+
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(queryEvents, std::chrono::milliseconds(200), std::chrono::seconds(30)));
+
+        for (const auto& event : {*tagEvent, *untagEvent, *pruneEvent})
+        {
+            VERIFY_ARE_EQUAL(std::string{"image"}, event.at("Type").get<std::string>());
+            VERIFY_ARE_EQUAL(event.at("Action").get<std::string>(), event.at("status").get<std::string>());
+            VERIFY_ARE_EQUAL(std::string{"local"}, event.at("scope").get<std::string>());
+            VERIFY_IS_FALSE(event.contains("from"));
+
+            const auto timeNano = event.at("timeNano").get<std::int64_t>();
+            VERIFY_IS_GREATER_THAN(timeNano, 0LL);
+            VERIFY_ARE_EQUAL(timeNano / 1'000'000'000, event.at("time").get<std::int64_t>());
+        }
+
+        VERIFY_ARE_EQUAL(imageId, tagEvent->at("id").get<std::string>());
+        VERIFY_ARE_EQUAL(imageId, untagEvent->at("id").get<std::string>());
+        VERIFY_ARE_EQUAL(imageId, untagEvent->at("Actor").at("Attributes").at("name").get<std::string>());
+        VERIFY_IS_FALSE(pruneEvent->contains("id"));
+        VERIFY_ARE_EQUAL(std::string{"0"}, pruneEvent->at("Actor").at("Attributes").at("reclaimed").get<std::string>());
+
+        result = RunWslc(std::format(L"events --since {} --until {} --filter event=tag --filter image={}", since, EpochSeconds() + 1, image));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VerifyEventLines(
+            result.GetStdoutLines(), {std::format(L" image tag {} (name={})", wsl::shared::string::MultiByteToWide(imageId), image)});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Events_VolumeLifecycle)
     {
         GUID runId{};

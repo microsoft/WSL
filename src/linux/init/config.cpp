@@ -2970,7 +2970,7 @@ try
 
         if (Config.CgroupNamespace)
         {
-            if (UtilMoveSelfToDistroCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, "login") < 0 ||
+            if (UtilMoveSelfToCgroup(CGROUP_MOUNTPOINT WSL_USER_NON_SYSTEMD_CGROUP_DIR, "login") < 0 ||
                 UtilEnterCgroupNamespace(Config.CgroupNamespace.get(), "login") < 0)
             {
                 _exit(1);

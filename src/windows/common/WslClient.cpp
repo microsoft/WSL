@@ -732,6 +732,17 @@ int ListDistributionsHelper(_In_ ListOptions options)
         return (WI_IsFlagSet(Left.Flags, LXSS_ENUMERATE_FLAGS_DEFAULT));
     });
 
+    if (options.running && !options.online)
+    {
+        std::erase_if(distros, [&](const auto& entry) { return (entry.State != LxssDistributionStateRunning); });
+
+        if ((!options.quiet) && (distros.empty()))
+        {
+            wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageNoRunningDistro());
+            return -1;
+        }
+    }
+
     if (options.verbose)
     {
         THROW_HR_IF(WSL_E_DEFAULT_DISTRO_NOT_FOUND, distros.empty());
@@ -791,17 +802,6 @@ int ListDistributionsHelper(_In_ ListOptions options)
     }
     else if (!options.online)
     {
-        if (options.running)
-        {
-            std::erase_if(distros, [&](const auto& entry) { return (entry.State != LxssDistributionStateRunning); });
-
-            if ((!options.quiet) && (distros.empty()))
-            {
-                wsl::windows::common::wslutil::PrintMessage(wsl::shared::Localization::MessageNoRunningDistro());
-                return -1;
-            }
-        }
-
         if (!options.all)
         {
             std::erase_if(distros, [&](const auto& entry) {

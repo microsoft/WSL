@@ -11,7 +11,7 @@ set(SOURCES
     WSLCSession.cpp
     WSLCSessionRuntime.cpp
     WSLCContainer.cpp
-    WSLCRestartScheduler.cpp
+    WSLCContainerStateStore.cpp
     WSLCVirtualMachine.cpp
 
     # Process management
@@ -27,7 +27,6 @@ set(SOURCES
     # Supporting classes
     DockerEventTracker.cpp
     DockerHTTPClient.cpp
-    EventStore.cpp
     IORelay.cpp
     OptionParser.cpp
     ServiceProcessLauncher.cpp
@@ -37,14 +36,14 @@ set(SOURCES
 set(HEADERS
     DockerEventTracker.h
     DockerHTTPClient.h
-    EventStore.h
     IORelay.h
     OptionParser.h
     ServiceProcessLauncher.h
     WSLCContainer.h
     WSLCContainerMetadata.h
+    WSLCContainerStateStore.h
     WSLCExitRequestState.h
-    WSLCRestartScheduler.h
+    WSLCRestartTransaction.h
     WindowsCertStore.h
     WSLCProcess.h
     WSLCProcessControl.h

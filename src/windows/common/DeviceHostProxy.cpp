@@ -294,6 +294,14 @@ void DeviceHostProxy::AddRemoteFileSystem(const GUID& ImplementationClsid, const
     m_fileSystems.emplace_back(ImplementationClsid, Tag, Plan9Fs, m_git.get());
 }
 
+void DeviceHostProxy::RemoveRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag) noexcept
+{
+    auto lock = m_lock.lock_exclusive();
+    const auto removed = std::erase_if(
+        m_fileSystems, [&](const auto& entry) { return entry.ImplementationClsid == ImplementationClsid && entry.Tag == Tag; });
+    LOG_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), removed == 0);
+}
+
 wil::com_ptr<IPlan9FileSystem> DeviceHostProxy::GetRemoteFileSystem(const GUID& ImplementationClsid, std::wstring_view Tag)
 {
     auto lock = m_lock.lock_shared();

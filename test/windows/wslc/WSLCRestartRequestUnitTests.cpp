@@ -4,14 +4,62 @@
 #include "Common.h"
 #include "../../../src/windows/wslcsession/WSLCExitRequestState.h"
 #include "../../../src/windows/wslcsession/WSLCRestartBackoff.h"
+#include "../../../src/windows/wslcsession/WSLCRestartTransaction.h"
 
 namespace WSLCRestartRequests {
 
 using wsl::windows::service::wslc::WSLCExitRequestState;
+using wsl::windows::service::wslc::WSLCRestartTransaction;
 
 class WSLCRestartRequestUnitTests
 {
     WSLC_TEST_CLASS(WSLCRestartRequestUnitTests)
+
+    TEST_METHOD(RestartCleanup_CancelledRestartCannotCleanUpReplacement)
+    {
+        auto cancelled = std::make_shared<WSLCRestartTransaction>();
+        auto owner = cancelled;
+
+        // A's start commits before its cancelled wait unwinds; B acquires the stopped interval.
+        owner.reset();
+        auto replacement = std::make_shared<WSLCRestartTransaction>();
+        owner = replacement;
+
+        unsigned cleanupCalls = 0;
+        cancelled->CleanupIfOwned(owner, false, [&]() { ++cleanupCalls; });
+        VERIFY_ARE_EQUAL(0u, cleanupCalls);
+        VERIFY_IS_TRUE(owner == replacement);
+
+        replacement->CleanupIfOwned(owner, false, [&]() {
+            VERIFY_IS_FALSE(static_cast<bool>(owner));
+            ++cleanupCalls;
+        });
+        VERIFY_ARE_EQUAL(1u, cleanupCalls);
+        VERIFY_IS_FALSE(static_cast<bool>(owner));
+    }
+
+    TEST_METHOD(RestartCleanup_CancelledWaitAfterStartCommitDoesNotCleanUp)
+    {
+        auto restart = std::make_shared<WSLCRestartTransaction>();
+        auto owner = restart;
+        owner.reset();
+
+        unsigned cleanupCalls = 0;
+        restart->CleanupIfOwned(owner, false, [&]() { ++cleanupCalls; });
+        VERIFY_ARE_EQUAL(0u, cleanupCalls);
+        VERIFY_IS_FALSE(static_cast<bool>(owner));
+    }
+
+    TEST_METHOD(RestartCleanup_SuccessReleasesOwnershipWithoutFailureCleanup)
+    {
+        auto restart = std::make_shared<WSLCRestartTransaction>();
+        auto owner = restart;
+
+        unsigned cleanupCalls = 0;
+        restart->CleanupIfOwned(owner, true, [&]() { ++cleanupCalls; });
+        VERIFY_ARE_EQUAL(0u, cleanupCalls);
+        VERIFY_IS_FALSE(static_cast<bool>(owner));
+    }
 
     TEST_METHOD(RestartBackoff_CapturesEachRunDuration)
     {
@@ -120,6 +168,38 @@ class WSLCRestartRequestUnitTests
         VERIFY_IS_TRUE(state.SuppressesRestart());
         VERIFY_IS_TRUE(state.CompleteRequest(second, false));
         VERIFY_IS_FALSE(state.SuppressesRestart());
+    }
+
+    TEST_METHOD(RestartRequests_IdleEventTracksPendingRequests)
+    {
+        WSLCExitRequestState state;
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
+        state.BeginRun();
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
+
+        const auto first = state.BeginRequest();
+        const auto second = state.BeginRequest();
+        const auto batch = state.IdleEvent();
+        VERIFY_IS_TRUE(static_cast<bool>(batch));
+        VERIFY_IS_FALSE(batch.is_signaled());
+        VERIFY_IS_TRUE(state.CompleteRequest(first, true));
+        VERIFY_IS_FALSE(batch.is_signaled());
+        VERIFY_IS_TRUE(state.CompleteRequest(second, false));
+        VERIFY_IS_TRUE(batch.is_signaled());
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
+
+        // A later batch must not reset an event captured from an earlier one.
+        const auto stale = state.BeginRequest();
+        const auto staleBatch = state.IdleEvent();
+        VERIFY_ARE_NOT_EQUAL(batch.get(), staleBatch.get());
+        VERIFY_IS_TRUE(batch.is_signaled());
+        VERIFY_IS_FALSE(staleBatch.is_signaled());
+
+        state.BeginRun();
+        VERIFY_IS_TRUE(staleBatch.is_signaled());
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
+        VERIFY_IS_FALSE(state.CompleteRequest(stale, false));
+        VERIFY_IS_FALSE(static_cast<bool>(state.IdleEvent()));
     }
 
     TEST_METHOD(RestartRequests_FailurePreservesSuccessfulIntent)

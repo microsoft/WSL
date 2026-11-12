@@ -44,9 +44,9 @@ EXTERN_C_START
 #define WSLC_E_CONTAINER_DELETED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 19)             /* 0x80040613 */
 #define WSLC_E_CAPABILITY_ADDITIONS_DISABLED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 20) /* 0x80040614 */
 #define WSLC_E_RUNTIME_UPDATE_NEEDED MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 21)         /* 0x80040615 */
-
+#define WSLC_E_NETWORK_PREFIX_AMBIGUOUS MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, WSLC_E_BASE + 22)      /* 0x80040616 */
 // Session values
-#define WSLC_SESSION_OPTIONS_SIZE 72
+#define WSLC_SESSION_OPTIONS_SIZE 80
 #define WSLC_SESSION_OPTIONS_ALIGNMENT 8
 
 typedef struct WslcSessionSettings
@@ -155,6 +155,11 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 STDAPI WslcSetSessionSettingsFeatureFlags(_In_ WslcSessionSettings* sessionSettings, _In_ WslcSessionFeatureFlags flags);
 
+// Allows containers to reach services listening on the Windows host loopback interface through the given hostname.
+// Disabled by default; pass null to disable. Requires WSL 3.0.5 or later.
+// hostName is not copied and must stay valid until WslcCreateSession returns.
+STDAPI WslcSetSessionSettingsHostLoopback(_In_ WslcSessionSettings* sessionSettings, _In_opt_z_ PCSTR hostName);
+
 STDAPI WslcGetSessionTerminationEvent(_In_ WslcSession session, _Out_ HANDLE* terminationEvent);
 STDAPI WslcGetSessionTerminationReason(_In_ WslcSession session, _Out_ WslcSessionTerminationReason* reason);
 
@@ -208,7 +213,7 @@ typedef struct WslcContainerNamedVolume
 
 typedef struct WslcContainerNetwork
 {
-    _In_z_ PCSTR name; // Network name (e.g. "bridge" or a network created with WslcCreateSessionNetwork)
+    _In_z_ PCSTR name;                               // Network name. A full network ID or unique ID prefix is also accepted.
     _In_reads_opt_(aliasCount) const PCSTR* aliases; // DNS aliases for the container on this network; user-defined networks only
     _In_ uint32_t aliasCount;
     _In_opt_ const IN_ADDR* ipv4Address;  // Static IPv4 address for the container on this network; user-defined networks only
@@ -365,6 +370,50 @@ typedef enum WslcDeleteContainerFlags
 DEFINE_ENUM_FLAG_OPERATORS(WslcDeleteContainerFlags);
 
 STDAPI WslcDeleteContainer(_In_ WslcContainer container, _In_ WslcDeleteContainerFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Connects a created or running container to a session network.
+//
+// Parameters:
+//   container
+//       A valid WslcContainer handle.
+//
+//   network
+//       The network to connect to. network->name may be a network name, full ID, or unique ID prefix. Aliases and static
+//       IP addresses are optional and are only supported on user-defined networks.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches network->name.
+//   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if network->name is an ID prefix that matches more than one network.
+//   - Returns E_INVALIDARG if the container's networking mode does not support additional networks.
+//   - Requires WSL 3.1.0 or later; returns WSLC_E_RUNTIME_UPDATE_NEEDED on older runtimes.
+STDAPI WslcConnectContainerNetwork(_In_ WslcContainer container, _In_ const WslcContainerNetwork* network, _Outptr_opt_result_z_ PWSTR* errorMessage);
+
+// Disconnects a created or running container from a session network.
+//
+// Parameters:
+//   container
+//       A valid WslcContainer handle.
+//
+//   nameOrId
+//       The name, full ID, or unique ID prefix of the network to disconnect from.
+//
+//   errorMessage
+//       Optional. On failure, receives a human-readable error message. May be null.
+//
+// Return Value:
+//   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
+//
+// Notes:
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches nameOrId.
+//   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if nameOrId is an ID prefix that matches more than one network.
+//   - Requires WSL 3.1.0 or later; returns WSLC_E_RUNTIME_UPDATE_NEEDED on older runtimes.
+STDAPI WslcDisconnectContainerNetwork(_In_ WslcContainer container, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // PROCESS DEFINITIONS
 STDAPI WslcInitProcessSettings(_Out_ WslcProcessSettings* processSettings);
@@ -804,8 +853,9 @@ STDAPI WslcCreateSessionNetwork(
 //   session
 //       A valid WslcSession handle.
 //
-//   name
-//       The name of the network to delete.
+//   nameOrId
+//       The name, full ID, or unique ID prefix of the network to delete. A full ID match takes precedence over a name match,
+//       and a name match takes precedence over an ID prefix match.
 //
 //   errorMessage
 //       Optional. On failure, receives a human-readable error message. May be null.
@@ -814,10 +864,11 @@ STDAPI WslcCreateSessionNetwork(
 //   S_OK on success. Otherwise, an HRESULT error code indicating the reason for failure.
 //
 // Notes:
-//   - Returns WSLC_E_NETWORK_NOT_FOUND if the network does not exist.
+//   - Returns WSLC_E_NETWORK_NOT_FOUND if no network matches nameOrId.
+//   - Returns WSLC_E_NETWORK_PREFIX_AMBIGUOUS if nameOrId is an ID prefix that matches more than one network.
 //   - Returns HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) if a container is connected to the network.
 //   - Returns WSLC_E_RUNTIME_UPDATE_NEEDED if the installed WSL runtime does not support network management.
-STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage);
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage);
 
 // STORAGE
 

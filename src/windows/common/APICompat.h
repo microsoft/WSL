@@ -124,6 +124,7 @@ public:
     DEFAULT_MOVABLE(SessionSettingsConversion);
 
     explicit SessionSettingsConversion(const WSLCCompatSessionSettings& Settings);
+    explicit SessionSettingsConversion(const WSLCCompatSessionSettings2& Settings);
 
     const WSLCSessionSettings* Get() const noexcept
     {
@@ -155,6 +156,11 @@ inline VolumeOptionsConversion Convert(const WSLCCompatVolumeOptions& Options)
 }
 
 inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings& Settings)
+{
+    return SessionSettingsConversion(Settings);
+}
+
+inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings2& Settings)
 {
     return SessionSettingsConversion(Settings);
 }

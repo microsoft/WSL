@@ -26,9 +26,10 @@ Abstract:
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
+#include "WSLCContainerStateStore.h"
 #include "WSLCExitRequestState.h"
 #include "WSLCRestartBackoff.h"
-#include "WSLCNetworkMetadata.h"
+#include "WSLCRestartTransaction.h"
 #include "WSLCVhdVolume.h"
 #include <unordered_map>
 
@@ -96,11 +97,15 @@ public:
         std::int64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags,
-        WSLCContainerRestartPolicy RestartPolicy);
+        WSLCContainerRestartPolicy RestartPolicy,
+        const WSLCPersistedContainerState& PersistentState,
+        HRESULT PersistentStateLoadError);
 
     ~WSLCContainerImpl();
 
     void Initialize();
+
+    void Rundown() noexcept;
 
     // Applies the restart policy to a container found when the session starts.
     void OnSessionStart();
@@ -124,7 +129,7 @@ public:
     void Stats(LPSTR* Output) const;
     void GetLabels(WSLCLabelInformation** Labels, ULONG* Count) const;
     void ConnectToNetwork(const WSLCNetworkConnectionOptions* Options);
-    void DisconnectFromNetwork(LPCSTR NetworkName);
+    void DisconnectFromNetwork(LPCSTR NetworkNameOrId);
 
     void CopyTo(IWSLCContainer** Container) const;
 
@@ -157,7 +162,6 @@ public:
         WSLCSession& wslcSession,
         WSLCSessionRuntime& runtime,
         IWSLCPluginNotifier* pluginNotifier,
-        const std::unordered_map<std::string, NetworkEntry>& SessionNetworks,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 
@@ -198,13 +202,6 @@ private:
         unique_com_disconnect Wrapper;
     };
 
-    // Restart() runs a stop phase followed by a start phase. This marks the pair as one transaction so
-    // that Start() and Stop() cannot land in between.
-    struct RestartTransaction
-    {
-        wil::unique_event Completed{wil::EventOptions::ManualReset};
-    };
-
     __requires_exclusive_lock_held(m_lock) bool RequestDeleteExclusiveLockHeld(WSLCDeleteFlags Flags, bool Prune = false);
 
     void AllocateBridgedModePorts();
@@ -212,13 +209,15 @@ private:
 
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> StartTransition(TransitionKind kind, ContainerEvent expectedEvent);
 
-    // Returns with both locks held when no transition is active (or it matches kind) and, if waitForRestart,
-    // no restart is in flight either. Both conditions are re-checked every time the locks come back.
+    // Returns with both locks held when no transition is active (or it matches kind), if waitForRestart, no restart
+    // is in flight, and, if waitForExitRequests, no stop or kill request is in flight against an exited run. All
+    // conditions are re-checked every time the locks come back.
     void WaitForConflictingTransitionToComplete(
         wil::rwlock_release_exclusive_scope_exit& lock,
         wil::rwlock_release_shared_scope_exit& lifecycleLock,
         std::optional<TransitionKind> kind = std::nullopt,
-        bool waitForRestart = true);
+        bool waitForRestart = true,
+        bool waitForExitRequests = false);
 
     // Phases of Restart(). Identical to Start() and Stop() except that they do not stand down for the
     // restart they are part of. PolicyRestartToken identifies a start requested by the restart policy,
@@ -235,6 +234,9 @@ private:
     __requires_shared_lock_held(m_lock) bool HasPolicyRestartAuthorityLockHeld(std::uint64_t Token) const noexcept;
     void RunPolicyRestart(std::uint64_t Token) noexcept;
     void OnPolicyRestartFailed(std::uint64_t Token) noexcept;
+
+    // Logs a failure to save the persisted state and warns the caller.
+    void ReportStateSaveFailure(HRESULT Result) noexcept;
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
@@ -282,6 +284,7 @@ private:
     // N.B. Stop releases it across the docker request, which can block indefinitely, and re-checks m_stateGeneration instead.
     wil::srwlock m_lifecycleLock;
     mutable wil::srwlock m_lock;
+    std::once_flag m_rundown;
     std::string m_name;
     std::string m_image;
     std::string m_id;
@@ -294,11 +297,10 @@ private:
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
-    // Non-null from before Restart()'s stop phase until its start phase commits Running. Start() and
-    // Stop() stand down for that window, and OnStopped() keeps the container's runtime resources mapped
-    // and skips the auto-delete of an --rm container. Delete() does not stand down: a remove that lands
-    // between the two phases takes effect, and the restart's start phase fails.
-    _Guarded_by_(m_lock) std::shared_ptr<RestartTransaction> m_restart;
+    // Owns the stop/start pair until Running commits, its owner completes cleanup, or the container is Deleted.
+    // Start() and Stop() stand down for that window, and OnStopped() retains runtime resources and suppresses
+    // auto-removal of an --rm container. Delete() can take effect between the phases, causing the start phase to fail.
+    _Guarded_by_(m_lock) std::shared_ptr<WSLCRestartTransaction> m_restart;
 
     // True between a successful StartPhase() and the release of the container's ports and mounts. A
     // restart leaves this set across the two phases, which is what tells the start phase they are still
@@ -358,10 +360,13 @@ private:
 
     // Delay before the next policy restart; reset when a run lasts long enough or by an explicit start.
     _Guarded_by_(m_lock) WSLCRestartBackoff m_restartBackoff;
+
+    // State persisted across VM shutdown for the lifetime of the container. Internally synchronized.
+    WSLCContainerStateStore m_persistentState;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer
-    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, IWSLCCompatContainer, IFastRundown, ISupportErrorInfo>,
+    : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCContainer, Microsoft::WRL::ChainInterfaces<IWSLCCompatContainer2, IWSLCCompatContainer>, IFastRundown, ISupportErrorInfo>,
       public COMImplClass<WSLCContainerImpl, std::weak_ptr<WSLCContainerImpl>>
 {
 
@@ -392,13 +397,17 @@ public:
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
-    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkName) override;
+    IFACEMETHOD(DisconnectFromNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     // IWSLCCompatContainer.
     IFACEMETHOD(Start)(_In_ WSLCContainerStartFlags Flags) override;
     IFACEMETHOD(GetInitProcess)(_Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Exec)(_In_ const WSLCCompatProcessOptions* Options, _Out_ IWSLCCompatProcess** Process) override;
     IFACEMETHOD(Inspect)(_Out_ LPSTR* Output) override;
+
+    // IWSLCCompatContainer2.
+    IFACEMETHOD(ConnectNetwork)(_In_ const WSLCCompatNetworkConnection* Network) override;
+    IFACEMETHOD(DisconnectNetwork)(_In_ LPCSTR NetworkNameOrId) override;
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

@@ -602,6 +602,28 @@ void ValidateStringArray(PCSTR const* strings, uint32_t count)
     }
 }
 
+void ValidateContainerNetwork(const WslcContainerNetwork& network)
+{
+    THROW_HR_IF(E_INVALIDARG, network.name == nullptr || *network.name == '\0');
+    ValidateStringArray(network.aliases, network.aliasCount);
+}
+
+// Stores the newest compat container interface the runtime implements and configures its proxy.
+HRESULT InitializeContainer(WslcContainerImpl& impl)
+{
+    wil::com_ptr<IWSLCCompatContainer2> container2;
+    const auto queryResult = impl.container->QueryInterface(IID_PPV_ARGS(container2.put()));
+    if (queryResult != E_NOINTERFACE)
+    {
+        RETURN_IF_FAILED(queryResult);
+        impl.container2 = container2.get();
+        impl.container = std::move(container2);
+    }
+
+    wsl::windows::common::security::ConfigureForCOMImpersonation(impl.container.get());
+    return S_OK;
+}
+
 } // namespace
 
 // SESSION DEFINITIONS
@@ -673,7 +695,8 @@ try
     wil::com_ptr<IWSLCCompatSessionManager> sessionManager = CreateSessionManager();
 
     auto result = std::make_unique<WslcSessionImpl>();
-    WSLCCompatSessionSettings runtimeSettings{};
+    WSLCCompatSessionSettings2 runtimeSettings2{};
+    auto& runtimeSettings = runtimeSettings2.Base;
     runtimeSettings.DisplayName = internalType->displayName;
     runtimeSettings.StoragePath = internalType->storagePath;
     runtimeSettings.MaximumStorageSizeMb = internalType->vhdRequirements.sizeBytes / _1MB;
@@ -686,7 +709,26 @@ try
     WI_SetFlag(runtimeSettings.FeatureFlags, WslcFeatureFlagsDnsTunneling);
 
     wil::com_ptr<IWSLCCompatSession> compatSession;
-    if (SUCCEEDED(errorInfoWrapper.CaptureResult(sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession))))
+    HRESULT createResult{};
+    if (internalType->hostLoopback == nullptr)
+    {
+        createResult = sessionManager->CreateSession(&runtimeSettings, WSLCSessionFlagsNone, nullptr, &compatSession);
+    }
+    else
+    {
+        // Host loopback is only understood by IWSLCCompatSessionManager2 runtimes.
+        wil::com_ptr<IWSLCCompatSessionManager2> sessionManager2;
+        const auto queryResult = sessionManager->QueryInterface(IID_PPV_ARGS(sessionManager2.put()));
+        RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, queryResult == E_NOINTERFACE);
+        RETURN_IF_FAILED(queryResult);
+
+        wsl::windows::common::security::ConfigureForCOMImpersonation(sessionManager2.get());
+
+        runtimeSettings2.HostLoopback = internalType->hostLoopback;
+        createResult = sessionManager2->CreateSession2(&runtimeSettings2, WSLCSessionFlagsNone, nullptr, &compatSession);
+    }
+
+    if (SUCCEEDED(errorInfoWrapper.CaptureResult(createResult)))
     {
         wil::com_ptr<IWSLCCompatSession2> compatSession2;
         const auto queryResult = compatSession->QueryInterface(IID_PPV_ARGS(compatSession2.put()));
@@ -835,6 +877,17 @@ try
     auto internalType = CheckAndGetInternalType(sessionSettings);
 
     internalType->featureFlags = flags;
+
+    return S_OK;
+}
+CATCH_RETURN();
+
+STDAPI WslcSetSessionSettingsHostLoopback(_In_ WslcSessionSettings* sessionSettings, _In_opt_z_ PCSTR hostName)
+try
+{
+    auto internalType = CheckAndGetInternalType(sessionSettings);
+
+    internalType->hostLoopback = hostName;
 
     return S_OK;
 }
@@ -1176,7 +1229,7 @@ try
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(hr)))
     {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+        RETURN_IF_FAILED(InitializeContainer(*result));
 
         if (IOCallback::HasIOCallback(internalContainerSettings->initProcessOptions))
         {
@@ -1204,7 +1257,7 @@ try
 
     if (SUCCEEDED(errorInfoWrapper.CaptureResult(internalSession->GetSession()->OpenContainer(nameOrId, &result->container))))
     {
-        wsl::windows::common::security::ConfigureForCOMImpersonation(result->container.get());
+        RETURN_IF_FAILED(InitializeContainer(*result));
         *container = reinterpret_cast<WslcContainer>(result.release());
     }
 
@@ -1397,9 +1450,7 @@ try
 
     for (uint32_t i = 0; i < networkCount; ++i)
     {
-        const auto& network = networks[i];
-        RETURN_HR_IF(E_INVALIDARG, network.name == nullptr || *network.name == '\0');
-        ValidateStringArray(network.aliases, network.aliasCount);
+        ValidateContainerNetwork(networks[i]);
     }
 
     internalType->networks = networks;
@@ -1566,6 +1617,41 @@ try
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
 
     return errorInfoWrapper.CaptureResult(internalType->container->Delete(ConvertFlags(flags)));
+}
+CATCH_RETURN();
+
+STDAPI WslcConnectContainerNetwork(_In_ WslcContainer container, _In_ const WslcContainerNetwork* network, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF_NULL(E_POINTER, network);
+    ValidateContainerNetwork(*network);
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, internalType->container2 == nullptr);
+
+    NetworkAddressBuffers addressBuffers{};
+    const auto settings = ConvertNetworkSettings(*network, addressBuffers);
+
+    WSLCCompatNetworkConnection connection{};
+    connection.NetworkName = network->name;
+    connection.Settings = settings.empty() ? nullptr : settings.data();
+    connection.SettingsCount = static_cast<ULONG>(settings.size());
+
+    return errorInfoWrapper.CaptureResult(internalType->container2->ConnectNetwork(&connection));
+}
+CATCH_RETURN();
+
+STDAPI WslcDisconnectContainerNetwork(_In_ WslcContainer container, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
+try
+{
+    ErrorInfoWrapper errorInfoWrapper{errorMessage};
+    auto internalType = CheckAndGetInternalType(container);
+    RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->container);
+    RETURN_HR_IF(E_INVALIDARG, nameOrId == nullptr || *nameOrId == '\0');
+
+    RETURN_HR_IF(WSLC_E_RUNTIME_UPDATE_NEEDED, internalType->container2 == nullptr);
+    return errorInfoWrapper.CaptureResult(internalType->container2->DisconnectNetwork(nameOrId));
 }
 CATCH_RETURN();
 
@@ -2131,18 +2217,18 @@ try
 }
 CATCH_RETURN();
 
-STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR name, _Outptr_opt_result_z_ PWSTR* errorMessage)
+STDAPI WslcDeleteSessionNetwork(_In_ WslcSession session, _In_z_ PCSTR nameOrId, _Outptr_opt_result_z_ PWSTR* errorMessage)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
 
     auto internalType = CheckAndGetInternalType(session);
     RETURN_HR_IF_NULL(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), internalType->GetSession());
-    RETURN_HR_IF_NULL(E_POINTER, name);
+    RETURN_HR_IF_NULL(E_POINTER, nameOrId);
     auto* compatSession2 = internalType->GetSession2();
     RETURN_HR_IF_NULL(WSLC_E_RUNTIME_UPDATE_NEEDED, compatSession2);
 
-    return errorInfoWrapper.CaptureResult(compatSession2->DeleteNetwork(name));
+    return errorInfoWrapper.CaptureResult(compatSession2->DeleteNetwork(nameOrId));
 }
 CATCH_RETURN();
 

@@ -325,27 +325,34 @@ Return Value:
 
     char Buffer[1024];
     int Fd;
+    int PathFd;
+    char ProcPath[64];
     int Result;
     ssize_t Size;
     struct stat Stat;
 
-    Fd = 0;
+    Fd = -1;
+    PathFd = -1;
     switch (FileType)
     {
     case DT_REG:
 
         //
-        // Skip files that aren't readable.
+        // Pin the file before checking its mode, including files that cannot
+        // be opened for reading. Reopen through procfs to read the same inode.
         //
 
-        LxtCheckErrnoZeroSuccess(lstat(FullPath, &Stat));
+        LxtCheckErrno(PathFd = open(FullPath, O_PATH | O_NOFOLLOW));
+        LxtCheckErrnoZeroSuccess(fstat(PathFd, &Stat));
+        LxtCheckTrue(S_ISREG(Stat.st_mode));
         if ((Stat.st_mode & S_IRUSR) == 0)
         {
             Result = LXT_RESULT_SUCCESS;
             goto ErrorExit;
         }
 
-        LxtCheckErrno(Fd = open(FullPath, O_RDONLY));
+        snprintf(ProcPath, sizeof(ProcPath), "/proc/self/fd/%d", PathFd);
+        LxtCheckErrno(Fd = open(ProcPath, O_RDONLY));
         LxtCheckErrno(Size = read(Fd, Buffer, sizeof(Buffer)));
         LxtCheckGreater(Size, 0, "%d");
         break;
@@ -376,9 +383,14 @@ ErrorExit:
         LxtLogError("Error reading %s", FullPath);
     }
 
-    if (Fd > 0)
+    if (Fd >= 0)
     {
         close(Fd);
+    }
+
+    if (PathFd >= 0)
+    {
+        close(PathFd);
     }
 
     return Result;
