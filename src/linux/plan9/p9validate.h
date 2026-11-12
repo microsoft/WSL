@@ -1,5 +1,5 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
-// Generated from the Plan9 protocol definitions by p9datagen.ps1 -Validation.
+// Keep message layouts in sync with GetMessageSize in p9data.h and TraceLogMessage in p9log.h.
 #pragma once
 
 #include "p9protohelpers.h"
