@@ -17,7 +17,10 @@ set(SOURCES
     telemetry.cpp
     timezone.cpp
     SecCompDispatcher.cpp
+    securityaudit/ProcessCreationAudit.cpp
     securityaudit/ProcessExecutionAudit.cpp
+    securityaudit/NetworkAudit.cpp
+    securityaudit/SystemAudit.cpp
     SecurityAudit.cpp
     util.cpp
     WslDistributionConfig.cpp
@@ -43,7 +46,10 @@ set(HEADERS
     telemetry.h
     timezone.h
     SecCompDispatcher.h
+    securityaudit/ProcessCreationAudit.h
     securityaudit/ProcessExecutionAudit.h
+    securityaudit/NetworkAudit.h
+    securityaudit/SystemAudit.h
     util.h
     WslDistributionConfig.h
     wslinfo.h

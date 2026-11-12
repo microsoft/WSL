@@ -3,7 +3,10 @@
 #include "common.h"
 #include "util.h"
 #include "SocketChannel.h"
+#include "securityaudit/ProcessCreationAudit.h"
 #include "securityaudit/ProcessExecutionAudit.h"
+#include "securityaudit/NetworkAudit.h"
+#include "securityaudit/SystemAudit.h"
 #include <arpa/inet.h>
 #include <atomic>
 #include <netpacket/packet.h>
@@ -39,8 +42,27 @@ void ProcessEvent(void* context, int, void* data, unsigned int size)
         event_begin_s header{};
         memcpy(&header, data, sizeof(header));
         THROW_ERRNO_IF(EINVAL, header.code_bytes_start != CODE_BYTES || header.version != VERSION || header.size != size);
+        if (header.event_type == event_type_fork_process)
+        {
+            auto message =
+                wsl::linux::securityaudit::DecodeProcessCreation(gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size});
+            if (message)
+            {
+                audit.channel.SendMessage(*message);
+            }
+            return;
+        }
         if (header.event_type != event_type_exec_process)
         {
+            const auto bytes = gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size};
+            if (auto message = wsl::linux::securityaudit::DecodeNetworkAudit(bytes))
+            {
+                audit.channel.SendMessage(*message);
+            }
+            else if (auto message = wsl::linux::securityaudit::DecodeSystemAudit(bytes))
+            {
+                audit.channel.SendMessage(*message);
+            }
             return;
         }
         auto message = wsl::linux::securityaudit::DecodeProcessExecution(
@@ -97,13 +119,21 @@ int RunSecurityAudit(int socket, bool includeCommandLine)
         }
     });
     std::array<char, 8192> error{};
-    const syscall_config syscalls[] = {{__NR_execve, true}};
+    // The SDK's fork selector controls task_newtask for clone/fork/vfork/clone3, excluding CLONE_THREAD.
+    const syscall_config syscalls[] = {
+        {__NR_execve, true},   {__NR_fork, true},           {__NR_socket, false},        {__NR_connect, false},
+        {__NR_bind, false},    {__NR_listen, false},        {__NR_accept, false},        {__NR_accept4, false},
+        {__NR_sendmsg, false}, {__NR_init_module, false},   {__NR_finit_module, false},  {__NR_setuid, false},
+        {__NR_setgid, false},  {__NR_setresuid, false},     {__NR_setresgid, false},     {__NR_capset, false},
+        {__NR_mount, false},   {__NR_umount2, false},       {__NR_pivot_root, false},    {__NR_setns, false},
+        {__NR_unshare, false}, {__NR_clock_settime, false}, {__NR_clock_adjtime, false}, {__NR_settimeofday, false},
+        {__NR_adjtimex, false}};
     const auto info = ebpf_plugin_start(
         "/wsl-security-audit",
         PERF_FEATURES_BTF | FEATURE_RINGBUFF | FEATURE_ENRICHMENT_AT_SOURCE | FEATURE_RUNTIME_MAP_FLIGHTING | FEATURE_PID_NS_ID_QUERY,
-        FEATURE_SYSCALL_EXTENDED_DATA | FEATURE_CONTAINER_RUNTIME_METADATA,
+        FEATURE_SYSCALL_EXTENDED_DATA | FEATURE_CONTAINER_RUNTIME_METADATA | FEATURE_CONNECT_ENDPOINT_ENRICHMENT | FEATURE_ACCEPT_ENDPOINT_ENRICHMENT,
         syscalls,
-        1,
+        COUNT_OF(syscalls),
         nullptr,
         0,
         (8 * 1024 * 1024) / 512,
@@ -123,7 +153,8 @@ int RunSecurityAudit(int socket, bool includeCommandLine)
         LOG_ERROR("eBPF polling startup failed: {}, {}", result, error.data());
         THROW_ERRNO(EIO);
     }
-    LOG_INFO("Security audit collecting ProcessExecuted fields; command line enabled: {}", includeCommandLine);
+    LOG_INFO(
+        "Security audit collecting ProcessExecuted fields, ProcessCreated, network and system events; command line enabled: {}", includeCommandLine);
 
     while (!audit.failed)
     {

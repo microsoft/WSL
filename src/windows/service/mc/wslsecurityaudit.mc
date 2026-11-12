@@ -20,3 +20,88 @@ Facility=Audit
 Language=Neutral
 %2%n%n%4
 .
+
+;// Insertions 1 and 3 contain the child VM PID and JSON; insertion 4 is the grouped display.
+MessageId=62013 SymbolicName=MSG_PROCESS_CREATED
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62014 SymbolicName=MSG_NETWORK_SOCKET
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62015 SymbolicName=MSG_NETWORK_CONNECT
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62016 SymbolicName=MSG_NETWORK_BIND
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62017 SymbolicName=MSG_NETWORK_LISTEN
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62018 SymbolicName=MSG_NETWORK_ACCEPT
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62019 SymbolicName=MSG_NETWORK_SENDMSG
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62020 SymbolicName=MSG_KERNEL_MODULE_LOAD
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62021 SymbolicName=MSG_PRIVILEGE_TRANSITION
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62022 SymbolicName=MSG_FILESYSTEM_VIEW_CHANGE
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62023 SymbolicName=MSG_NAMESPACE_CHANGE
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.
+
+MessageId=62024 SymbolicName=MSG_TIME_CHANGE
+Severity=Success
+Facility=Audit
+Language=Neutral
+%2%n%n%4
+.

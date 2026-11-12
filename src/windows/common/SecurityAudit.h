@@ -5,11 +5,18 @@
 #include <authz.h>
 #include <wil/resource.h>
 #include <span>
+#include <string_view>
+#include <nlohmann/json_fwd.hpp>
 
 namespace wsl::windows::common::securityaudit {
 
 bool Enabled();
 void Uninstall();
+
+std::string EscapeEventParameters(std::string_view text);
+std::wstring FormatEventField(const nlohmann::json& object, const char* name);
+std::wstring NormalizeEventMessage(std::wstring_view text);
+std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_view text);
 
 class EventSource
 {

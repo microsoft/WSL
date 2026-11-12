@@ -11,26 +11,6 @@
 
 namespace wsl::windows::common::securityaudit {
 
-namespace {
-    std::string EscapeEventParameters(std::string_view text)
-    {
-        std::string escaped;
-        escaped.reserve(text.size());
-        for (const char character : text)
-        {
-            if (character == '%')
-            {
-                escaped += "\\u0025"; // Prevent Event Viewer parameter-message expansion.
-            }
-            else
-            {
-                escaped += character;
-            }
-        }
-        return escaped;
-    }
-} // namespace
-
 static_assert(MSG_PROCESS_EXECUTED_DETAILS <= UINT16_MAX);
 
 bool ProcessExecutionEnabled()
@@ -168,58 +148,33 @@ std::wstring FormatProcessExecutionDisplay(std::wstring_view details)
     THROW_HR_IF(E_INVALIDARG, !data.is_object());
     const auto namespaces = data.value("namespaceIds", Json::object());
     THROW_HR_IF(E_INVALIDARG, !namespaces.is_object());
-    const auto field = [](const Json& object, const char* name) -> std::wstring {
-        const auto value = object.find(name);
-        if (value == object.end())
-        {
-            return L"-";
-        }
-        auto text = value->dump(-1, ' ', true);
-        if (value->is_string())
-        {
-            text = text.substr(1, text.size() - 2);
-        }
-        return wsl::shared::string::MultiByteToWide(EscapeEventParameters(text));
-    };
-
     auto text = wsl::shared::Localization::MessageSecurityAuditProcessExecutionDisplay(
-        field(data, "distro"),
-        field(data, "distroId"),
-        field(data, "pid"),
-        field(data, "tid"),
-        field(data, "ppid"),
-        field(data, "executable"),
-        field(data, "executablePath"),
-        field(data, "argv"),
-        field(data, "cwd"),
-        field(data, "timestampNs"),
-        field(data, "uid"),
-        field(data, "euid"),
-        field(data, "gid"),
-        field(data, "egid"),
-        field(namespaces, "pid"),
-        field(namespaces, "mount"),
-        field(namespaces, "network"));
+        FormatEventField(data, "distro"),
+        FormatEventField(data, "distroId"),
+        FormatEventField(data, "pid"),
+        FormatEventField(data, "tid"),
+        FormatEventField(data, "ppid"),
+        FormatEventField(data, "executable"),
+        FormatEventField(data, "executablePath"),
+        FormatEventField(data, "argv"),
+        FormatEventField(data, "cwd"),
+        FormatEventField(data, "timestampNs"),
+        FormatEventField(data, "uid"),
+        FormatEventField(data, "euid"),
+        FormatEventField(data, "gid"),
+        FormatEventField(data, "egid"),
+        FormatEventField(namespaces, "pid"),
+        FormatEventField(namespaces, "mount"),
+        FormatEventField(namespaces, "network"));
     if (data.contains("truncatedFields") || data.contains("omittedFields") || data.contains("invalidFields"))
     {
         text += L"\n\n" + wsl::shared::Localization::MessageSecurityAuditCollectionStatus(
-                              field(data, "truncatedFields"), field(data, "omittedFields"), field(data, "invalidFields"));
+                              FormatEventField(data, "truncatedFields"),
+                              FormatEventField(data, "omittedFields"),
+                              FormatEventField(data, "invalidFields"));
     }
 
-    std::wstring display;
-    for (const auto character : text)
-    {
-        if (character == L'\r')
-        {
-            continue;
-        }
-        if (character == L'\n')
-        {
-            display += L'\r';
-        }
-        display += character;
-    }
-    return display;
+    return NormalizeEventMessage(text);
 }
 
 void ReportProcessExecution(EventSource& source, uint32_t pid)

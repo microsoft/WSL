@@ -431,6 +431,9 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageStartSecurityAudit,
     LxInitMessageProcessExecuted,
     LxInitMessageProcessExecutedDetails,
+    LxInitMessageProcessCreated,
+    LxInitMessageNetworkAudit,
+    LxInitMessageSystemAudit,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -553,6 +556,9 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageStartSecurityAudit)
         X(LxInitMessageProcessExecuted)
         X(LxInitMessageProcessExecutedDetails)
+        X(LxInitMessageProcessCreated)
+        X(LxInitMessageNetworkAudit)
+        X(LxInitMessageSystemAudit)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1596,6 +1602,110 @@ struct LX_INIT_PROCESS_EXECUTED_DETAILS
 };
 
 static_assert(offsetof(LX_INIT_PROCESS_EXECUTED_DETAILS, Buffer) == sizeof(LX_INIT_PROCESS_EXECUTED_DETAILS));
+
+struct LX_INIT_PROCESS_CREATED
+{
+    static inline auto Type = LxInitMessageProcessCreated;
+    MESSAGE_HEADER Header;
+    uint64_t TimestampNs;
+    uint64_t CgroupId;
+    uint32_t ParentPid;
+    uint32_t ChildPid;
+    uint32_t ChildTid;
+    // These describe the creating task's context.
+    uint32_t PidNamespace;
+    uint32_t MountNamespace;
+    uint32_t NetworkNamespace;
+    uint32_t Uid;
+    uint32_t Gid;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(ParentPid), FIELD(ChildPid), FIELD(ChildTid));
+};
+
+enum class LX_NETWORK_AUDIT_OPERATION : uint32_t
+{
+    Socket,
+    Connect,
+    Bind,
+    Listen,
+    Accept,
+    SendMessage,
+    Accept4
+};
+
+enum LX_NETWORK_AUDIT_FIELDS : uint32_t
+{
+    LxNetworkAuditResult = 1,
+    LxNetworkAuditProtocol = 2
+};
+
+struct LX_AUDIT_ENDPOINT
+{
+    // Use protocol-independent family values, not the differing Linux/Windows AF_INET6 constants.
+    uint32_t Family; // 0 = unavailable, 4 = IPv4, 6 = IPv6
+    uint32_t Port;   // Host byte order; zero means unavailable.
+    uint8_t Address[16];
+};
+
+struct LX_INIT_NETWORK_AUDIT
+{
+    static inline auto Type = LxInitMessageNetworkAudit;
+    MESSAGE_HEADER Header;
+    LX_NETWORK_AUDIT_OPERATION Operation;
+    uint32_t Fields;
+    int64_t Result;
+    uint32_t Pid;
+    uint32_t Uid;
+    uint32_t Euid;
+    uint32_t PidNamespace;
+    uint32_t MountNamespace;
+    uint32_t NetworkNamespace;
+    int32_t Protocol;
+    LX_AUDIT_ENDPOINT Local;
+    LX_AUDIT_ENDPOINT Remote;
+
+    PRETTY_PRINT(FIELD(Header));
+};
+
+enum class LX_SYSTEM_AUDIT_OPERATION : uint32_t
+{
+    InitModule,
+    FinitModule,
+    SetUid,
+    SetGid,
+    SetResUid,
+    SetResGid,
+    Capset,
+    Mount,
+    Unmount,
+    PivotRoot,
+    SetNamespace,
+    Unshare,
+    ClockSetTime,
+    ClockAdjtime,
+    SetTimeOfDay,
+    Adjtimex
+};
+
+enum LX_SYSTEM_AUDIT_FIELDS : uint32_t
+{
+    LxSystemAuditResult = 1,
+    LxSystemAuditUid = 2,
+    LxSystemAuditGid = 4
+};
+
+struct LX_INIT_SYSTEM_AUDIT
+{
+    static inline auto Type = LxInitMessageSystemAudit;
+    MESSAGE_HEADER Header;
+    LX_SYSTEM_AUDIT_OPERATION Operation;
+    uint32_t Fields;
+    int64_t Result;
+    uint32_t NewUid;
+    uint32_t NewGid;
+
+    PRETTY_PRINT(FIELD(Header));
+};
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
 {

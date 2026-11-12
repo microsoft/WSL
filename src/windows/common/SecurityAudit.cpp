@@ -12,6 +12,7 @@
 #include <ntsecapi.h>
 #pragma pop_macro("_NTDEF_")
 #include <wil/token_helpers.h>
+#include <nlohmann/json.hpp>
 
 namespace wsl::windows::common::securityaudit {
 namespace {
@@ -96,6 +97,64 @@ void Uninstall()
         const auto error = GetLastError();
         THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
     }
+}
+
+std::string EscapeEventParameters(std::string_view text)
+{
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char character : text)
+    {
+        if (character == '%')
+        {
+            escaped += "\\u0025"; // Prevent Event Viewer parameter-message expansion.
+        }
+        else
+        {
+            escaped += character;
+        }
+    }
+    return escaped;
+}
+
+std::wstring FormatEventField(const nlohmann::json& object, const char* name)
+{
+    const auto value = object.find(name);
+    if (value == object.end())
+    {
+        return L"-";
+    }
+    auto text = value->dump(-1, ' ', true);
+    if (value->is_string())
+    {
+        text = text.substr(1, text.size() - 2);
+    }
+    return wsl::shared::string::MultiByteToWide(EscapeEventParameters(text));
+}
+
+std::wstring NormalizeEventMessage(std::wstring_view text)
+{
+    std::wstring display;
+    for (const auto character : text)
+    {
+        if (character == L'\r')
+        {
+            continue;
+        }
+        if (character == L'\n')
+        {
+            display += L'\r';
+        }
+        display += character;
+    }
+    return display;
+}
+
+std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_view text)
+{
+    return NormalizeEventMessage(
+        wsl::shared::Localization::MessageSecurityAuditSystemCall(wsl::shared::string::MultiByteToWide(std::string(syscall))) +
+        L"\n\n" + std::wstring(text));
 }
 
 EventSource::EventSource() : m_token(Authority(SE_AUDIT_NAME))

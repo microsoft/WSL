@@ -27,7 +27,10 @@ Abstract:
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
 #include "SecurityAudit.h"
+#include "securityaudit/ProcessCreationAudit.h"
 #include "securityaudit/ProcessExecutionAudit.h"
+#include "securityaudit/NetworkAudit.h"
+#include "securityaudit/SystemAudit.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -2375,21 +2378,40 @@ try
             securityaudit::ReportProcessExecution(source, event->Pid);
             continue;
         }
-        THROW_HR_IF(E_INVALIDARG, header.MessageType != LxInitMessageProcessExecutedDetails);
+        THROW_HR_IF(
+            E_INVALIDARG,
+            header.MessageType != LxInitMessageProcessCreated && header.MessageType != LxInitMessageProcessExecutedDetails &&
+                header.MessageType != LxInitMessageNetworkAudit && header.MessageType != LxInitMessageSystemAudit);
         std::wstring details;
         try
         {
-            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
-            THROW_HR_IF(E_INVALIDARG, !event);
-            std::optional<securityaudit::ProcessExecutionDistribution> distribution;
+            switch (header.MessageType)
             {
-                auto lock = m_auditDistributionLock.lock_shared();
-                if (const auto found = m_auditDistributions.find(event->PidNamespace); found != m_auditDistributions.end())
+            case LxInitMessageProcessCreated:
+                details = securityaudit::FormatProcessCreation(bytes);
+                break;
+            case LxInitMessageNetworkAudit:
+                details = securityaudit::FormatNetworkAudit(bytes);
+                break;
+            case LxInitMessageSystemAudit:
+                details = securityaudit::FormatSystemAudit(bytes);
+                break;
+            case LxInitMessageProcessExecutedDetails:
+            {
+                const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+                THROW_HR_IF(E_INVALIDARG, !event);
+                std::optional<securityaudit::ProcessExecutionDistribution> distribution;
                 {
-                    distribution = found->second;
+                    auto lock = m_auditDistributionLock.lock_shared();
+                    if (const auto found = m_auditDistributions.find(event->PidNamespace); found != m_auditDistributions.end())
+                    {
+                        distribution = found->second;
+                    }
                 }
+                details = securityaudit::FormatProcessExecution(bytes, includeCommandLine, distribution ? &*distribution : nullptr);
+                break;
             }
-            details = securityaudit::FormatProcessExecution(bytes, includeCommandLine, distribution ? &*distribution : nullptr);
+            }
         }
         catch (const wil::ResultException& error)
         {
@@ -2397,8 +2419,33 @@ try
             LOG_CAUGHT_EXCEPTION();
             continue;
         }
-        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
-        securityaudit::ReportProcessExecutionDetails(source, event->Pid, details);
+        switch (header.MessageType)
+        {
+        case LxInitMessageProcessCreated:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_CREATED>(bytes);
+            securityaudit::ReportProcessCreation(source, event->ChildPid, details);
+            break;
+        }
+        case LxInitMessageNetworkAudit:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_NETWORK_AUDIT>(bytes);
+            securityaudit::ReportNetworkAudit(source, *event, details);
+            break;
+        }
+        case LxInitMessageSystemAudit:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_SYSTEM_AUDIT>(bytes);
+            securityaudit::ReportSystemAudit(source, *event, details);
+            break;
+        }
+        case LxInitMessageProcessExecutedDetails:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+            securityaudit::ReportProcessExecutionDetails(source, event->Pid, details);
+            break;
+        }
+        }
     }
 }
 catch (...)

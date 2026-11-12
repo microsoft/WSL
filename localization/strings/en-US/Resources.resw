@@ -4271,4 +4271,149 @@ Namespaces:
 &#9;Invalid fields:&#9;{}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Field lists contain JSON property names and must not be translated. Preserve line breaks and tabs. A dash means no fields of that kind.</comment>
   </data>
+  <data name="MessageSecurityAuditProcessCreation" xml:space="preserve">
+    <value>A Linux process was created successfully in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Description of a successfully observed Linux process creation, not program execution or thread creation.</comment>
+  </data>
+  <data name="MessageSecurityAuditProcessCreationDisplay" xml:space="preserve">
+    <value>Process Creation:
+&#9;Parent Process ID (VM):&#9;{}
+&#9;Child Process ID (VM):&#9;{}
+&#9;Child Thread ID (VM):&#9;{}
+&#9;Timestamp (monotonic ns):&#9;{}
+
+Creating Process Context:
+&#9;UID:&#9;{}
+&#9;GID:&#9;{}
+&#9;Cgroup ID:&#9;{}
+
+Creating Process Namespaces:
+&#9;PID:&#9;{}
+&#9;Mount:&#9;{}
+&#9;Network:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Preserve line breaks and tabs. PID and TID are identifiers in the WSL virtual machine. Parent means the creating process. Namespace IDs, cgroup ID, UID and GID describe that creating process. Cgroup ID is numeric, not a path. Timestamp is the observation time on the Linux monotonic clock in nanoseconds. A dash means unavailable.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkSocket" xml:space="preserve">
+    <value>A Linux socket operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description; observation does not imply the operation succeeded.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkConnect" xml:space="preserve">
+    <value>A Linux connect operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description; this is a connection attempt, not proof that a connection was established.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkBind" xml:space="preserve">
+    <value>A Linux bind operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description; observation does not imply the operation succeeded.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkListen" xml:space="preserve">
+    <value>A Linux listen operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Occurrence-only security event; no additional operation fields are collected.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkAccept" xml:space="preserve">
+    <value>A Linux accept operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description; observation does not imply the operation succeeded.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkSendMessage" xml:space="preserve">
+    <value>A Linux sendmsg operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}{Locked="sendmsg"}Occurrence-only security event; no additional operation fields are collected.</comment>
+  </data>
+  <data name="MessageSecurityAuditNoAdditionalFields" xml:space="preserve">
+    <value>No additional fields are collected for this event.</value>
+    <comment>Body of an occurrence-only security event. No operation result or success is implied.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkSocketDisplay" xml:space="preserve">
+    <value>Process Context:
+&#9;Process ID (VM):&#9;{}
+&#9;UID:&#9;{}
+&#9;Effective UID:&#9;{}
+
+Socket:
+&#9;Protocol:&#9;{}
+
+Namespaces:
+&#9;PID:&#9;{}
+&#9;Mount:&#9;{}
+&#9;Network:&#9;{}
+
+Outcome:
+&#9;Result:&#9;{}
+&#9;Error:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Preserve line breaks and tabs. Protocol is the numeric socket protocol argument; zero requests the default. Result is the Linux syscall result and error is a numeric Linux error code. A dash means unavailable.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkEndpointsDisplay" xml:space="preserve">
+    <value>Process Context:
+&#9;Process ID (VM):&#9;{}
+&#9;UID:&#9;{}
+&#9;Effective UID:&#9;{}
+
+Namespaces:
+&#9;PID:&#9;{}
+&#9;Mount:&#9;{}
+&#9;Network:&#9;{}
+
+Endpoints:
+&#9;Local IP:&#9;{}
+&#9;Local Port:&#9;{}
+&#9;Remote IP:&#9;{}
+&#9;Remote Port:&#9;{}
+
+Outcome:
+&#9;Result:&#9;{}
+&#9;Error:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Preserve line breaks and tabs. IP addresses and ports are reported only when available, not inferred. Result is the Linux syscall result and error is a numeric Linux error code. A dash means unavailable.</comment>
+  </data>
+  <data name="MessageSecurityAuditNetworkBindDisplay" xml:space="preserve">
+    <value>Process Context:
+&#9;Process ID (VM):&#9;{}
+&#9;UID:&#9;{}
+&#9;Effective UID:&#9;{}
+
+Namespaces:
+&#9;PID:&#9;{}
+&#9;Mount:&#9;{}
+&#9;Network:&#9;{}
+
+Bind:
+&#9;Local IP:&#9;{}
+
+Outcome:
+&#9;Result:&#9;{}
+&#9;Error:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Preserve line breaks and tabs. This event does not collect the local port. Result is the Linux syscall result and error is a numeric Linux error code. A dash means unavailable.</comment>
+  </data>
+  <data name="MessageSecurityAuditKernelModuleLoad" xml:space="preserve">
+    <value>A Linux kernel module load operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description; observation does not imply a module was successfully loaded.</comment>
+  </data>
+  <data name="MessageSecurityAuditPrivilegeTransition" xml:space="preserve">
+    <value>A Linux credential operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description; new credentials are included only when a successful change can be observed.</comment>
+  </data>
+  <data name="MessageSecurityAuditFilesystemViewChange" xml:space="preserve">
+    <value>A Linux filesystem view operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description for mount, unmount or root-switch operations; success is not implied.</comment>
+  </data>
+  <data name="MessageSecurityAuditNamespaceChange" xml:space="preserve">
+    <value>A Linux namespace operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Security event description for namespace entry or unsharing; success is not implied.</comment>
+  </data>
+  <data name="MessageSecurityAuditTimeChange" xml:space="preserve">
+    <value>A Linux time-change operation was observed in WSL.</value>
+    <comment>{Locked="Linux"}{Locked="WSL"}Occurrence-only security event; no time value, caller or operation result is collected.</comment>
+  </data>
+  <data name="MessageSecurityAuditResultDisplay" xml:space="preserve">
+    <value>Outcome:
+&#9;Result:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Preserve line breaks and tabs. Result is the Linux syscall result; a dash means unavailable, not success.</comment>
+  </data>
+  <data name="MessageSecurityAuditPrivilegeDisplay" xml:space="preserve">
+    <value>New Credentials:
+&#9;UID:&#9;{}
+&#9;GID:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. Preserve line breaks and tabs. These are observed real UID/GID values after a successful operation, not requested arguments. A dash means unavailable.</comment>
+  </data>
+  <data name="MessageSecurityAuditSystemCall" xml:space="preserve">
+    <value>System Call:&#9;{}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The insertion is a Linux syscall name and must not be translated. Preserve the tab.</comment>
+  </data>
 </root>
