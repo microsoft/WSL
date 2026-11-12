@@ -1845,11 +1845,8 @@ Return Value:
         BytesWritten = 0;
 
         auto stopStdinForwarding = [&]() {
-            if (StdIn != -1)
-            {
-                CLOSE(StdIn);
-                StdIn = -1;
-            }
+            CLOSE(StdIn);
+            StdIn = -1;
 
             PendingStdin.clear();
             PollDescriptors[0].fd = -1;
