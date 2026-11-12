@@ -46,7 +46,9 @@ std::map<std::wstring, std::wstring> ParseVirtioFsMountOptions(_In_ std::wstring
 
         if (!key.empty())
         {
-            parsed.insert({std::move(key), std::move(value)});
+            // Automount places the default uid/gid before user-specified options. Keep the last value
+            // of a repeated option so that user-specified values win, as they do with Plan9.
+            parsed.insert_or_assign(std::move(key), std::move(value));
         }
     }
 
