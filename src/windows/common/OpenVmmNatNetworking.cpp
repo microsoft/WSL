@@ -172,13 +172,23 @@ void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)
         [](const std::string&, bool) {});
 }
 
-void OpenVmmNatNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate)
+void OpenVmmNatNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, bool allocate)
 {
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
         protocol != IPPROTO_TCP && protocol != IPPROTO_UDP,
         "Unsupported bind protocol %d",
         protocol);
+
+    if (addr.si_family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&addr.Ipv6.sin6_addr))
+    {
+        SOCKADDR_IN ipv4Address{};
+        ipv4Address.sin_family = AF_INET;
+        ipv4Address.sin_port = addr.Ipv6.sin6_port;
+        memcpy(&ipv4Address.sin_addr, &addr.Ipv6.sin6_addr.u.Byte[12], sizeof(ipv4Address.sin_addr));
+        addr = {};
+        addr.Ipv4 = ipv4Address;
+    }
 
     if (addr.si_family != AF_INET && addr.si_family != AF_INET6)
     {

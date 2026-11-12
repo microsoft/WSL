@@ -15,7 +15,7 @@ SOCKADDR_UN wsl::windows::common::vsock::GetUnixSocketAddress(_In_ const std::fi
 {
     SOCKADDR_UN address{};
     address.sun_family = AF_UNIX;
-    const auto narrowPath = Path.string();
+    const auto narrowPath = wsl::shared::string::WideToMultiByte(Path.native());
     THROW_HR_IF_MSG(E_INVALIDARG, narrowPath.size() >= sizeof(address.sun_path), "vsock bridge path too long: %hs", narrowPath.c_str());
     std::copy(narrowPath.cbegin(), narrowPath.cend(), address.sun_path);
     address.sun_path[narrowPath.size()] = '\0';
@@ -26,9 +26,9 @@ wil::unique_socket wsl::windows::common::vsock::Connect(_In_ const std::filesyst
 {
     std::optional<ExecutionContext> context;
     const auto* current = ExecutionContext::Current();
-    if (current == nullptr || WI_IsFlagClear(current->CurrentContext(), Context::OpenVMM))
+    if (current == nullptr || WI_IsFlagClear(current->CurrentContext(), Context::OpenVmm))
     {
-        context.emplace(Context::OpenVMM);
+        context.emplace(Context::OpenVmm);
     }
 
     wil::unique_socket socket{::socket(AF_UNIX, SOCK_STREAM, 0)};

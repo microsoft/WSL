@@ -2,8 +2,10 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "OpenVmmNatNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
 #include "VirtualMachineBackendTestHelpers.h"
+#include "vsock.hpp"
 
 using wsl::windows::common::vm::openvmm::ValidateCreateRequest;
 using namespace VirtualMachineBackendTestHelpers;
@@ -70,7 +72,7 @@ class OpenVmmVirtualMachineBackendTests
         const auto& error = context.ReportedError().value();
         VERIFY_ARE_EQUAL(E_INVALIDARG, error.Code);
         VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::CreateVm));
-        VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVMM));
+        VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVmm));
     }
 
     TEST_METHOD(RejectsIncompatibleOpenVmmSettings)
@@ -150,6 +152,17 @@ class OpenVmmVirtualMachineBackendTests
         request.Processor.PerfmonLbr = VmFeatureRequest::Disabled;
         request.NetworkAdapters.push_back({L"host", VmHostEndpointNetwork{}});
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+    }
+
+    TEST_METHOD(UsesUtf8ForUnixSocketPaths)
+    {
+        const auto address = wsl::windows::common::vsock::GetUnixSocketAddress(std::filesystem::path{L"socket-\u00e9"});
+        VERIFY_ARE_EQUAL(std::string{"socket-\xc3\xa9"}, std::string{address.sun_path});
+
+        const std::filesystem::path fitting{std::wstring(sizeof(address.sun_path) - 3, L'a') + L"\u00e9"};
+        const std::filesystem::path tooLong{std::wstring(sizeof(address.sun_path) - 2, L'a') + L"\u00e9"};
+        VERIFY_ARE_EQUAL(sizeof(address.sun_path) - 1, strlen(wsl::windows::common::vsock::GetUnixSocketAddress(fitting).sun_path));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { wsl::windows::common::vsock::GetUnixSocketAddress(tooLong); }));
     }
 
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
@@ -349,12 +362,13 @@ class OpenVmmVirtualMachineBackendTests
         auto& fileSystemTransport = std::get<VmVirtioFsDevice>(fileSystemRequest.Transport);
         fileSystemTransport.Layout = VmVirtioFsLayout::SingleShare;
         fileSystemRequest.UserToken = request.Identity.UserToken;
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        const auto ownerDevice = backend->CreateFileSystemDevice(fileSystemRequest);
+        backend->RemoveDevice(ownerDevice.Id);
         fileSystemRequest.UserToken.emplace();
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
+        VERIFY_ARE_EQUAL(E_UNEXPECTED, OperationResult([&] { backend->CreateFileSystemDevice(fileSystemRequest); }));
         fileSystemRequest.UserToken.reset();
         const auto fileSystemDevice = backend->CreateFileSystemDevice(fileSystemRequest);
-        VERIFY_ARE_EQUAL(UINT64{2}, fileSystemDevice.Id.Value);
+        VERIFY_ARE_EQUAL(UINT64{3}, fileSystemDevice.Id.Value);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, fileSystemDevice.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
         VERIFY_ARE_EQUAL(fileSystemTransport.Tag, std::get<VmVirtioFsDevice>(fileSystemDevice.Transport).Tag);
@@ -368,9 +382,7 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
         shareRequest.Options = VmVirtioFsShareOptions{};
         auto& shareOptions = std::get<VmVirtioFsShareOptions>(shareRequest.Options);
-        shareOptions.MountOptions.emplace(L"unsupported", L"");
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest); }));
-        shareOptions.MountOptions.clear();
+        shareOptions.MountOptions.emplace(L"metadata", L"");
         const auto share = backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
         const auto servingDevice = backend->GetFileSystemDeviceStatus(fileSystemDevice.Id);
         VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Prepared, fileSystemDevice.State);
@@ -378,6 +390,7 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(fileSystemTransport.Tag, std::get<VmVirtioFsDevice>(servingDevice.Transport).Tag);
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, share.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(fileSystemDevice.Id.Value, share.Device.Value);
+        VERIFY_IS_TRUE(share.MountOptions.contains(L"metadata"));
         VERIFY_ARE_EQUAL(fileSystemTransport.Tag, std::get<VmVirtioFsShareAddress>(share.GuestAddress).Tag);
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
                              backend->AddFileSystemShare(fileSystemDevice.Id, shareRequest);
@@ -429,6 +442,74 @@ class OpenVmmVirtualMachineBackendTests
 
         backend->BindPort(network.Id, bindingRequest);
         VERIFY_ARE_EQUAL(E_FAIL, OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
+
+        backend->Terminate();
+    }
+
+    TEST_METHOD(PersistentMemoryUsesVmOwnerToken)
+    {
+        SKIP_TEST_ARM64();
+        using wsl::windows::common::filesystem::TempFile;
+        auto request = CreateRunnableRequest();
+        TempFile file{GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS};
+        LARGE_INTEGER size{};
+        size.QuadPart = 2 * c_mib;
+        THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(file.Handle.get(), size, nullptr, FILE_BEGIN));
+        THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.Handle.get()));
+        file.Handle.reset();
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+        VmPersistentMemoryRequest memory{};
+        memory.Path = file.Path;
+        memory.UserToken.emplace();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory(memory); }));
+        memory.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddPersistentMemory(memory); }));
+        memory.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
+        const auto device = backend->AddPersistentMemory(memory);
+        VERIFY_ARE_EQUAL(UINT32{0}, device.Index);
+        VERIFY_ARE_EQUAL(file.Path.wstring(), device.EffectiveHostPath.wstring());
+        backend->Terminate();
+    }
+
+    TEST_METHOD(RelaysIpv4MappedPortNotifications)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRunnableRequest();
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+        const auto& adapters = backend->GetDescription().NetworkAdapters;
+        wsl::core::OpenVmmNatNetworking networking{
+            *backend, adapters.at(L"eth0"), adapters.at(L"loopback0"), wsl::core::GnsChannel{wil::unique_socket{}}, true, false};
+
+        auto [client, server] = MakeSocketPair();
+        networking.StartPortTracker(std::move(server));
+        wsl::shared::SocketChannel channel{std::move(client), "PortTrackerTest"};
+        LX_GNS_PORT_ALLOCATION_REQUEST notification{};
+        notification.Header.MessageType = LxGnsMessagePortMappingRequest;
+        notification.Header.MessageSize = sizeof(notification);
+        notification.Protocol = IPPROTO_TCP;
+        notification.Port = ReserveTcpPort();
+        notification.Af = AF_INET6;
+        THROW_HR_IF(E_FAIL, inet_pton(AF_INET6, "::ffff:127.0.0.1", notification.Address32) != 1);
+        notification.Allocate = true;
+        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+
+        notification.Af = AF_INET;
+        std::fill(std::begin(notification.Address32), std::end(notification.Address32), 0);
+        notification.Address32[0] = htonl(INADDR_LOOPBACK);
+        VERIFY_ARE_NOT_EQUAL(0, channel.Transaction(notification).Result);
+        notification.Allocate = false;
+        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+        notification.Allocate = true;
+        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+        notification.Af = AF_INET6;
+        THROW_HR_IF(E_FAIL, inet_pton(AF_INET6, "::ffff:127.0.0.1", notification.Address32) != 1);
+        notification.Allocate = false;
+        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
 
         backend->Terminate();
     }

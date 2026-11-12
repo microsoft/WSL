@@ -111,7 +111,7 @@ void ValidateFileSystemToken(HANDLE Token, HANDLE Identity)
 
 VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmCreateRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
     THROW_HR_IF_MSG(c_notSupported, wsl::shared::Arm64, "OpenVMM direct boot is currently supported only on x64");
     THROW_HR_IF(c_notSupported, Request.Boot.Method == VmBootMethod::Uefi);
@@ -244,7 +244,7 @@ OpenVmmVirtualMachineBackend::OpenVmmVirtualMachineBackend() = default;
 
 OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmDestroyVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     Shutdown();
@@ -257,7 +257,7 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Create(const VmCreateRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::CreateVm);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmCreateVmBegin",
@@ -465,7 +465,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
 void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexcept
 try
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     try
     {
         wsl::windows::common::io::MultiHandleWait io;
@@ -496,7 +496,7 @@ CATCH_LOG()
 
 void OpenVmmVirtualMachineBackend::OnProcessExit(DWORD ExitCode) noexcept
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmProcessExited", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(ExitCode, "exitCode"));
     bool notify;
@@ -554,7 +554,7 @@ VmState OpenVmmVirtualMachineBackend::GetState() const
 
 VmTerminationInformation OpenVmmVirtualMachineBackend::GetTerminationReason() const
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_exitEvent.is_signaled());
     auto lock = m_lock.lock_shared();
     return m_terminationInformation;
@@ -577,7 +577,7 @@ std::optional<std::filesystem::path> OpenVmmVirtualMachineBackend::GetCrashLogPa
 
 void OpenVmmVirtualMachineBackend::Start()
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmStartVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     auto lock = m_lock.lock_exclusive();
@@ -605,7 +605,7 @@ void OpenVmmVirtualMachineBackend::Terminate()
 
 void OpenVmmVirtualMachineBackend::Shutdown() noexcept
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmTerminateVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     {
@@ -684,7 +684,7 @@ void OpenVmmVirtualMachineBackend::Shutdown() noexcept
 
 VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
     WSL_LOG(
@@ -729,7 +729,7 @@ VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePo
 
 wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmConnectGuestBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(Port.Value, "port"));
@@ -753,7 +753,7 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
 
 std::optional<VmHostSocket> OpenVmmVirtualMachineBackend::CreateHostSocket(GuestServicePort Port)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmCreateHostSocketBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -789,7 +789,7 @@ std::optional<VmHostSocket> OpenVmmVirtualMachineBackend::CreateHostSocket(Guest
 
 void OpenVmmVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmCloseHostSocketBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -814,7 +814,7 @@ void OpenVmmVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
 
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto& path = validation::ValidateDiskSource(Request);
     THROW_HR_IF_MSG(
         c_notSupported,
@@ -914,7 +914,7 @@ std::vector<VmDiskAttachment> OpenVmmVirtualMachineBackend::GetAttachedDisks() c
 
 void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmDetachDiskBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(Disk.Value, "diskId"));
     ValidateResourceId(Disk, m_description.Identity);
@@ -935,11 +935,22 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 
 VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
-    THROW_HR_IF_MSG(
-        c_notSupported,
-        Request.UserToken.has_value(),
-        "OpenVMM persistent memory uses the VM owner identity and does not support alternate user tokens");
+    const auto context = CreateExecutionContext(Context::OpenVmm);
+    if (Request.UserToken)
+    {
+        const auto token = Request.UserToken->get();
+        const auto owner = m_description.Identity.UserToken.get();
+        THROW_HR_IF(E_INVALIDARG, !token);
+        if (token != owner)
+        {
+            const auto tokenInfo = wil::get_token_information<TOKEN_STATISTICS>(token);
+            const auto ownerInfo = wil::get_token_information<TOKEN_STATISTICS>(owner);
+            THROW_HR_IF_MSG(
+                c_notSupported,
+                tokenInfo.TokenId.HighPart != ownerInfo.TokenId.HighPart || tokenInfo.TokenId.LowPart != ownerInfo.TokenId.LowPart,
+                "OpenVMM persistent memory uses the VM owner identity and does not support alternate user tokens");
+        }
+    }
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
@@ -974,13 +985,13 @@ VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const
 
 VmGpuAttachment OpenVmmVirtualMachineBackend::AddGpu(const VmGpuRequest&)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support GPU assignment");
 }
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto* transport = std::get_if<VmVirtioFsDevice>(&Request.Transport);
     WSL_LOG(
         "OpenVmmCreateFileSystemDeviceBegin",
@@ -1042,7 +1053,7 @@ std::optional<VmFileSystemDevice> OpenVmmVirtualMachineBackend::GetFileSystemDev
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
@@ -1053,7 +1064,7 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDev
 
 VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmAddFileSystemShareBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1173,7 +1184,7 @@ std::optional<VmFileSystemShare> OpenVmmVirtualMachineBackend::GetFileSystemShar
 
 void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmRemoveFileSystemShareBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1209,19 +1220,19 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShareLocked(VmShareId Share)
 
 VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest&)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support section-backed shared memory");
 }
 
 void OpenVmmVirtualMachineBackend::ConfigureGuestDma(const VmGuestDmaRequest&)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support configuring a guest DMA window");
 }
 
 void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 {
-    const auto context = CreateExecutionContext(Context::OpenVMM);
+    const auto context = CreateExecutionContext(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
@@ -1234,14 +1245,14 @@ void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapter '%ls' must be configured at VM creation time", Request.Tag.c_str());
 }
 
 void OpenVmmVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration&)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be updated after VM creation");
 }
@@ -1249,7 +1260,7 @@ void OpenVmmVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const
 void OpenVmmVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be removed after VM creation");
 }
@@ -1257,7 +1268,7 @@ void OpenVmmVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
 VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmBindPortBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1318,7 +1329,7 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
 void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmUnbindPortBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1349,7 +1360,7 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_IF(E_INVALIDARG, Destination.family != IpAddressFamily_V4 && Destination.family != IpAddressFamily_V6);
     const auto destination = wsl::windows::common::string::IpAddressToWstring(Destination);
@@ -1396,7 +1407,7 @@ IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, 
 void OpenVmmVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record)
 {
     const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVMM);
+    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_IF_MSG(E_INVALIDARG, Record.Name.empty(), "A DNS record requires a name");
     THROW_HR_IF_MSG(c_notSupported, Record.Type != DnsRecordType_A, "Only A records are supported");

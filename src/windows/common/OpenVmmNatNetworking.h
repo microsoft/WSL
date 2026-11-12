@@ -32,7 +32,7 @@ public:
 private:
     using PortKey = std::tuple<bool, int, int, uint16_t>; // loopback0, address family, protocol, port
 
-    void HandlePortNotification(const SOCKADDR_INET& addr, int protocol, bool allocate);
+    void HandlePortNotification(SOCKADDR_INET addr, int protocol, bool allocate);
     void ModifyPort(bool loopbackDevice, const SOCKADDR_INET& hostAddress, int protocol, bool allocate);
 
     IVirtualMachineBackend& m_backend;
