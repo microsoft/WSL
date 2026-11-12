@@ -2680,9 +2680,6 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="WSLCCLI_ComposeStopLongDesc" xml:space="preserve">
     <value>Stop all containers in a compose session.</value>
   </data>
-  <data name="WSLCCLI_ComposePathArgDescription" xml:space="preserve">
-    <value>Path to the compose YAML file</value>
-  </data>
   <data name="WSLCCLI_ComposeAllResourcesArgDescription" xml:space="preserve">
     <value>Include all resources, even those not used by services</value>
   </data>
@@ -2720,13 +2717,20 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>The option '{}' is not yet implemented.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_ComposeStdinFileNotImplementedError" xml:space="preserve">
+    <value>Reading a Compose file from standard input is not yet implemented.</value>
+  </data>
+  <data name="WSLCCLI_ComposeFileNotFoundError" xml:space="preserve">
+    <value>No Compose configuration file was found in '{}' or any parent directory.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="WSLCCLI_ComposeProjectNameInvalidError" xml:space="preserve">
+    <value>Invalid project name '{}': must consist of at most {} lowercase alphanumeric characters, hyphens, and underscores, and start with a letter or number.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcComposeFileInvalid" xml:space="preserve">
     <value>The compose file '{0}' is invalid: {1}.</value>
     <comment>{Locked="{0}"}{Locked="{1}"}File paths, property names, and error details should not be translated</comment>
-  </data>
-  <data name="MessageWslcComposePathResolveFailed" xml:space="preserve">
-    <value>Failed to resolve the Compose file path '{0}'.</value>
-    <comment>{Locked="{0}"}File paths should not be translated</comment>
   </data>
   <data name="MessageWslcComposeFileOpenFailed" xml:space="preserve">
     <value>Failed to open the Compose file '{0}'.</value>

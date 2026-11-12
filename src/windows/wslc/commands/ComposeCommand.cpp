@@ -96,19 +96,8 @@ void ComposeCommand::ExecuteInternal(CLIExecutionContext& context) const
 
 void ComposeCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    ThrowIfAnySupplied<
-        ArgType::ComposeAllResources,
-        ArgType::ComposeAnsi,
-        ArgType::ComposeCompatibility,
-        ArgType::ComposeGlobalDryRun,
-        ArgType::ComposeEnvFile,
-        ArgType::ComposeFile,
-        ArgType::ComposeParallel,
-        ArgType::ComposeProfile,
-        ArgType::ComposeProgress,
-        ArgType::ComposeProjectDirectory,
-        ArgType::ComposeProjectName,
-        ArgType::ComposeDryRun>(execArgs);
+    ThrowIfAnySupplied<ArgType::ComposeAllResources, ArgType::ComposeAnsi, ArgType::ComposeCompatibility, ArgType::ComposeGlobalDryRun, ArgType::ComposeEnvFile, ArgType::ComposeParallel, ArgType::ComposeProfile, ArgType::ComposeProgress, ArgType::ComposeDryRun>(
+        execArgs);
 }
 
 } // namespace wsl::windows::wslc
