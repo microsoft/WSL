@@ -11168,6 +11168,32 @@ sys.exit(1 if queries else 0)
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
     }
 
+    // Validate that a blocked container stop request doesn't prevent session termination.
+    WSLC_TEST_METHOD(SessionTerminationCancelsContainerStop)
+    {
+        auto restoreSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { ResetTestSession(); });
+
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-terminate-pending-stop");
+        auto initProcess = container.GetInitProcess();
+        auto outputHandle = initProcess.GetStdHandle(1);
+
+        PartialHandleRead output{outputHandle.Get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult = E_UNEXPECTED;
+        std::thread stopThread([&]() { stopResult = container.Get().Stop(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE); });
+
+        auto cleanup = wil::scope_exit([&]() { stopThread.join(); });
+
+        output.ExpectConsume("stopping\n");
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+
+        stopThread.join();
+        cleanup.release();
+
+        VERIFY_ARE_EQUAL(stopResult, E_ABORT);
+    }
+
     WSLC_TEST_METHOD(ConcurrentContainerStopAndIgnoredSignal)
     {
         // The init process blocks in its SIGTERM handler and only logs SIGUSR1, so the Stop stays pending

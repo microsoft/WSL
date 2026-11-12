@@ -37,6 +37,7 @@ Abstract:
 #include "CommandLine.h"
 #include "retryshared.h"
 #include "RingBuffer.h"
+#include "socket.hpp"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 

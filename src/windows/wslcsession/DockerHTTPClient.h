@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include <vector>
 #include <boost/asio.hpp>
 #include <boost/asio/generic/stream_protocol.hpp>
 #include <boost/beast/core.hpp>
@@ -126,7 +127,7 @@ public:
 
     using HTTPResponse = boost::beast::http::message<false, boost::beast::http::buffer_body>;
 
-    DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE ExitingEvent, GUID VmId, ULONG ConnectTimeoutMs);
+    DockerHTTPClient(wsl::shared::SocketChannel&& Channel, std::vector<HANDLE>&& CancelEvents, GUID VmId, ULONG ConnectTimeoutMs);
 
     // Container management.
     std::vector<common::docker_schema::ContainerInfo> ListContainers(
@@ -282,7 +283,7 @@ private:
     ULONG m_connectTimeoutMs{};
     GUID m_vmId;
     shared::SocketChannel m_channel;
-    HANDLE m_exitingEvent;
+    std::vector<HANDLE> m_cancelEvents;
     wil::srwlock m_lock;
 };
 } // namespace wsl::windows::service::wslc
