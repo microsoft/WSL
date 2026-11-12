@@ -1532,12 +1532,38 @@ int RunDebugShell()
     THROW_HR(HCS_E_CONNECTION_CLOSED);
 }
 
+bool IsWindowsUpdateCommand(_In_ std::wstring_view commandLine)
+{
+    // Matches the elevated fallback command line: wsl.exe [--parent-console <pid>] --update --windows-update[-repair]
+    int argc{};
+    const wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(std::wstring(commandLine).c_str(), &argc)};
+    if (!argv)
+    {
+        return false;
+    }
+
+    int index = 1;
+    if (index < argc && wcscmp(argv[index], WSL_PARENT_CONSOLE_ARG) == 0)
+    {
+        index += 2;
+    }
+
+    if (index >= argc || wcscmp(argv[index], WSL_UPDATE_ARG) != 0)
+    {
+        return false;
+    }
+
+    return std::any_of(&argv[index + 1], &argv[argc], [](LPCWSTR argument) {
+        return wcscmp(argument, WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG) == 0 ||
+               wcscmp(argument, WSL_UPDATE_ARG_WINDOWS_UPDATE_REPAIR_OPTION_LONG) == 0;
+    });
+}
+
 int WslMain(_In_ std::wstring_view commandLine)
 {
     // Call the MSI package if we're in an MSIX context. The Windows Update fallback is excluded because it repairs or
     // updates the MSI package and can be launched from the MSIX package.
-    const bool windowsUpdate = commandLine.find(WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG) != std::wstring_view::npos;
-    if (!windowsUpdate && wsl::windows::common::wslutil::IsRunningInMsix())
+    if (!IsWindowsUpdateCommand(commandLine) && wsl::windows::common::wslutil::IsRunningInMsix())
     {
         const bool launchedViaAppActivation = winrt::Windows::ApplicationModel::AppInstance::GetActivatedEventArgs() != nullptr;
         const auto exitCode = wsl::windows::common::install::CallMsiPackage();

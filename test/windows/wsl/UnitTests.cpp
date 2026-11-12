@@ -7730,6 +7730,8 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         // Rate limited without a usable reset time waits one minute.
         VERIFY_IS_TRUE(getReset(403, {{L"x-ratelimit-remaining", L"0"}}) == now + minutes(1));
         VERIFY_IS_TRUE(getReset(403, {{L"x-ratelimit-remaining", L"0"}, {L"x-ratelimit-reset", L"invalid"}}) == now + minutes(1));
+        VERIFY_IS_TRUE(getReset(429, {}) == now + minutes(1));
+        VERIFY_IS_TRUE(getReset(429, {{L"x-ratelimit-remaining", L"5"}, {L"x-ratelimit-reset", L"5000"}}) == now + minutes(1));
     }
 
     WSL2_TEST_METHOD(CustomVhdBackingFileFailure)

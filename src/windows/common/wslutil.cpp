@@ -1056,9 +1056,10 @@ std::optional<std::chrono::system_clock::time_point> wsl::windows::common::wslut
         return result;
     };
 
+    // A 403 can also be a non rate limit error, so require a rate limit header. A 429 is always a rate limit.
     const auto retryAfter = getHeader(L"retry-after");
     const auto remaining = parseInteger(getHeader(L"x-ratelimit-remaining"));
-    if (!retryAfter.has_value() && remaining != 0)
+    if (statusCode == 403 && !retryAfter.has_value() && remaining != 0)
     {
         return {};
     }
@@ -1068,7 +1069,7 @@ std::optional<std::chrono::system_clock::time_point> wsl::windows::common::wslut
         return now + std::chrono::seconds(*seconds);
     }
 
-    if (const auto reset = parseInteger(getHeader(L"x-ratelimit-reset")))
+    if (const auto reset = parseInteger(getHeader(L"x-ratelimit-reset")); reset.has_value() && remaining == 0)
     {
         return std::chrono::system_clock::time_point{std::chrono::seconds(*reset)};
     }
