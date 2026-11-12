@@ -523,7 +523,8 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessInterfaceChange()
         const auto minimumMetric = endpoint.Network->GetMinimumMetric();
         const auto metricUpdate = originalMinimumMetric != minimumMetric;
 
-        endpoint.Network->PendingIPInterfaceUpdate |= connectedStateUpdated || mtuUpdated || metricUpdate;
+        endpoint.Network->PendingInterfacePropertiesUpdate |= connectedStateUpdated || mtuUpdated || metricUpdate;
+        endpoint.Network->PendingAddressAndRouteRefresh |= connectedStateUpdated || mtuUpdated;
 
         if (disableDefaultRoutesUpdated || connectedStateUpdated || mtuUpdated || metricUpdate)
         {
@@ -1021,7 +1022,6 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             TraceLoggingValue(linuxResultCode, "linuxResultCode"));
     }
 
-    const auto makingIpInterfaceUpdate = endpoint.Network->PendingIPInterfaceUpdate;
     // Linux may delete routes behind us when making interface, address, and route changes
     // will track when to refresh v4 and v6 routes to ensure routes are still present after changes
     // a few customers have seen this when we update temporary v6 addresses, for example
@@ -1029,7 +1029,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
 
     // First: update Linux with any interface updates
     // If IsHidden is set, then also indicate to Linux that the interface should be disconnected
-    if (endpoint.Network->PendingIPInterfaceUpdate || endpoint.Network->IsHidden)
+    if (endpoint.Network->PendingInterfacePropertiesUpdate || endpoint.Network->IsHidden)
     {
         const auto originalConnectValue = endpoint.Network->IsConnected;
         if (endpoint.Network->IsHidden)
@@ -1048,22 +1048,32 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
                 TraceLoggingValue(endpoint.InterfaceGuid, "InterfaceGuid"));
 
             syncSuccessful = false;
+            endpoint.Network->PendingAddressAndRouteRefresh = true;
             // interfaces are in an unknown state - push route updates in case Linux deleted routes behind us
             refreshAllRoutes = true;
         }
         else
         {
-            endpoint.Network->PendingIPInterfaceUpdate = false;
+            endpoint.Network->PendingInterfacePropertiesUpdate = false;
         }
 
         endpoint.Network->IsConnected = originalConnectValue;
-        if (originalConnectValue)
+        if (originalConnectValue && endpoint.Network->PendingAddressAndRouteRefresh)
         {
             // interface potentially just moved from disconnected -> connected
             // push route updates in case Linux deleted routes behind us
             refreshAllRoutes = true;
         }
     }
+
+    const bool canReplaceRouteMetrics = endpoint.StateTracking->InitialSyncComplete && endpoint.Network->IsConnected &&
+                                        !endpoint.Network->IsHidden && !endpoint.Network->PendingAddressAndRouteRefresh &&
+                                        endpoint.StateTracking->IpAddresses.size() == endpoint.Network->IpAddresses.size() &&
+                                        std::ranges::all_of(endpoint.StateTracking->IpAddresses, [&](const auto& address) {
+                                            const auto hostAddress = endpoint.Network->IpAddresses.find(address.Address);
+                                            return address.SyncStatus == Synced && hostAddress != endpoint.Network->IpAddresses.end() &&
+                                                   address.Address.IsPreferred() == hostAddress->IsPreferred();
+                                        });
 
     // Second: update Linux with any addresses to remove
     auto addressIt = endpoint.StateTracking->IpAddresses.begin();
@@ -1084,9 +1094,8 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
                     address->SyncStatus = PendingUpdate;
                     address->SyncRetryCount = TrackedIpAddress::MaxSyncRetryCount;
                 }
-                else if (makingIpInterfaceUpdate)
+                else if (endpoint.Network->PendingAddressAndRouteRefresh)
                 {
-                    // if we pushed an interface update, ensure our addresses are up to date
                     address->SyncStatus = PendingUpdate;
                     address->SyncRetryCount = TrackedIpAddress::MaxSyncRetryCount;
                 }
@@ -1151,45 +1160,9 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         refreshAllRoutes = true;
     }
 
-    // Third: update Linux with any routes to remove
-    auto routeIt = endpoint.StateTracking->Routes.begin();
-    while (routeIt != endpoint.StateTracking->Routes.end())
-    {
-        auto route = routeIt++;
-
-        // if the interface is hidden, we need to remove routes
-        // 'continue' to keep the route
-        if (!endpoint.Network->IsHidden)
-        {
-            if (endpoint.Network->Routes.contains(route->Route))
-            {
-                if (route->SyncStatus == PendingRemoval)
-                {
-                    // This route was slated for removal but still exists on the host.  It should be kept around instead.
-                    // We'll send an update just in case.
-                    route->SyncStatus = PendingUpdate;
-                    route->SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
-                }
-                else if (makingIpInterfaceUpdate)
-                {
-                    // if we pushed an interface update, ensure our routes are up to date
-                    route->SyncStatus = PendingUpdate;
-                    route->SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
-                }
-
-                continue;
-            }
-        }
-
-        // We found a route that should be removed from the guest.
-
-        if (route->SyncStatus != PendingRemoval)
-        {
-            // We've never attempted to remove this route before, so reset the sync retry count.
-            route->SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
-        }
-        route->SyncStatus = PendingRemoval;
-
+    // Third: classify route changes and remove routes that cannot be deferred
+    // Defer eligible metric-only removals until the desired routes are synced in step six.
+    const auto removeTrackedRoute = [&](std::set<TrackedRoute>::const_iterator route) {
         if (FAILED(SendRouteRequestToGns(endpoint, *route, hns::ModifyRequestType::Remove)))
         {
             if (route->SyncRetryCount == 0)
@@ -1225,9 +1198,63 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         }
         // push route updates in case Linux deleted routes behind us after removing other various routes
         refreshAllRoutes = true;
+    };
+
+    std::vector<std::set<TrackedRoute>::const_iterator> deferredRouteRemovals;
+    auto routeIt = endpoint.StateTracking->Routes.begin();
+    while (routeIt != endpoint.StateTracking->Routes.end())
+    {
+        auto route = routeIt++;
+
+        // if the interface is hidden, we need to remove routes
+        // 'continue' to keep the route
+        if (!endpoint.Network->IsHidden)
+        {
+            if (endpoint.Network->Routes.contains(route->Route))
+            {
+                if (route->SyncStatus == PendingRemoval)
+                {
+                    // This route was slated for removal but still exists on the host.  It should be kept around instead.
+                    // We'll send an update just in case.
+                    route->SyncStatus = PendingUpdate;
+                    route->SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
+                }
+                else if (endpoint.Network->PendingAddressAndRouteRefresh)
+                {
+                    route->SyncStatus = PendingUpdate;
+                    route->SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
+                }
+
+                continue;
+            }
+        }
+
+        // We found a route that should be removed from the guest.
+
+        if (route->SyncStatus != PendingRemoval)
+        {
+            // We've never attempted to remove this route before, so reset the sync retry count.
+            route->SyncRetryCount = TrackedRoute::MaxSyncRetryCount;
+        }
+        route->SyncStatus = PendingRemoval;
+
+        if (canReplaceRouteMetrics && std::ranges::any_of(endpoint.Network->Routes, [&](const auto& hostRoute) {
+                return route->Route.Equals(hostRoute, true) && route->Route.IsAutoGeneratedPrefixRoute == hostRoute.IsAutoGeneratedPrefixRoute;
+            }))
+        {
+            deferredRouteRemovals.push_back(route);
+            continue;
+        }
+
+        removeTrackedRoute(route);
     }
 
-    // Fourth: update Linux with any addresses to add
+    if (!endpoint.Network->PendingInterfacePropertiesUpdate)
+    {
+        endpoint.Network->PendingAddressAndRouteRefresh = false;
+    }
+
+    // Fourth: add or update addresses in Linux
     if (!endpoint.Network->IsHidden && endpoint.Network->IsConnected)
     {
         bool shouldRefreshAllAddresses = false;
@@ -1374,9 +1401,10 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             TraceLoggingValue(endpoint.Network->IsConnected, "isConnected"));
     }
 
-    // Fourth: update Linux with any routes to add
+    // Fifth: add or refresh routes in Linux
     if (!endpoint.Network->IsHidden && endpoint.Network->IsConnected)
     {
+        refreshAllRoutes |= !deferredRouteRemovals.empty();
         for (auto& hostRoute : endpoint.Network->Routes)
         {
             const auto trackedRoute = endpoint.StateTracking->Routes.emplace(TrackedRoute(hostRoute)).first;
@@ -1403,10 +1431,8 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             // A ModifyRequestType::Add plumbs a new route or leaves an existing one in place (EEXIST is ignored),
             // which is the desired behavior for PendingUpdate.
             //
-            // The route synchronization logic never attempts an in-place update of a route. Whenever
-            // a route change occurs on the host (ProcessRouteChange), we mark for removal the routes that are known
-            // to have been synced in Linux but are no longer part of the latest set of host routes, we do not
-            // do a diff of the route properties to determine if an in-place update is needed.
+            // Route changes use separate add and remove requests, not in-place updates.
+            // Eligible metric-only replacements retain the old routes until the deferred-removal step.
             case PendingAdd:
             case PendingUpdate:
                 hr = SendRouteRequestToGns(endpoint, trackedRoute, hns::ModifyRequestType::Add);
@@ -1425,7 +1451,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
                 break;
 
             case PendingRemoval:
-                // This route is still slated for removal, which we'll try again later.
+                // Do not re-add routes awaiting removal, including deferred metric-only replacements.
                 continue;
 
             default:
@@ -1477,7 +1503,24 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
             TraceLoggingValue(endpoint.Network->IsConnected, "isConnected"));
     }
 
-    // Fifth: update Linux with updated DNS information
+    // Sixth: remove deferred metric-only routes after all desired routes are synced
+    if (!deferredRouteRemovals.empty())
+    {
+        const bool replacementsSynced = std::ranges::all_of(endpoint.Network->Routes, [&](const auto& hostRoute) {
+            const auto trackedRoute = endpoint.StateTracking->Routes.find(TrackedRoute(hostRoute));
+            return trackedRoute != endpoint.StateTracking->Routes.end() && trackedRoute->SyncStatus == Synced;
+        });
+
+        if (replacementsSynced)
+        {
+            for (auto route = deferredRouteRemovals.rbegin(); route != deferredRouteRemovals.rend(); ++route)
+            {
+                removeTrackedRoute(*route);
+            }
+        }
+    }
+
+    // Seventh: update DNS information in Linux
     if (m_dnsInfo != m_trackedDnsInfo)
     {
         if (FAILED(SendDnsRequestToGns(endpoint, m_dnsInfo, hns::ModifyRequestType::Update)))
@@ -1610,10 +1653,12 @@ try
                     TraceLoggingValue(instanceCounter, "instanceCounter"),
                     TraceLoggingValue(endpoint.InterfaceGuid, "interfaceGuid"),
                     TraceLoggingValue(
-                        "Resetting IsHidden to false and PendingIPInterfaceUpdate to true to update the Interface", "message"));
+                        "Resetting IsHidden to false and PendingInterfacePropertiesUpdate to true to update the Interface",
+                        "message"));
                 endpoint.Network->IsHidden = false;
-                // setting PendingIPInterfaceUpdate to tell SyncIpStateWithLinux to update the Interface state
-                endpoint.Network->PendingIPInterfaceUpdate = true;
+                // setting PendingInterfacePropertiesUpdate to tell SyncIpStateWithLinux to update the Interface state
+                endpoint.Network->PendingInterfacePropertiesUpdate = true;
+                endpoint.Network->PendingAddressAndRouteRefresh = true;
             }
             mirroredConnectedInterfaces.insert(endpoint.InterfaceGuid);
         }
@@ -1630,8 +1675,9 @@ try
                     "Setting IsHidden to true - this interface is hidden on the host and must not be connected in the container",
                     "message"));
             endpoint.Network->IsHidden = true;
-            // setting PendingIPInterfaceUpdate to tell SyncIpStateWithLinux to update the Interface state
-            endpoint.Network->PendingIPInterfaceUpdate = true;
+            // setting PendingInterfacePropertiesUpdate to tell SyncIpStateWithLinux to update the Interface state
+            endpoint.Network->PendingInterfacePropertiesUpdate = true;
+            endpoint.Network->PendingAddressAndRouteRefresh = true;
         }
 
         if (!SyncIpStateWithLinux(endpoint))

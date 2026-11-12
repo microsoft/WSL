@@ -236,11 +236,16 @@ struct EndpointRoute
         return std::format(L"{}=>{} [metric {}]", GetFullDestinationPrefix(), NextHopString, Metric);
     }
 
-    bool operator==(const EndpointRoute& rhs) const noexcept
+    bool Equals(const EndpointRoute& rhs, bool ignoreMetric = false) const noexcept
     {
         return Family == rhs.Family && DestinationPrefix.PrefixLength == rhs.DestinationPrefix.PrefixLength &&
                DestinationPrefix.Prefix == rhs.DestinationPrefix.Prefix && NextHop == rhs.NextHop &&
-               SitePrefixLength == rhs.SitePrefixLength && Metric == rhs.Metric;
+               SitePrefixLength == rhs.SitePrefixLength && (ignoreMetric || Metric == rhs.Metric);
+    }
+
+    bool operator==(const EndpointRoute& rhs) const noexcept
+    {
+        return Equals(rhs);
     }
 
     bool operator!=(const EndpointRoute& other) const
@@ -329,7 +334,8 @@ struct NetworkSettings
     bool DisableIpv4DefaultRoutes = false;
     bool DisableIpv6DefaultRoutes = false;
     bool PendingUpdateToReconnectForMetered = false;
-    bool PendingIPInterfaceUpdate = false;
+    bool PendingInterfacePropertiesUpdate = false;
+    bool PendingAddressAndRouteRefresh = false;
 
     auto operator<=>(const NetworkSettings&) const = default;
 
@@ -422,7 +428,8 @@ std::shared_ptr<NetworkSettings> GetHostEndpointSettings();
         TraceLoggingValue((settings)->IPv6InterfaceMtu, "IPv6InterfaceMtu"), \
         TraceLoggingValue((settings)->IPv4InterfaceMetric.value_or(0xffffffff), "IPv4InterfaceMetric"), \
         TraceLoggingValue((settings)->IPv6InterfaceMetric.value_or(0xffffffff), "IPv6InterfaceMetric"), \
-        TraceLoggingValue((settings)->PendingIPInterfaceUpdate, "PendingIPInterfaceUpdate"), \
+        TraceLoggingValue((settings)->PendingInterfacePropertiesUpdate, "PendingInterfacePropertiesUpdate"), \
+        TraceLoggingValue((settings)->PendingAddressAndRouteRefresh, "PendingAddressAndRouteRefresh"), \
         TraceLoggingValue((settings)->PendingUpdateToReconnectForMetered, "PendingUpdateToReconnectForMetered")
 
 } // namespace wsl::core::networking

@@ -4550,6 +4550,38 @@ class MirroredTests
         VerifyHostRouteMirroring(AF_INET6);
     }
 
+    WSL2_TEST_METHOD(InterfaceMetricChangePreservesIpStateV4)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
+        {
+            LogSkipped("Host does not have IPv4 internet connectivity. Skipping...");
+            return;
+        }
+
+        VerifyHostInterfaceMetricChange(AF_INET);
+    }
+
+    WSL2_TEST_METHOD(InterfaceMetricChangePreservesIpStateV6)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        VerifyHostInterfaceMetricChange(AF_INET6);
+    }
+
     WSL2_TEST_METHOD(LoopbackLocal)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -5535,6 +5567,107 @@ class MirroredTests
         return false;
     }
 
+    static void CaptureNetworkChange(
+        const std::function<void()>& reset, const std::function<void()>& change, const std::function<bool(const std::wstring&)>& verifyEvents)
+    {
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&] {
+                reset();
+
+                wil::unique_handle readPipe;
+                wil::unique_handle writePipe;
+                VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&readPipe, &writePipe, nullptr, 64 * 1024));
+                VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(writePipe.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+                auto command = LxssGenerateWslCommandLine(L"ip -o monitor label address route");
+                NetworkTests::unique_kill_process monitor(LxsstuStartProcess(command.data(), nullptr, writePipe.get(), writePipe.get()));
+                writePipe.reset();
+                change();
+
+                std::string output;
+                DWORD available{};
+                for (;;)
+                {
+                    VERIFY_WIN32_BOOL_SUCCEEDED(PeekNamedPipe(readPipe.get(), nullptr, 0, nullptr, &available, nullptr));
+                    if (available == 0)
+                    {
+                        break;
+                    }
+
+                    char buffer[4096];
+                    DWORD bytesRead{};
+                    VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(readPipe.get(), buffer, std::min<DWORD>(sizeof(buffer), available), &bytesRead, nullptr));
+                    VERIFY_ARE_NOT_EQUAL(bytesRead, (DWORD)0);
+                    output.append(buffer, bytesRead);
+                }
+
+                const auto events = wsl::shared::string::MultiByteToWide(output);
+                LogInfo("Network events:\r\n%ls", NetworkTests::FixLineEndings(events).c_str());
+                THROW_HR_IF_MSG(E_PENDING, !verifyEvents(events), "The expected route-change events have not been observed");
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(10),
+            [] {
+                try
+                {
+                    throw;
+                }
+                catch (const wil::ResultException& error)
+                {
+                    return error.GetErrorCode() == E_PENDING;
+                }
+                catch (...)
+                {
+                    return false;
+                }
+            }));
+    }
+
+    static bool VerifyRouteMetricChangeOrder(const NetworkTests::Route& route, int newMetric, const std::wstring& events)
+    {
+        std::optional<size_t> addedRoute;
+        std::optional<size_t> removedRoute;
+        const std::wregex routePattern(LR"(^\[ROUTE\](Deleted )?(\S+) via (\S+) dev (\S+).* metric ([0-9]+)(?:\s|$))");
+        std::wsmatch match;
+        std::wistringstream lines(events);
+        std::wstring line;
+        size_t position = 0;
+        while (std::getline(lines, line))
+        {
+            if (lines.eof())
+            {
+                break;
+            }
+
+            ++position;
+            if (!std::regex_search(line, match, routePattern) || match.str(2) != route.Prefix.value_or(L"default") ||
+                match.str(3) != route.Via || match.str(4) != route.Device)
+            {
+                continue;
+            }
+
+            const bool removed = match[1].matched;
+            const int metric = std::stoi(match.str(5));
+            if (!removed && metric == newMetric && !addedRoute.has_value())
+            {
+                addedRoute = position;
+            }
+            if (removed && metric == route.Metric && !removedRoute.has_value())
+            {
+                removedRoute = position;
+            }
+        }
+
+        if (addedRoute.has_value() && removedRoute.has_value())
+        {
+            VERIFY_IS_TRUE(
+                addedRoute.value() < removedRoute.value(), L"The replacement must be added before the old route is removed");
+            return true;
+        }
+
+        return false;
+    }
+
     // Adds a host route using RFC 5737 / RFC 3849 documentation ranges (safe to add without
     // affecting host connectivity), then updates its metric, gateway, and destination, verifying each change mirrors into Linux.
     static void VerifyHostRouteMirroring(ADDRESS_FAMILY family)
@@ -5564,8 +5697,24 @@ class MirroredTests
         const auto initialRoute = FindMirroredRoute(family, destinationA, gatewayA);
         VERIFY_IS_TRUE(initialRoute.has_value());
 
-        SetHostRouteMetric(destinationA, gatewayA, metricB);
-        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true, initialRoute->Metric + (metricB - metricA)));
+        auto previousRoute = initialRoute.value();
+        for (const int metric : {metricB, metricA})
+        {
+            const int expectedMetric = initialRoute->Metric + (metric - metricA);
+            CaptureNetworkChange(
+                [&] {
+                    SetHostRouteMetric(destinationA, gatewayA, metricA + previousRoute.Metric - initialRoute->Metric);
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true, previousRoute.Metric));
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, false, expectedMetric));
+                },
+                [&] {
+                    SetHostRouteMetric(destinationA, gatewayA, metric);
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, true, expectedMetric));
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayA, false, previousRoute.Metric));
+                },
+                [&](const std::wstring& events) { return VerifyRouteMetricChangeOrder(previousRoute, expectedMetric, events); });
+            previousRoute.Metric = expectedMetric;
+        }
 
         RemoveHostRoute(destinationA);
         AddHostRoute(ifIndex, destinationA, gatewayB, metricB);
@@ -5576,6 +5725,88 @@ class MirroredTests
         AddHostRoute(ifIndex, destinationB, gatewayB, metricB);
         VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationB, gatewayB, true));
         VERIFY_IS_TRUE(WaitForMirroredRoute(family, destinationA, gatewayB, false));
+    }
+
+    static void SetHostInterfaceMetric(DWORD ifIndex, ADDRESS_FAMILY family, ULONG metric, bool automaticMetric = false)
+    {
+        const auto metricArgument = automaticMetric ? L"" : std::format(L" -InterfaceMetric {}", metric);
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(
+                L"Set-NetIPInterface -InterfaceIndex {} -AddressFamily {} -AutomaticMetric {}{} -PolicyStore ActiveStore "
+                L"-Confirm:$false -ErrorAction Stop",
+                ifIndex,
+                family == AF_INET ? L"IPv4" : L"IPv6",
+                automaticMetric ? L"Enabled" : L"Disabled",
+                metricArgument),
+            0);
+    }
+
+    static void VerifyHostInterfaceMetricChange(ADDRESS_FAMILY family)
+    {
+        const bool v4 = family == AF_INET;
+        const DWORD ifIndex = NetworkTests::GetBestInterfaceIndex(family);
+        const ADDRESS_FAMILY otherFamily = v4 ? AF_INET6 : AF_INET;
+        MIB_IPINTERFACE_ROW originalInterface{};
+        originalInterface.Family = family;
+        originalInterface.InterfaceIndex = ifIndex;
+        VERIFY_ARE_EQUAL(GetIpInterfaceEntry(&originalInterface), (ULONG)NO_ERROR);
+
+        MIB_IPINTERFACE_ROW otherInterface{};
+        otherInterface.Family = otherFamily;
+        otherInterface.InterfaceIndex = ifIndex;
+        const bool hasOtherInterface = GetIpInterfaceEntry(&otherInterface) == NO_ERROR;
+        auto restoreMetrics = wil::scope_exit([&] {
+            SetHostInterfaceMetric(ifIndex, family, originalInterface.Metric, originalInterface.UseAutomaticMetric);
+            if (hasOtherInterface)
+            {
+                SetHostInterfaceMetric(ifIndex, otherFamily, otherInterface.Metric, otherInterface.UseAutomaticMetric);
+            }
+        });
+
+        constexpr int routeMetric = 100;
+        constexpr int metricA = 30;
+        constexpr int metricB = 35;
+        if (hasOtherInterface)
+        {
+            SetHostInterfaceMetric(ifIndex, otherFamily, 100);
+        }
+        SetHostInterfaceMetric(ifIndex, family, metricA);
+
+        const std::wstring destination = v4 ? L"192.0.2.0/24" : L"2001:db8:1::/64";
+        const std::wstring gateway = v4 ? L"192.0.2.1" : L"2001:db8:1::1";
+        VERIFY_IS_FALSE(HostRouteExists(destination));
+        auto cleanupRoute = wil::scope_exit([&] { RemoveHostRoute(destination); });
+        AddHostRoute(ifIndex, destination, gateway, routeMetric);
+        VERIFY_IS_TRUE(WaitForMirroredRoute(family, destination, gateway, true, routeMetric + metricA));
+        const auto initialRoute = FindMirroredRoute(family, destination, gateway, routeMetric + metricA);
+        VERIFY_IS_TRUE(initialRoute.has_value());
+
+        const auto guestIndex =
+            std::stoul(LxsstuLaunchWslAndCaptureOutput(L"cat /sys/class/net/" + initialRoute->Device + L"/ifindex", 0).first);
+        const auto deletedAddress = std::format(L"[ADDR]Deleted {}:", guestIndex);
+
+        auto previousRoute = initialRoute.value();
+        for (const int metric : {metricB, metricA})
+        {
+            const int expectedMetric = routeMetric + metric;
+            CaptureNetworkChange(
+                [&] {
+                    SetHostInterfaceMetric(ifIndex, family, previousRoute.Metric - routeMetric);
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destination, gateway, true, previousRoute.Metric));
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destination, gateway, false, expectedMetric));
+                },
+                [&] {
+                    SetHostInterfaceMetric(ifIndex, family, metric);
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destination, gateway, true, expectedMetric));
+                    VERIFY_IS_TRUE(WaitForMirroredRoute(family, destination, gateway, false, previousRoute.Metric));
+                },
+                [&](const std::wstring& events) {
+                    VERIFY_ARE_EQUAL(
+                        events.find(deletedAddress), std::wstring::npos, L"A metric-only change must not delete addresses");
+                    return VerifyRouteMetricChangeOrder(previousRoute, expectedMetric, events);
+                });
+            previousRoute.Metric = expectedMetric;
+        }
     }
 
     WSL2_TEST_METHOD(DnsResolutionBasic)
