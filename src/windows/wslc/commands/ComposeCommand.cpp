@@ -30,6 +30,23 @@ std::vector<std::unique_ptr<Command>> ComposeCommand::CreateCommands() const
     return commands;
 }
 
+std::vector<Argument> ComposeCommand::GetGlobalArguments() const
+{
+    return {
+        CreateGlobalArgument(ArgType::ComposeAllResources),
+        CreateGlobalArgument(ArgType::ComposeAnsi),
+        CreateGlobalArgument(ArgType::ComposeCompatibility),
+        CreateGlobalArgument(ArgType::ComposeGlobalDryRun),
+        CreateGlobalArgument(ArgType::ComposeEnvFile, {.Limit = Limit::Unlimited}),
+        CreateGlobalArgument(ArgType::ComposeFile, {.Limit = Limit::Unlimited}),
+        CreateGlobalArgument(ArgType::ComposeParallel),
+        CreateGlobalArgument(ArgType::ComposeProfile, {.Limit = Limit::Unlimited}),
+        CreateGlobalArgument(ArgType::ComposeProgress),
+        CreateGlobalArgument(ArgType::ComposeProjectDirectory),
+        CreateGlobalArgument(ArgType::ComposeProjectName),
+    };
+}
+
 std::wstring ComposeCommand::ShortDescription() const
 {
     return Localization::WSLCCLI_ComposeCommandDesc();
@@ -43,6 +60,13 @@ std::wstring ComposeCommand::LongDescription() const
 void ComposeCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
     OutputHelp(context.Terminal);
+}
+
+std::vector<Argument> ComposeSubcommand::GetArguments() const
+{
+    auto arguments = GetComposeArguments();
+    arguments.push_back(Argument::Create(ArgType::ComposeDryRun));
+    return arguments;
 }
 
 } // namespace wsl::windows::wslc

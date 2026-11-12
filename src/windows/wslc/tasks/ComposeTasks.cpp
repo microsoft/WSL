@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
+#include "Argument.h"
 #include "ArgumentConvertedTypes.h"
 #include "ComposeService.h"
 #include "ComposeTasks.h"
@@ -22,6 +23,34 @@ namespace {
     ComposeProjectReference ComposeProject(CLIExecutionContext& context)
     {
         return ComposeProjectReference{std::filesystem::path{ComposePath(context)}};
+    }
+
+    template <ArgType E>
+    void ThrowIfSupplied(ArgMap& args)
+    {
+        bool supplied = false;
+        if constexpr (std::is_same_v<ArgMap::value_t<E>, bool>)
+        {
+            supplied = args.GetValue<E>();
+        }
+        else
+        {
+            supplied = args.Contains(E);
+        }
+
+        if (!supplied)
+        {
+            return;
+        }
+
+        const auto name = std::wstring(2, WSLC_CLI_ARG_ID_CHAR) + Argument::Create(E).Name();
+        THROW_HR_WITH_USER_ERROR(E_NOTIMPL, Localization::WSLCCLI_ComposeOptionNotImplementedError(name));
+    }
+
+    template <ArgType... Types>
+    void ThrowIfAnySupplied(ArgMap& args)
+    {
+        (ThrowIfSupplied<Types>(args), ...);
     }
 
 } // namespace
@@ -57,6 +86,23 @@ void UpCompose(CLIExecutionContext& context)
 {
     context.ExitCode =
         ComposeService::Up(context.Terminal, context.Data.Get<Data::Session>(), ComposePath(context), context.CreateCancelEvent());
+}
+
+void ValidateComposeOptions(CLIExecutionContext& context)
+{
+    ThrowIfAnySupplied<
+        ArgType::ComposeAllResources,
+        ArgType::ComposeAnsi,
+        ArgType::ComposeCompatibility,
+        ArgType::ComposeGlobalDryRun,
+        ArgType::ComposeEnvFile,
+        ArgType::ComposeFile,
+        ArgType::ComposeParallel,
+        ArgType::ComposeProfile,
+        ArgType::ComposeProgress,
+        ArgType::ComposeProjectDirectory,
+        ArgType::ComposeProjectName,
+        ArgType::ComposeDryRun>(context.Args);
 }
 
 } // namespace wsl::windows::wslc::task
