@@ -439,6 +439,34 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableAutoProxy, false);
     }
 
+    if (EnableOpenVmm)
+    {
+        const auto validateSetting = [](bool Conflict, PCWSTR Setting, PCWSTR RequiredValue) {
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), shared::Localization::MessageOpenVmmConfigConflict(Setting, RequiredValue), Conflict);
+        };
+        validateSetting(EnableGpuSupport, L"wsl2.gpuSupport", L"false");
+        validateSetting(EnableGuiApps, L"wsl2.guiApplications", L"false");
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), shared::Localization::MessageOpenVmmNestedVirtualizationConflict(), EnableNestedVirtualization);
+        validateSetting(!EnableVirtio, L"wsl2.virtio", L"true");
+        validateSetting(!EnableVirtioFs, L"wsl2.virtioFs", L"true");
+        validateSetting(EnableVirtio9p, L"wsl2.virtio9p", L"false");
+        validateSetting(EnableVirtioFsAggregateShares, L"experimental.virtioFsAggregateShares", L"false");
+        validateSetting(EnableHardwarePerformanceCounters, L"wsl2.hardwarePerformanceCounters", L"false");
+        validateSetting(SwiotlbSizeBytes != 0, L"experimental.swiotlb", L"0");
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            shared::Localization::MessageOpenVmmNetworkingConflict(),
+            NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::None);
+        if (NetworkingMode == NetworkingMode::Nat)
+        {
+            validateSetting(FirewallConfig.Enabled(), L"wsl2.firewall", L"false");
+            validateSetting(EnableDnsTunneling, L"wsl2.dnsTunneling", L"false");
+            validateSetting(EnableIpv6, L"wsl2.ipv6", L"false");
+        }
+    }
+
     if (!EnableVirtio)
     {
         VALIDATE_CONFIG_OPTION(!EnableVirtio, EnableVirtio9p, false);

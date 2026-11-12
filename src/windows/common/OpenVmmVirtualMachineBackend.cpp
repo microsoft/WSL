@@ -128,8 +128,10 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         Request.Processor.NestedVirtualization != VmFeatureRequest::Disabled);
     description.Processor.NestedVirtualization = false;
     description.Memory.SizeBytes = (Request.Memory.SizeBytes / c_mib) * c_mib;
-    validation::ValidateFeature(Request.Processor.PerfmonPmu, L"PMU");
-    validation::ValidateFeature(Request.Processor.PerfmonLbr, L"LBR");
+    THROW_HR_IF_MSG(
+        c_notSupported,
+        Request.Processor.PerfmonPmu != VmFeatureRequest::Disabled || Request.Processor.PerfmonLbr != VmFeatureRequest::Disabled,
+        "OpenVMM does not support hardware performance counters");
     validation::ValidateFeature(Request.Memory.AllowOvercommit, L"memory overcommit");
     validation::ValidateFeature(Request.Memory.DeferredCommit, L"deferred memory commit");
     validation::ValidateFeature(Request.Memory.ColdDiscard, L"cold discard");

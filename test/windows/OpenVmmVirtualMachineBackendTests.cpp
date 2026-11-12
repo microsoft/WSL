@@ -73,6 +73,85 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVMM));
     }
 
+    TEST_METHOD(RejectsIncompatibleOpenVmmSettings)
+    {
+        using wsl::windows::common::filesystem::TempFile;
+        constexpr std::string_view validConfig =
+            "[wsl2]\n"
+            "gpuSupport=false\n"
+            "guiApplications=false\n"
+            "nestedVirtualization=false\n"
+            "virtio=true\n"
+            "virtioFs=true\n"
+            "virtio9p=false\n"
+            "hardwarePerformanceCounters=false\n"
+            "networkingMode=nat\n"
+            "firewall=false\n"
+            "dnsTunneling=false\n"
+            "ipv6=false\n"
+            "[experimental]\n"
+            "openVmm=true\n"
+            "virtioFsAggregateShares=false\n";
+
+        auto token = GetNonElevatedToken(TokenImpersonation);
+        const auto configure = [&](std::string_view Override) {
+            TempFile file{GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS};
+            const auto content = std::string{Override} + std::string{validConfig};
+            DWORD written = 0;
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.Handle.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
+            VERIFY_ARE_EQUAL(content.size(), static_cast<size_t>(written));
+            file.Handle.reset();
+            return OperationResult([&] { wsl::core::Config config{file.Path.c_str(), token.get()}; });
+        };
+
+        VERIFY_ARE_EQUAL(S_OK, configure(""));
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nnetworkingMode=none\nfirewall=true\ndnsTunneling=true\nipv6=true\n"));
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[experimental]\nopenVmm=false\n[wsl2]\ngpuSupport=true\n"));
+        for (const auto* setting : {
+                 "\n[wsl2]\ngpuSupport=true\n",
+                 "\n[wsl2]\nguiApplications=true\n",
+                 "\n[wsl2]\nnestedVirtualization=true\n",
+                 "\n[wsl2]\nvirtio=false\n",
+                 "\n[wsl2]\nvirtioFs=false\n",
+                 "\n[wsl2]\nvirtio9p=true\n",
+                 "\n[wsl2]\nhardwarePerformanceCounters=true\n",
+                 "\n[wsl2]\nnetworkingMode=mirrored\n",
+                 "\n[wsl2]\nnetworkingMode=bridged\n",
+                 "\n[wsl2]\nnetworkingMode=consomme\n",
+                 "\n[wsl2]\nfirewall=true\n",
+                 "\n[wsl2]\ndnsTunneling=true\n",
+                 "\n[wsl2]\nipv6=true\n",
+                 "\n[experimental]\nvirtioFsAggregateShares=true\n",
+                 "\n[experimental]\nswiotlb=1M\n",
+             })
+        {
+            VERIFY_ARE_EQUAL(c_notSupported, configure(setting));
+        }
+
+        const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::CreateVm);
+        VERIFY_ARE_EQUAL(c_notSupported, configure("\n[wsl2]\ngpuSupport=true\n"));
+        VERIFY_IS_TRUE(context.ReportedError().has_value());
+        VERIFY_IS_TRUE(context.ReportedError()->Message.has_value());
+        VERIFY_IS_TRUE(context.ReportedError()->Message->find(L"wsl2.gpuSupport") != std::wstring::npos);
+    }
+
+    TEST_METHOD(RejectsUnsupportedOpenVmmProcessorFeatures)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        request.Processor.NestedVirtualization = VmFeatureRequest::Preferred;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Processor.NestedVirtualization = VmFeatureRequest::Disabled;
+        request.Processor.PerfmonPmu = VmFeatureRequest::Preferred;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Processor.PerfmonPmu = VmFeatureRequest::Disabled;
+        request.Processor.PerfmonLbr = VmFeatureRequest::Required;
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Processor.PerfmonLbr = VmFeatureRequest::Disabled;
+        request.NetworkAdapters.push_back({L"host", VmHostEndpointNetwork{}});
+        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+    }
+
     TEST_METHOD(PreservesCallerIdentityAndBootInputs)
     {
         SKIP_TEST_ARM64();
@@ -95,7 +174,12 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_FALSE(disk.ReadOnly);
 
         request.Mmio.HighWindowSizeBytes = c_mib;
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        request.Mmio.MaximumGuestAddressBits = 20;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
+        request.Mmio.MaximumGuestAddressBits.reset();
+        request.Mmio.HighWindowSizeBytes = c_mib + 1;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
         request.Mmio = {};
         request.Memory.SmallPageBacking = VmFeatureRequest::Required;
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
@@ -206,7 +290,7 @@ class OpenVmmVirtualMachineBackendTests
         auto request = CreateRequest();
         request.Consoles = {
             {VmConsoleRole::EarlyBoot, VmSerialConsole{0, L"\\\\.\\pipe\\early"}},
-            {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"", L"\\\\.\\pipe\\console"}}};
+            {VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"hvc0", L"\\\\.\\pipe\\console"}}};
         VERIFY_ARE_EQUAL(size_t{2}, ValidateCreateRequest(request).Boot.Consoles.size());
     }
 
@@ -379,7 +463,6 @@ class OpenVmmVirtualMachineBackendTests
         decltype(capabilities.Features) expectedFeatures;
         for (const auto feature :
              {VmFeature::SerialConsole,
-              VmFeature::VirtioConsole,
               VmFeature::VirtioFsFileBacked,
               VmFeature::UserModeNatNetwork,
               VmFeature::TcpPortBinding,
