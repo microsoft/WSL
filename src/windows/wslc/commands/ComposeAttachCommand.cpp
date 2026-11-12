@@ -42,7 +42,7 @@ std::wstring ComposeAttachCommand::LongDescription() const
 
 void ComposeAttachCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveComposeProject(ComposeProjectSelection::NamePreferred) << ResolveSession << AttachCompose;
+    context << ResolveSession << ResolveComposeProject(ComposeProjectSelection::NamePreferred) << AttachCompose;
 }
 
 } // namespace wsl::windows::wslc

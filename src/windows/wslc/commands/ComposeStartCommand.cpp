@@ -42,7 +42,7 @@ std::wstring ComposeStartCommand::LongDescription() const
 
 void ComposeStartCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveComposeProject(ComposeProjectSelection::NameWithoutFiles) << ResolveSession << StartCompose;
+    context << ResolveSession << ResolveComposeProject(ComposeProjectSelection::NameWithoutFiles) << StartCompose;
 }
 
 } // namespace wsl::windows::wslc
