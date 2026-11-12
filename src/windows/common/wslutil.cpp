@@ -379,38 +379,6 @@ std::regex BuildImageReferenceRegex()
     return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
 }
 
-std::wstring FormatLocalTime(std::chrono::system_clock::time_point time)
-{
-    // FILETIME counts 100-nanosecond intervals since 1601-01-01, the system clock counts from 1970-01-01.
-    constexpr int64_t c_unixEpochAsFileTime = 116444736000000000LL;
-    using FileTimeTicks = std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>;
-
-    ULARGE_INTEGER ticks{};
-    ticks.QuadPart = static_cast<uint64_t>(std::chrono::duration_cast<FileTimeTicks>(time.time_since_epoch()).count() + c_unixEpochAsFileTime);
-
-    const FILETIME fileTime{ticks.LowPart, ticks.HighPart};
-    SYSTEMTIME utcTime{};
-    SYSTEMTIME localTime{};
-    THROW_IF_WIN32_BOOL_FALSE(FileTimeToSystemTime(&fileTime, &utcTime));
-    THROW_IF_WIN32_BOOL_FALSE(SystemTimeToTzSpecificLocalTime(nullptr, &utcTime, &localTime));
-
-    auto format = [&](auto formatFunction, DWORD flags) {
-        const int size = formatFunction(LOCALE_NAME_USER_DEFAULT, flags, &localTime, nullptr, nullptr, 0);
-        THROW_LAST_ERROR_IF(size == 0);
-
-        std::wstring result(size, L'\0');
-        THROW_LAST_ERROR_IF(formatFunction(LOCALE_NAME_USER_DEFAULT, flags, &localTime, nullptr, result.data(), size) == 0);
-        result.resize(size - 1);
-        return result;
-    };
-
-    auto getDateFormat = [](LPCWSTR locale, DWORD flags, const SYSTEMTIME* systemTime, LPCWSTR pattern, LPWSTR buffer, int size) {
-        return GetDateFormatEx(locale, flags, systemTime, pattern, buffer, size, nullptr);
-    };
-
-    return std::format(L"{} {}", format(getDateFormat, DATE_SHORTDATE), format(GetTimeFormatEx, TIME_NOSECONDS));
-}
-
 void ThrowIfGitHubRateLimited(const winrt::Windows::Web::Http::HttpResponseMessage& response)
 {
     const auto headers = response.Headers();
@@ -439,7 +407,11 @@ void ThrowIfGitHubRateLimited(const winrt::Windows::Web::Http::HttpResponseMessa
         TraceLoggingValue(getHeader(L"x-ratelimit-resource").value_or(L"").c_str(), "resource"),
         TraceLoggingValue(getHeader(L"retry-after").value_or(L"").c_str(), "retryAfter"));
 
-    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited(FormatLocalTime(reset.value())));
+    const auto resetTime = std::chrono::system_clock::to_time_t(reset.value());
+    THROW_HR_WITH_USER_ERROR(
+        WSL_E_GITHUB_RATE_LIMITED,
+        Localization::MessageGitHubRateLimited(
+            wsl::shared::string::MultiByteToWide(wsl::windows::common::timestamp::EpochToLocalDisplayTime(resetTime))));
 }
 
 } // namespace
