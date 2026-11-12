@@ -117,6 +117,7 @@ public:
     void DisconnectFromNetwork(LPCSTR NetworkName);
 
     void CopyTo(IWSLCContainer** Container) const;
+    Microsoft::WRL::ComPtr<WSLCContainer> GetComWrapper() const;
 
     const std::string& Image() const noexcept;
     const std::string& Name() const noexcept;
@@ -151,6 +152,7 @@ public:
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted,
         EventStore& eventStore);
 
+    // Returns empty if the container disappears before recovery completes.
     static std::shared_ptr<WSLCContainerImpl> Open(
         const common::docker_schema::ContainerInfo& DockerContainer,
         WSLCSession& wslcSession,
@@ -213,6 +215,7 @@ private:
     // restart they are part of.
     void StartPhase(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, bool RestartPhase);
     void StopPhase(WSLCSignal Signal, LONG TimeoutSeconds, bool Kill, bool RestartPhase);
+    __requires_exclusive_lock_held(m_lock) void CreateInitProcess(std::unique_ptr<WSLCProcessIO> io);
 
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
@@ -262,7 +265,7 @@ private:
     mutable std::mutex m_processesLock;
     __guarded_by(m_processesLock) std::vector<std::weak_ptr<DockerExecProcessControl>> m_processes;
     __guarded_by(m_processesLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_initProcess;
-    __guarded_by(m_processesLock) DockerContainerProcessControl* m_initProcessControl = nullptr;
+    __guarded_by(m_processesLock) std::shared_ptr<DockerContainerProcessControl> m_initProcessControl;
 
     _Guarded_by_(m_lock) std::shared_ptr<StateTransition> m_transition;
 
@@ -332,6 +335,7 @@ public:
     IFACEMETHOD(Logs)(_In_ WSLCLogsFlags Flags, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr, _In_ LONGLONG Since, _In_ LONGLONG Until, _In_ ULONGLONG Tail) override;
     IFACEMETHOD(GetId)(_Out_ WSLCContainerId Id) override;
     IFACEMETHOD(GetName)(_Out_ LPSTR* Name) override;
+    IFACEMETHOD(GetImage)(_Out_ LPSTR* Image) override;
     IFACEMETHOD(GetLabels)(_Out_ WSLCLabelInformation** Labels, _Out_ ULONG* Count) override;
     IFACEMETHOD(Stats)(_Out_ LPSTR* Output) override;
     IFACEMETHOD(ConnectToNetwork)(_In_ const WSLCNetworkConnectionOptions* Options) override;
@@ -345,9 +349,23 @@ public:
 
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
+    // Internal entry points share the caller's execution context.
+    HRESULT StartImpl(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
+    HRESULT StopImpl(WSLCSignal Signal, LONG TimeoutSeconds);
+    HRESULT DeleteImpl(WSLCDeleteFlags Flags);
+    HRESULT GetStateImpl(WSLCContainerState* State);
+    HRESULT GetIdImpl(WSLCContainerId Id);
+    HRESULT GetNameImpl(LPSTR* Name);
+    HRESULT GetImageImpl(LPSTR* Image);
+
     // Cache read-only properties so they remain accessible after the impl is disconnected.
     // Called from WSLCContainerImpl::PrepareDisconnectComWrapper() while m_lock is held exclusively.
-    void CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
+    void CacheState(
+        const std::string& id,
+        const std::string& name,
+        const std::string& image,
+        WSLCContainerState state,
+        const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept;
 
 private:
     WSLCSession& m_session;
@@ -358,6 +376,7 @@ private:
     mutable wil::srwlock m_cacheLock;
     _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedId;
     _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedName;
+    _Guarded_by_(m_cacheLock) std::optional<std::string> m_cachedImage;
     _Guarded_by_(m_cacheLock) std::optional<WSLCContainerState> m_cachedState;
     _Guarded_by_(m_cacheLock) Microsoft::WRL::ComPtr<IWSLCProcess> m_cachedInitProcess;
 };

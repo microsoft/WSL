@@ -13,9 +13,10 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include "WSLCSession.h"
 #include "ComposeLabels.h"
 #include "ComposeNormalizer.h"
-#include "WSLCSession.h"
+#include "WSLCComposeOperation.h"
 #include "WSLCComposeSession.h"
 #include "WSLCExecutionContext.h"
 #include "WSLCContainer.h"
@@ -341,7 +342,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, ProcessHandle);
 
-    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE);
+    *ProcessHandle = wslutil::DuplicateHandle(GetCurrentProcess(), PROCESS_SET_QUOTA | PROCESS_TERMINATE | SYNCHRONIZE);
     return S_OK;
 }
 CATCH_RETURN();
@@ -2390,7 +2391,7 @@ try
 
     auto lock = AcquireLease();
 
-    auto result = wil::ResultFromException([&]() { CreateContainerImpl(containerOptions, Container); });
+    auto result = wil::ResultFromException([&]() { THROW_IF_FAILED(CreateContainerImpl(containerOptions).CopyTo(Container)); });
 
     // This telemetry event is used to keep track of the container creation failure rate and surface unexpected errors.
     WSL_LOG(
@@ -2455,7 +2456,8 @@ try
         std::ranges::any_of(
             m_composeSessions, [&](const auto& entry) { return entry.second->GetProjectName() == spec.ProjectName; }));
 
-    auto containers = CreateComposeContainers(spec);
+    const ComposeCancellation cancellation(m_sessionTerminatingEvent.get(), nullptr);
+    auto containers = CreateComposeContainers(spec, cancellation, {});
 
     Microsoft::WRL::ComPtr<WSLCComposeSession> composeSession;
     THROW_IF_FAILED(Microsoft::WRL::MakeAndInitialize<WSLCComposeSession>(&composeSession, this, configPath.wstring(), spec, std::move(containers)));
@@ -2466,15 +2468,155 @@ try
 }
 CATCH_RETURN();
 
-std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeContainers(const ComposeSpec& Spec)
+HRESULT WSLCSession::ExecuteComposeOperation(
+    const WSLCComposeOperationRequest* request, IComposeProgressCallback* progressCallback, HANDLE cancelEvent, WSLCComposeOperationResult* result)
+try
 {
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> containers;
-    const std::string networkName = ComposeNormalizer::DefaultNetworkName(Spec.ProjectName);
+    WSLCExecutionContext context(this);
+    RETURN_HR_IF_NULL(E_POINTER, result);
+    *result = {};
+    RETURN_HR_IF_NULL(E_POINTER, request);
+
+    // Shutdown drains the invocation even while it has no VM lease or outgoing callback RPC.
+    auto callRegistration = RegisterUserCOMCallback();
+    WSLCComposeOperation operation(*this, *request, progressCallback, cancelEvent);
+    operation.Execute(*result, context);
+    return S_OK;
+}
+CATCH_RETURN();
+
+std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> WSLCSession::DiscoverComposeContainers(std::string_view projectKey)
+{
+    const std::string projectKeyValue{projectKey};
+    auto lease = AcquireLease();
+
+    const std::map<std::string, std::vector<std::string>> filters{
+        {"label",
+         {
+             std::format("{}={}", compose::label::c_project, projectKeyValue),
+         }},
+    };
+
+    // Discovery needs typed labels and recovery of uncached containers.
+    const auto dockerContainers = ListDockerContainers(true, -1, filters);
+
+    struct ComposeContainer
+    {
+        std::string Service;
+        uint64_t ContainerNumber;
+        Microsoft::WRL::ComPtr<WSLCContainer> Container;
+    };
+
+    std::vector<ComposeContainer> composeContainers;
+    composeContainers.reserve(dockerContainers.size());
+
+    std::unique_lock containersLock{m_containersLock};
+    // Create-event publication retains the implementation backing the creator's COM wrapper.
+    WaitForConflictingCreateToComplete(containersLock);
+    std::erase_if(m_containers, [](const auto& entry) { return entry.second->State() == WslcContainerStateDeleted; });
+    // Every project-label match must have supported WSLC metadata and an unambiguous resource identity.
+    for (const auto& dockerContainer : dockerContainers)
+    {
+        const auto metadataVersion = dockerContainer.Labels.find(compose::label::c_metadataVersion);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            metadataVersion == dockerContainer.Labels.end() || metadataVersion->second != compose::label::c_metadataVersionValue,
+            "WSLC Compose project '%hs' contains container '%hs' with an unsupported metadata version",
+            projectKeyValue.c_str(),
+            dockerContainer.Id.c_str());
+
+        const auto service = dockerContainer.Labels.find(compose::label::c_service);
+        const auto containerNumber = dockerContainer.Labels.find(compose::label::c_containerNumber);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+            service == dockerContainer.Labels.end() || service->second.empty() ||
+                containerNumber == dockerContainer.Labels.end() || containerNumber->second.empty(),
+            "WSLC Compose project '%hs' contains container '%hs' with incomplete resource identity",
+            projectKeyValue.c_str(),
+            dockerContainer.Id.c_str());
+
+        uint64_t parsedContainerNumber{};
+        const auto parseResult = std::from_chars(
+            containerNumber->second.data(), containerNumber->second.data() + containerNumber->second.size(), parsedContainerNumber);
+        THROW_HR_IF_MSG(
+            HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+            parseResult.ec != std::errc{} || parseResult.ptr != containerNumber->second.data() + containerNumber->second.size() ||
+                parsedContainerNumber == 0,
+            "WSLC Compose project '%hs' contains container '%hs' with invalid container number '%hs'",
+            projectKeyValue.c_str(),
+            dockerContainer.Id.c_str(),
+            containerNumber->second.c_str());
+
+        auto existing = m_containers.find(dockerContainer.Id);
+        if (existing == m_containers.end())
+        {
+            auto container = WSLCContainerImpl::Open(
+                dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
+            if (!container)
+            {
+                continue;
+            }
+            existing = m_containers.emplace(container->ID(), std::move(container)).first;
+        }
+
+        composeContainers.emplace_back(service->second, parsedContainerNumber, existing->second->GetComWrapper());
+    }
+
+    // Resource identity gives lifecycle execution and results a stable order across Docker enumerations.
+    const auto compareResourceIdentity = [](const ComposeContainer& left, const ComposeContainer& right) {
+        return std::tie(left.Service, left.ContainerNumber) < std::tie(right.Service, right.ContainerNumber);
+    };
+    std::ranges::sort(composeContainers, compareResourceIdentity);
+    const auto duplicate = std::ranges::adjacent_find(composeContainers, [](const ComposeContainer& left, const ComposeContainer& right) {
+        return left.Service == right.Service && left.ContainerNumber == right.ContainerNumber;
+    });
+    THROW_HR_IF_MSG(
+        HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+        duplicate != composeContainers.end(),
+        "WSLC Compose project '%hs' contains duplicate resource identity '%hs'",
+        projectKeyValue.c_str(),
+        duplicate == composeContainers.end() ? "" : std::format("{}:{}", duplicate->Service, duplicate->ContainerNumber).c_str());
+
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> result;
+    result.reserve(composeContainers.size());
+    std::ranges::transform(composeContainers, std::back_inserter(result), [](auto& entry) { return std::move(entry.Container); });
+    return result;
+}
+
+std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> WSLCSession::CreateComposeContainers(
+    const ComposeSpec& spec, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
+{
+    // Record cancellation at checkpoints so cleanup follows the operation's failure cause.
+    bool cancellationObserved = false;
+    const auto checkCancelled = [&]() {
+        const auto result = wil::ResultFromException([&]() { cancellation.Check(); });
+        cancellationObserved = result == HRESULT_FROM_WIN32(ERROR_CANCELLED);
+        THROW_IF_FAILED(result);
+    };
+
+    checkCancelled();
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> containers;
+    const std::string networkName = ComposeNormalizer::DefaultNetworkName(spec.ProjectName);
 
     // Create a network for the compose session.
     // TODO: open an existing network instead of deleting.
 
-    auto networkCleanup = DeleteNetworkImpl(networkName.c_str(), Spec.ProjectName);
+    if (progressReporter)
+    {
+        bool networkExists;
+        {
+            std::lock_guard networksLock(m_networksLock);
+            networkExists = m_networks.contains(networkName);
+        }
+
+        if (networkExists)
+        {
+            progressReporter("remove", networkName, 1, 1, "network");
+            checkCancelled();
+        }
+    }
+
+    auto networkCleanup = DeleteNetworkImpl(networkName.c_str(), spec.ProjectName);
     THROW_HR_IF_MSG(
         networkCleanup,
         FAILED(networkCleanup) && networkCleanup != WSLC_E_NETWORK_NOT_FOUND,
@@ -2484,29 +2626,49 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     WSLCNetworkOptions networkOptions{};
     networkOptions.Name = networkName.c_str();
     const std::array networkLabels{
-        WSLCLabel{.Key = compose::label::c_project, .Value = Spec.ProjectName.c_str()},
+        WSLCLabel{.Key = compose::label::c_project, .Value = spec.ProjectName.c_str()},
         WSLCLabel{.Key = compose::label::c_network, .Value = "default"},
         WSLCLabel{.Key = compose::label::c_metadataVersion, .Value = compose::label::c_metadataVersionValue},
     };
     networkOptions.Labels = networkLabels.data();
     networkOptions.LabelsCount = static_cast<ULONG>(networkLabels.size());
+    if (progressReporter)
+    {
+        progressReporter("create", networkName, 1, 1, "network");
+    }
+    checkCancelled();
     THROW_IF_FAILED(CreateNetworkImpl(&networkOptions));
 
+    // Docker Compose can leave partial resources after interruption; labels support rediscovery on the next invocation.
     auto cleanup = wil::scope_exit([&] {
-        for (const auto& container : containers)
+        if (cancellationObserved)
         {
-            LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+            return;
         }
 
-        LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str(), Spec.ProjectName));
+        for (const auto& container : containers)
+        {
+            LOG_IF_FAILED(container->DeleteImpl(WSLCDeleteFlagsForce));
+        }
+
+        LOG_IF_FAILED(DeleteNetworkImpl(networkName.c_str(), spec.ProjectName));
     });
 
+    checkCancelled();
     auto lease = AcquireLease();
-    for (const auto& definition : Spec.Containers)
+    for (size_t index = 0; index < spec.Containers.size(); ++index)
     {
+        checkCancelled();
+        const auto& definition = spec.Containers[index];
+        if (progressReporter)
+        {
+            progressReporter("create", definition.Name, index + 1, spec.Containers.size(), "container");
+            checkCancelled();
+        }
+
         ServiceContainerLauncher launcher(
             definition.Image, definition.Name, definition.Command, definition.Environment, networkName, WSLCProcessFlagsStdin);
-        launcher.AddLabel(compose::label::c_project, Spec.ProjectName);
+        launcher.AddLabel(compose::label::c_project, spec.ProjectName);
         launcher.AddLabel(compose::label::c_service, definition.ServiceName);
         launcher.AddLabel(compose::label::c_containerNumber, "1");
         launcher.AddLabel(compose::label::c_metadataVersion, compose::label::c_metadataVersionValue);
@@ -2538,12 +2700,17 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
             }
         }
 
-        Microsoft::WRL::ComPtr<IWSLCContainer> container;
+        Microsoft::WRL::ComPtr<WSLCContainer> container;
         HRESULT result = wil::ResultFromException([&]() { container = launcher.Create(*this); });
         if (result == WSLC_E_IMAGE_NOT_FOUND)
         {
-            // TODO: Wire the pull output to caller.
+            if (progressReporter)
+            {
+                progressReporter("pull", definition.Image, 1, 1, "image");
+            }
+            checkCancelled();
             PullImageLockHeld(definition.Image.c_str(), nullptr, FALSE, nullptr);
+            checkCancelled();
             container = launcher.Create(*this);
         }
         else
@@ -2559,7 +2726,7 @@ std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> WSLCSession::CreateComposeCo
     return containers;
 }
 
-void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions, IWSLCContainer** Container)
+Microsoft::WRL::ComPtr<WSLCContainer> WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptions)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasVm());
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasEvents());
@@ -2633,7 +2800,7 @@ void WSLCSession::CreateContainerImpl(const WSLCContainerOptions* containerOptio
             std::rethrow_exception(pendingCreate->Exception);
         }
 
-        container->CopyTo(Container);
+        return container->GetComWrapper();
     }
     catch (const DockerHTTPException& e)
     {
@@ -2889,6 +3056,17 @@ try
 }
 CATCH_RETURN();
 
+std::vector<docker_schema::ContainerInfo> WSLCSession::ListDockerContainers(
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
+{
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+    try
+    {
+        return m_runtime.Docker().ListContainers(all, limit, filters, size);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+}
+
 HRESULT WSLCSession::ListContainers(
     const WSLCListContainersOptions* Options, WSLCContainerEntry** Containers, ULONG* Count, WSLCContainerPortMapping** Ports, ULONG* PortsCount)
 try
@@ -2926,14 +3104,7 @@ try
     }
 
     auto lock = AcquireLease();
-    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
-
-    std::vector<docker_schema::ContainerInfo> dockerContainers;
-    try
-    {
-        dockerContainers = m_runtime.Docker().ListContainers(all, limit, filters, size);
-    }
-    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list containers");
+    const auto dockerContainers = ListDockerContainers(all, limit, filters, size);
 
     std::lock_guard containersLock{m_containersLock};
 
@@ -3781,15 +3952,22 @@ try
             CancelUserHandleIO();
         }
 
+        bool callbacksDrained;
         {
             std::lock_guard comLock(m_userCOMCallbacksLock);
 
             // Cancel any pending outgoing COM callback calls (e.g. IProgressCallback::OnProgress)
             // to unblock operations waiting for cross-process COM responses.
             CancelUserCOMCallbacks();
+            callbacksDrained = m_userCOMCallbackThreads.empty();
         }
 
-        sessionLock = m_runtime.TryLockExclusive();
+        // A registered thread can enter its outgoing RPC after CoCancelCall found no active call.
+        // Keep cancelling until every registration is released, without holding the runtime lock.
+        if (callbacksDrained)
+        {
+            sessionLock = m_runtime.TryLockExclusive();
+        }
         retrying = true;
     }
 
@@ -4249,8 +4427,7 @@ UserCOMCallback WSLCSession::RegisterUserCOMCallback()
 
     // Don't allow new COM calls if the session is terminating.
     // N.B. This check must happen under m_userCOMCallbacksLock to synchronize with Terminate().
-    THROW_HR_IF_MSG(
-        E_ABORT, m_sessionTerminatingEvent.is_signaled(), "Refusing to make a COM callback while the session is terminating.");
+    THROW_HR_IF_MSG(E_ABORT, m_terminating.load(), "Refusing to make a COM callback while the session is terminating.");
 
     THROW_IF_FAILED(CoEnableCallCancellation(nullptr));
 
@@ -4297,7 +4474,7 @@ void WSLCSession::CancelUserCOMCallbacks()
 
 void WSLCSession::OnContainerDeleted(const WSLCContainerImpl* Container)
 {
-    // N.B. Invoked only from WSLCContainer::Delete, which already holds a VmLease (the shared
+    // N.B. Invoked only from WSLCContainer::DeleteImpl, which already holds a VmLease (the shared
     // session lock). The lease prevents a concurrent idle teardown from clearing m_containers,
     // so this only needs m_containersLock. It must NOT re-acquire the shared session lock here:
     // doing so while the idle worker is queued for the exclusive lock would deadlock (recursive
@@ -4401,6 +4578,11 @@ void WSLCSession::RecoverExistingContainers()
         {
             auto container = WSLCContainerImpl::Open(
                 dockerContainer, *this, m_runtime, m_pluginNotifier.get(), std::bind(&WSLCSession::OnContainerDeleted, this, std::placeholders::_1), m_eventStore);
+
+            if (!container)
+            {
+                continue;
+            }
 
             auto [it, inserted] = m_containers.emplace(container->ID(), std::move(container));
             WI_ASSERT(inserted);

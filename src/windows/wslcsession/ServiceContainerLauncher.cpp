@@ -18,12 +18,10 @@ Abstract:
 
 namespace wsl::windows::service::wslc {
 
-Microsoft::WRL::ComPtr<IWSLCContainer> ServiceContainerLauncher::Create(WSLCSession& Session)
+Microsoft::WRL::ComPtr<WSLCContainer> ServiceContainerLauncher::Create(WSLCSession& Session)
 {
     auto storage = CreateOptions();
-    Microsoft::WRL::ComPtr<IWSLCContainer> container;
-    Session.CreateContainerImpl(&storage.Options, &container);
-    return container;
+    return Session.CreateContainerImpl(&storage.Options);
 }
 
 } // namespace wsl::windows::service::wslc

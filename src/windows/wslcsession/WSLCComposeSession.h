@@ -22,12 +22,13 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 class WSLCSession;
+class WSLCContainer;
 
 class DECLSPEC_UUID("A8AA75A3-5B41-45AE-A847-1DF6CF35EAA0") WSLCComposeSession
     : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCComposeSession, IFastRundown, ISupportErrorInfo>
 {
 public:
-    HRESULT RuntimeClassInitialize(WSLCSession* Session, std::wstring ConfigPath, ComposeSpec Spec, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Containers);
+    HRESULT RuntimeClassInitialize(WSLCSession* Session, std::wstring ConfigPath, ComposeSpec Spec, std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> Containers);
 
     const std::string& GetProjectName() const noexcept
     {
@@ -47,7 +48,7 @@ private:
     WSLCSession* m_session{};
     std::wstring m_configPath;
     ComposeSpec m_spec;
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> m_containers;
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> m_containers;
 };
 
 } // namespace wsl::windows::service::wslc

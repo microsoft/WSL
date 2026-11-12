@@ -46,8 +46,8 @@ cpp_quote("#define WSLC_MAX_IMAGE_ID_LENGTH 255")
 cpp_quote("#define WSLC_CONTAINER_ID_LENGTH 64")
 cpp_quote("#define WSLC_MAX_BINDING_ADDRESS_LENGTH 45")
 cpp_quote("#define WSLC_MAX_SAVE_IMAGES_COUNT 256")
-cpp_quote("#define WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH 255")
 cpp_quote("#define WSLC_EPHEMERAL_PORT 0")
+cpp_quote("#define WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH 255")
 cpp_quote("#define WSLC_STOP_TIMEOUT_DEFAULT LONG_MIN") // Pass to Stop() to use the default container stop timeout
 cpp_quote("#define WSLC_STOP_TIMEOUT_NONE -1") // Wait forever for the container to stop.
 
@@ -579,6 +579,8 @@ interface IWSLCContainer : IUnknown
     HRESULT Logs([in] WSLCLogsFlags Flags, [out] WSLCHandle* Stdout, [out] WSLCHandle* Stderr, [in] LONGLONG Since, [in] LONGLONG Until, [in] ULONGLONG Tail);
     HRESULT GetId([out, string] WSLCContainerId Id);
     HRESULT GetName([out, string] LPSTR* Name);
+    // Returns the image reference used to create the container, including after deletion.
+    HRESULT GetImage([out, string] LPSTR* Image);
     HRESULT GetLabels([out, size_is(, *Count)] WSLCLabelInformation** Labels, [out] ULONG* Count);
     HRESULT Kill([in] WSLCSignal Signal);
     HRESULT Stats([out] LPSTR* Output);
@@ -589,6 +591,156 @@ interface IWSLCContainer : IUnknown
     HRESULT DownloadArchive([in, string] LPCSTR SrcPath, [in] BOOL FollowLink, [in] WSLCHandle OutHandle);
     HRESULT Restart([in] WSLCSignal Signal, [in] LONG TimeoutSeconds, [in, unique] IWarningCallback* WarningCallback);
 }
+
+// Call-scoped Compose execution within one WSLC session.
+// See doc\docs\technical-documentation\wslc-compose-operations.md for the lifecycle and supported behavior.
+typedef enum _WSLCComposeAction
+{
+    WSLCComposeActionValidate,
+    WSLCComposeActionCreate,
+    WSLCComposeActionUp,
+    WSLCComposeActionStart,
+    WSLCComposeActionAttach,
+    WSLCComposeActionStop,
+} WSLCComposeAction;
+
+typedef enum _WSLCComposeProjectType
+{
+    WSLCComposeProjectTypeDocuments,
+    WSLCComposeProjectTypeProjectKey,
+} WSLCComposeProjectType;
+
+typedef struct _WSLCComposeDocument
+{
+    // SourcePath supplies diagnostic context and its parent resolves relative bind mounts.
+    // Content contains the original document bytes, including any encoding marker.
+    [string] LPCWSTR SourcePath;
+    [string] LPCWSTR BaseDirectory;
+    [unique, size_is(ContentSize)] const byte* Content;
+    ULONG ContentSize;
+} WSLCComposeDocument;
+
+typedef struct _WSLCComposeDocumentCollection
+{
+    // Supplies the default project name when ExplicitProjectName is absent.
+    [string] LPCWSTR ProjectDirectory;
+    [unique, string] LPCSTR ExplicitProjectName;
+    [unique, size_is(DocumentCount)] const WSLCComposeDocument* Documents;
+    ULONG DocumentCount;
+} WSLCComposeDocumentCollection;
+
+typedef struct _WSLCComposeProject
+{
+    // Documents supports every action; ProjectKey supports Start, Attach, and Stop.
+    // ProjectKey is the exact normalized project name within the owning WSLC session.
+    WSLCComposeProjectType Type;
+
+    [switch_type(WSLCComposeProjectType), switch_is(Type)]
+    union
+    {
+        [case(WSLCComposeProjectTypeDocuments)]
+        [unique] const WSLCComposeDocumentCollection* Documents;
+        [case(WSLCComposeProjectTypeProjectKey)]
+        [unique, string] LPCSTR ProjectKey;
+        [default];
+    } Value;
+} WSLCComposeProject;
+
+typedef enum _WSLCComposeActionOptionsType
+{
+    WSLCComposeActionOptionsTypeNone,
+    WSLCComposeActionOptionsTypeStop,
+} WSLCComposeActionOptionsType;
+
+typedef struct _WSLCComposeStopOptions
+{
+    ULONG TimeoutSeconds;
+} WSLCComposeStopOptions;
+
+typedef struct _WSLCComposeActionOptions
+{
+    // Stop requires the Stop variant; every other action requires None.
+    WSLCComposeActionOptionsType Type;
+
+    [switch_type(WSLCComposeActionOptionsType), switch_is(Type)]
+    union
+    {
+        [case(WSLCComposeActionOptionsTypeNone)]
+        ULONG Reserved;
+        [case(WSLCComposeActionOptionsTypeStop)]
+        WSLCComposeStopOptions Stop;
+        [default];
+    } Value;
+} WSLCComposeActionOptions;
+
+typedef struct _WSLCComposeOperationRequest
+{
+    WSLCComposeAction Action;
+    WSLCComposeProject Project;
+    WSLCComposeActionOptions ActionOptions;
+} WSLCComposeOperationRequest;
+
+typedef enum _WSLCComposeStatus
+{
+    WSLCComposeStatusValidating,
+    WSLCComposeStatusExecuting,
+    WSLCComposeStatusSucceeded,
+    WSLCComposeStatusFailed,
+    WSLCComposeStatusCancelled,
+} WSLCComposeStatus;
+
+typedef struct _WSLCComposeResourceProgressEvent
+{
+    [string] LPCSTR Operation;
+    [unique, string] LPCSTR ResourceKey;
+    // Current is the one-based resource ordinal; notifications precede the associated work.
+    ULONGLONG Current;
+    ULONGLONG Total;
+    [unique, string] LPCSTR Unit;
+} WSLCComposeResourceProgressEvent;
+
+typedef struct _WSLCComposeProgressEvent
+{
+    ULONGLONG SequenceNumber;
+    // Phase or terminal outcome of the whole invocation, present on every notification.
+    WSLCComposeStatus Status;
+    // Present for granular progress where applicable.
+    [unique] const WSLCComposeResourceProgressEvent* Progress;
+} WSLCComposeProgressEvent;
+
+[
+    uuid(308809E7-2EB6-4A48-99D9-C959054FDDA9),
+    pointer_default(unique),
+    object
+]
+interface IComposeProgressCallback : IUnknown
+{
+    // Called synchronously during ExecuteComposeOperation, with sequence numbers starting at one.
+    // Event data is borrowed for this call. Return promptly; resource callbacks can hold the project lock.
+    // Observer failures are logged and do not change the operation outcome. Cancellation uses the caller's event.
+    HRESULT OnProgress([in] const WSLCComposeProgressEvent* Event);
+}
+
+typedef enum _WSLCComposeOperationStatus
+{
+    WSLCComposeOperationStatusSucceeded,
+    WSLCComposeOperationStatusFailed,
+    WSLCComposeOperationStatusCancelled,
+} WSLCComposeOperationStatus;
+
+typedef char WSLCComposeProjectKey[WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH + 1];
+
+typedef struct _WSLCComposeOperationResult
+{
+    WSLCComposeOperationStatus Status;
+    HRESULT Result;
+    // Optional localized failure description owned by the caller.
+    [unique, string] LPWSTR ErrorMessage;
+    WSLCComposeProjectKey ProjectKey;
+    // Observed containers from successful execution. Failed or cancelled operations require resource rediscovery.
+    [unique, size_is(AffectedContainersCount)] WSLCContainerEntry* AffectedContainers;
+    ULONG AffectedContainersCount;
+} WSLCComposeOperationResult;
 
 [
     uuid(96DFF26B-422A-44F3-B675-23DA2BA32C77),
@@ -809,7 +961,9 @@ interface IWSLCSession : IUnknown
     HRESULT UnmapVmPort([in] int Family, [in] unsigned short WindowsPort, [in] unsigned short LinuxPort);
 
     // Session initialization - called by SYSTEM service after launching per-user process.
+
     // Returns a handle to this COM server process (used to add to job object).
+    // The caller owns the handle and can also wait for process exit (SYNCHRONIZE).
     HRESULT GetProcessHandle([out, system_handle(sh_process)] HANDLE* ProcessHandle);
 
     // Initializes the session with a VM factory. VMs are created through the factory.
@@ -855,6 +1009,16 @@ interface IWSLCSession : IUnknown
 
     HRESULT CreateComposeSession([in] LPCWSTR Path, [out] IWSLCComposeSession** ComposeSession);
 
+    // Executes synchronously, including callback delivery and cleanup. Request buffers remain valid until return.
+    // Envelope/transport failures fail the method; S_OK supplies a terminal result, whose Result carries the execution HRESULT.
+    // The caller frees Result->ErrorMessage and Result->AffectedContainers with CoTaskMemFree.
+    // CancelEvent is an optional manual-reset event. Cancellation is cooperative; completed mutations remain visible.
+    // Callers needing responsive input or stream handling execute this method on a separate COM-initialized thread.
+    HRESULT ExecuteComposeOperation(
+        [in] const WSLCComposeOperationRequest* Request,
+        [in, unique] IComposeProgressCallback* ProgressCallback,
+        [in, unique, system_handle(sh_event)] HANDLE CancelEvent,
+        [out] WSLCComposeOperationResult* Result);
     // Used only for testing. Fails the next CreateNetwork after dockerd created the network, so the
     // rollback path can be exercised.
     HRESULT SetNetworkFaultsForTest([in] BOOL FailCreateInspect);

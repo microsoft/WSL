@@ -846,8 +846,6 @@ WSLCContainerImpl::WSLCContainerImpl(
     m_mappedPorts(std::move(ports)),
     m_labels(std::move(labels)),
     m_comWrapper(wil::MakeOrThrow<WSLCContainer>(wslcSession, std::move(onDeleted))),
-    m_containerEvents(runtime.Events().RegisterContainerStateUpdates(
-        m_id, std::bind(&WSLCContainerImpl::OnEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))),
     m_eventStore(eventStore),
     m_state(InitialState),
     m_createdAt(CreatedAt),
@@ -916,8 +914,18 @@ WSLCContainerImpl::~WSLCContainerImpl()
 
 void WSLCContainerImpl::Initialize()
 {
-    // N.B. this must be done here because weak_from_this() is only valid after the constructor returns.
+    // Both weak references require shared ownership; event delivery requires an initialized wrapper.
+    auto lock = m_lock.lock_exclusive();
     m_comWrapper->Initialize(weak_from_this());
+    m_containerEvents = m_runtime.Events().RegisterContainerStateUpdates(
+        m_id,
+        [weak = weak_from_this()](
+            ContainerEvent event, std::optional<int> exitCode, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano) {
+            if (const auto container = weak.lock())
+            {
+                container->OnEvent(event, exitCode, attributes, eventTimeNano);
+            }
+        });
 }
 
 void WSLCContainerImpl::SetExitCode(int ExitCode) noexcept
@@ -979,11 +987,16 @@ void WSLCContainerImpl::GetCreatedAt(LONGLONG* Result)
 
 void WSLCContainerImpl::CopyTo(IWSLCContainer** Container) const
 {
+    THROW_IF_FAILED(GetComWrapper().CopyTo(Container));
+}
+
+Microsoft::WRL::ComPtr<WSLCContainer> WSLCContainerImpl::GetComWrapper() const
+{
     auto lock = m_lock.lock_shared();
 
     THROW_HR_IF_MSG(RPC_E_DISCONNECTED, m_comWrapper == nullptr, "Container '%hs' is being released", m_id.c_str());
 
-    THROW_IF_FAILED(m_comWrapper.CopyTo(Container));
+    return m_comWrapper;
 }
 
 void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const
@@ -1098,13 +1111,7 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
         THROW_DOCKER_USER_ERROR_MSG(e, "Failed to attach to container '%hs' during start", m_id.c_str());
     }
 
-    auto control = std::make_unique<DockerContainerProcessControl>(*this, m_runtime.Docker());
-
-    {
-        std::lock_guard processesLock{m_processesLock};
-        m_initProcessControl = control.get();
-        m_initProcess = wil::MakeOrThrow<WSLCProcess>(std::move(control), std::move(io), m_initProcessFlags);
-    }
+    CreateInitProcess(std::move(io));
 
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [this]() mutable {
         std::lock_guard processesLock{m_processesLock};
@@ -1193,6 +1200,16 @@ void WSLCContainerImpl::StartPhase(WSLCContainerStartFlags Flags, const WSLCProc
     lock.reset();
     lifecycleLock.reset();
     AttachToTransition(transition);
+}
+
+__requires_exclusive_lock_held(m_lock) void WSLCContainerImpl::CreateInitProcess(std::unique_ptr<WSLCProcessIO> io)
+{
+    auto control = std::make_shared<DockerContainerProcessControl>(*this, m_runtime.Docker());
+    auto process = wil::MakeOrThrow<WSLCProcess>(control, std::move(io), m_initProcessFlags);
+
+    std::lock_guard processesLock{m_processesLock};
+    m_initProcessControl = std::move(control);
+    m_initProcess = std::move(process);
 }
 
 void WSLCContainerImpl::WaitForConflictingTransitionToComplete(
@@ -2831,8 +2848,6 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         "Cannot open WSLC container %hs: missing WSLC metadata label",
         dockerContainer.Id.c_str());
 
-    WI_ASSERT(dockerContainer.State != ContainerState::Running);
-
     auto metadata = ParseContainerMetadata(metadataIt->second.c_str());
     auto labels = StripInternalLabels(dockerContainer.Labels);
 
@@ -2888,13 +2903,39 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
 
     container->Initialize();
 
-    // Restore the state change timestamp from Docker inspect data.
+    // The event subscription is active before inspection, so later transitions remain observable.
+    auto lock = container->m_lock.lock_exclusive();
+    common::docker_schema::InspectContainer inspectData;
     try
     {
-        auto inspectData = DockerClient.InspectContainer(dockerContainer.Id);
-        auto state = DockerStateToWSLCState(dockerContainer.State);
+        inspectData = DockerClient.InspectContainer(dockerContainer.Id);
+    }
+    catch (const DockerHTTPException& error)
+    {
+        if (error.StatusCode() == 404)
+        {
+            return {};
+        }
 
-        if (state == WslcContainerStateCreated)
+        throw;
+    }
+
+    if (container->m_state == WslcContainerStateDeleted)
+    {
+        return {};
+    }
+
+    container->m_state = DockerStateToWSLCState(nlohmann::json(inspectData.State.Status).get<ContainerState>());
+    if (container->m_state == WslcContainerStateRunning)
+    {
+        // Recovered processes obtain I/O through the container's Attach method.
+        container->CreateInitProcess(nullptr);
+    }
+    container->UpdateActivityHoldLockHeld();
+
+    try
+    {
+        if (container->m_state == WslcContainerStateCreated)
         {
             // A created-but-never-started container has no StartedAt/FinishedAt; its state last
             // changed when it was created.
@@ -2902,7 +2943,8 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Open(
         }
         else
         {
-            const auto& timestamp = (state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
+            const auto& timestamp =
+                (container->m_state == WslcContainerStateRunning) ? inspectData.State.StartedAt : inspectData.State.FinishedAt;
 
             if (!timestamp.empty() && timestamp != c_unsetTimestamp)
             {
@@ -3182,7 +3224,7 @@ __requires_exclusive_lock_held(m_lock) unique_com_disconnect WSLCContainerImpl::
         // so callers can still query state/process after the impl is gone.
         {
             std::lock_guard processesLock{m_processesLock};
-            m_comWrapper->CacheState(m_id, m_name, m_state, m_initProcess);
+            m_comWrapper->CacheState(m_id, m_name, m_image, m_state, m_initProcess);
         }
     }
 
@@ -3265,6 +3307,11 @@ CATCH_RETURN();
 HRESULT WSLCContainer::GetState(WSLCContainerState* Result)
 {
     WSLCExecutionContext context(&m_session);
+    return GetStateImpl(Result);
+}
+
+HRESULT WSLCContainer::GetStateImpl(WSLCContainerState* Result)
+{
     RETURN_HR_IF_NULL(E_POINTER, Result);
 
     *Result = WslcContainerStateInvalid;
@@ -3334,10 +3381,14 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds)
-try
 {
     WSLCExecutionContext context(&m_session);
+    return StopImpl(Signal, TimeoutSeconds);
+}
 
+HRESULT WSLCContainer::StopImpl(WSLCSignal Signal, LONG TimeoutSeconds)
+try
+{
     // Hold a VM lease for the whole operation: --rm containers self-delete during Stop, which
     // disconnects the wrapper and drops activity. Without the lease, the idle worker can fire
     // during the post-stop destroy wait (up to 60s) and tear the VM down mid-call.
@@ -3370,10 +3421,14 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWarningCallback* WarningCallback)
-try
 {
     WSLCExecutionContext context(&m_session, WarningCallback);
+    return StartImpl(Flags, StartOptions);
+}
 
+HRESULT WSLCContainer::StartImpl(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions)
+try
+{
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCContainerStartFlagsValid), "Invalid flags: 0x%x", Flags);
 
     auto vmLease = m_session.Runtime().AcquireVmLease();
@@ -3410,10 +3465,14 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::Delete(WSLCDeleteFlags Flags)
-try
 {
     WSLCExecutionContext context(&m_session);
+    return DeleteImpl(Flags);
+}
 
+HRESULT WSLCContainer::DeleteImpl(WSLCDeleteFlags Flags)
+try
+{
     THROW_HR_IF_MSG(E_INVALIDARG, WI_IsAnyFlagSet(Flags, ~WSLCDeleteFlagsValid), "Invalid flags: 0x%x", Flags);
 
     // Special case for Delete(): If deletion is successful, notify the WSLCSession that the container has been deleted.
@@ -3431,7 +3490,8 @@ try
 }
 CATCH_RETURN();
 
-void WSLCContainer::CacheState(const std::string& id, const std::string& name, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
+void WSLCContainer::CacheState(
+    const std::string& id, const std::string& name, const std::string& image, WSLCContainerState state, const Microsoft::WRL::ComPtr<IWSLCProcess>& initProcess) noexcept
 try
 {
     auto cacheLock = m_cacheLock.lock_exclusive();
@@ -3441,6 +3501,7 @@ try
 
     m_cachedId = id;
     m_cachedName = name;
+    m_cachedImage = image;
     m_cachedState = state;
     m_cachedInitProcess = initProcess;
 }
@@ -3499,10 +3560,14 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::GetId(WSLCContainerId Id)
-try
 {
     WSLCExecutionContext context(&m_session);
+    return GetIdImpl(Id);
+}
 
+HRESULT WSLCContainer::GetIdImpl(WSLCContainerId Id)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Id);
 
     const auto hr = wil::ResultFromException([&] {
@@ -3526,10 +3591,14 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCContainer::GetName(LPSTR* Name)
-try
 {
     WSLCExecutionContext context(&m_session);
+    return GetNameImpl(Name);
+}
 
+HRESULT WSLCContainer::GetNameImpl(LPSTR* Name)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Name);
     *Name = nullptr;
 
@@ -3550,6 +3619,31 @@ try
     }
 
     return hr;
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::GetImage(LPSTR* Image)
+{
+    WSLCExecutionContext context(&m_session);
+    return GetImageImpl(Image);
+}
+
+HRESULT WSLCContainer::GetImageImpl(LPSTR* Image)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Image);
+    *Image = nullptr;
+
+    const auto result = wil::ResultFromException([&]() {
+        auto [lock, impl] = LockImpl();
+        *Image = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(impl->Image().c_str()).release();
+    });
+    RETURN_HR_IF(result, result != RPC_E_DISCONNECTED);
+
+    auto cacheLock = m_cacheLock.lock_shared();
+    RETURN_HR_IF(result, !m_cachedImage.has_value());
+    *Image = wil::make_unique_ansistring<wil::unique_cotaskmem_ansistring>(m_cachedImage->c_str()).release();
+    return S_OK;
 }
 CATCH_RETURN();
 

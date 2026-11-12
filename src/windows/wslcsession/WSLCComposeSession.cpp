@@ -19,7 +19,7 @@ Abstract:
 namespace wsl::windows::service::wslc {
 
 HRESULT WSLCComposeSession::RuntimeClassInitialize(
-    WSLCSession* Session, std::wstring ConfigPath, ComposeSpec Spec, std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> Containers)
+    WSLCSession* Session, std::wstring ConfigPath, ComposeSpec Spec, std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> Containers)
 {
     RETURN_HR_IF_NULL(E_INVALIDARG, Session);
     RETURN_HR_IF(E_INVALIDARG, ConfigPath.empty());
@@ -87,7 +87,8 @@ try
         THROW_IF_FAILED_EXCEPT(result, RPC_E_DISCONNECTED);
     }
 
-    m_containers = m_session->CreateComposeContainers(m_spec);
+    const ComposeCancellation cancellation(m_session->m_sessionTerminatingEvent.get(), nullptr);
+    m_containers = m_session->CreateComposeContainers(m_spec, cancellation, {});
     for (const auto& container : m_containers)
     {
         const HRESULT result = container->Start(WSLCContainerStartFlagsNone, nullptr, nullptr);
