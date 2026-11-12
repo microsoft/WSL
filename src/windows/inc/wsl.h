@@ -113,6 +113,8 @@ Abstract:
 #define WSL_UPDATE_ARG_PRE_RELEASE_OPTION_LONG L"--pre-release"
 #define WSL_UPDATE_ARG_PROMPT_OPTION_LONG L"--prompt-before-exit"
 #define WSL_UPDATE_ARG_WEB_DOWNLOAD_OPTION_LONG L"--web-download"
+#define WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG L"--windows-update"
+#define WSL_UPDATE_ARG_WINDOWS_UPDATE_REPAIR_OPTION_LONG L"--windows-update-repair"
 #define WSL_USER_ARG L"-u"
 #define WSL_USER_ARG_LONG L"--user"
 #define WSL_VERSION_ARG L"-v"

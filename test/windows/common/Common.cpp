@@ -2629,8 +2629,14 @@ void ScopedEnvVariable::Clear()
     VERIFY_IS_TRUE(SetEnvironmentVariableW(m_name.c_str(), nullptr));
 }
 
-UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode)
+UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, LPCWSTR Content, UINT StatusCode, const std::vector<std::pair<std::wstring, std::wstring>>& Headers)
 {
+    std::wstring addHeaders;
+    for (const auto& [name, value] : Headers)
+    {
+        addHeaders += std::format(L"    $context.Response.Headers.Add('{}', '{}')\n", name, value);
+    }
+
     auto cmd = std::format(
         LR"(Powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
 $ErrorActionPreference = 'Stop'
@@ -2641,12 +2647,13 @@ while ($true)
 {{
     $context = $server.GetContext()
     $context.Response.StatusCode = {}
-    $content = [Text.Encoding]::UTF8.GetBytes('{}')
+{}    $content = [Text.Encoding]::UTF8.GetBytes('{}')
     $context.Response.OutputStream.Write($content , 0, $content.length)
     $context.Response.close()
 }}")",
         Endpoint,
         StatusCode,
+        addHeaders,
         Content);
 
     m_process = LxsstuStartProcess(cmd.data());

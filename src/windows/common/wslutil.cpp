@@ -107,6 +107,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_DISTRIBUTION_NAME_NEEDED),
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
+    X(WSL_E_GITHUB_RATE_LIMITED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
     X(WSLC_E_CONTAINER_DISABLED),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
@@ -376,6 +377,69 @@ std::regex BuildImageReferenceRegex()
     auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
 
     return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
+}
+
+std::wstring FormatLocalTime(std::chrono::system_clock::time_point time)
+{
+    // FILETIME counts 100-nanosecond intervals since 1601-01-01, the system clock counts from 1970-01-01.
+    constexpr int64_t c_unixEpochAsFileTime = 116444736000000000LL;
+    using FileTimeTicks = std::chrono::duration<int64_t, std::ratio<1, 10'000'000>>;
+
+    ULARGE_INTEGER ticks{};
+    ticks.QuadPart = static_cast<uint64_t>(std::chrono::duration_cast<FileTimeTicks>(time.time_since_epoch()).count() + c_unixEpochAsFileTime);
+
+    const FILETIME fileTime{ticks.LowPart, ticks.HighPart};
+    SYSTEMTIME utcTime{};
+    SYSTEMTIME localTime{};
+    THROW_IF_WIN32_BOOL_FALSE(FileTimeToSystemTime(&fileTime, &utcTime));
+    THROW_IF_WIN32_BOOL_FALSE(SystemTimeToTzSpecificLocalTime(nullptr, &utcTime, &localTime));
+
+    auto format = [&](auto formatFunction, DWORD flags) {
+        const int size = formatFunction(LOCALE_NAME_USER_DEFAULT, flags, &localTime, nullptr, nullptr, 0);
+        THROW_LAST_ERROR_IF(size == 0);
+
+        std::wstring result(size, L'\0');
+        THROW_LAST_ERROR_IF(formatFunction(LOCALE_NAME_USER_DEFAULT, flags, &localTime, nullptr, result.data(), size) == 0);
+        result.resize(size - 1);
+        return result;
+    };
+
+    auto getDateFormat = [](LPCWSTR locale, DWORD flags, const SYSTEMTIME* systemTime, LPCWSTR pattern, LPWSTR buffer, int size) {
+        return GetDateFormatEx(locale, flags, systemTime, pattern, buffer, size, nullptr);
+    };
+
+    return std::format(L"{} {}", format(getDateFormat, DATE_SHORTDATE), format(GetTimeFormatEx, TIME_NOSECONDS));
+}
+
+void ThrowIfGitHubRateLimited(const winrt::Windows::Web::Http::HttpResponseMessage& response)
+{
+    const auto headers = response.Headers();
+    auto getHeader = [&headers](LPCWSTR name) -> std::optional<std::wstring> {
+        if (!headers.HasKey(name))
+        {
+            return {};
+        }
+
+        return std::wstring{headers.Lookup(name)};
+    };
+
+    const auto statusCode = static_cast<uint32_t>(response.StatusCode());
+    const auto reset = GetGitHubRateLimitReset(statusCode, getHeader, std::chrono::system_clock::now());
+    if (!reset.has_value())
+    {
+        return;
+    }
+
+    WSL_LOG(
+        "GitHubRateLimited",
+        TraceLoggingValue(statusCode, "statusCode"),
+        TraceLoggingValue(getHeader(L"x-ratelimit-limit").value_or(L"").c_str(), "limit"),
+        TraceLoggingValue(getHeader(L"x-ratelimit-remaining").value_or(L"").c_str(), "remaining"),
+        TraceLoggingValue(getHeader(L"x-ratelimit-reset").value_or(L"").c_str(), "reset"),
+        TraceLoggingValue(getHeader(L"x-ratelimit-resource").value_or(L"").c_str(), "resource"),
+        TraceLoggingValue(getHeader(L"retry-after").value_or(L"").c_str(), "retryAfter"));
+
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited(FormatLocalTime(reset.value())));
 }
 
 } // namespace
@@ -995,6 +1059,51 @@ std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common:
     return asset.value();
 }
 
+std::optional<std::chrono::system_clock::time_point> wsl::windows::common::wslutil::GetGitHubRateLimitReset(
+    uint32_t statusCode, const std::function<std::optional<std::wstring>(LPCWSTR)>& getHeader, std::chrono::system_clock::time_point now)
+{
+    // See https://docs.github.com/rest/using-the-rest-api/rate-limits-for-the-rest-api
+    if (statusCode != 403 && statusCode != 429)
+    {
+        return {};
+    }
+
+    auto parseInteger = [](const std::optional<std::wstring>& value) -> std::optional<uint64_t> {
+        if (!value.has_value() || value->empty())
+        {
+            return {};
+        }
+
+        wchar_t* end{};
+        const auto result = wcstoull(value->c_str(), &end, 10);
+        if (*end != L'\0')
+        {
+            return {};
+        }
+
+        return result;
+    };
+
+    const auto retryAfter = getHeader(L"retry-after");
+    const auto remaining = parseInteger(getHeader(L"x-ratelimit-remaining"));
+    if (!retryAfter.has_value() && remaining != 0)
+    {
+        return {};
+    }
+
+    if (const auto seconds = parseInteger(retryAfter))
+    {
+        return now + std::chrono::seconds(*seconds);
+    }
+
+    if (const auto reset = parseInteger(getHeader(L"x-ratelimit-reset")))
+    {
+        return std::chrono::system_clock::time_point{std::chrono::seconds(*reset)};
+    }
+
+    return now + std::chrono::minutes(1);
+}
+
 std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLatestGitHubRelease(bool preRelease)
 {
     ExecutionContext context(Context::QueryLatestGitHubRelease);
@@ -1007,6 +1116,7 @@ std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLa
     winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
+    ThrowIfGitHubRateLimited(response);
     response.EnsureSuccessStatusCode();
 
     return GetLatestGitHubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
@@ -1051,6 +1161,7 @@ GitHubRelease wsl::windows::common::wslutil::GetGitHubReleaseByTag(_In_ const st
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto url = c_specificReleaseListUrl + inTag;
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
+    ThrowIfGitHubRateLimited(response);
     response.EnsureSuccessStatusCode();
 
     const auto content = response.Content().ReadAsStringAsync().get();
@@ -1254,6 +1365,36 @@ bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& 
 {
     return wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdFileExtension) ||
            wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
+}
+
+int wsl::windows::common::wslutil::LaunchElevated(_In_ LPCWSTR CommandLine)
+{
+    PrintMessage(GetSystemErrorString(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED)));
+
+    // Add the attach parent process argument to the command line and shell execute an elevated version of wsl.exe.
+    std::wstring arguments;
+    arguments += WSL_PARENT_CONSOLE_ARG L" ";
+    arguments += std::to_wstring(GetCurrentProcessId());
+    arguments += L" ";
+    arguments += CommandLine;
+
+    const auto path = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
+    SHELLEXECUTEINFOW execInfo{};
+    execInfo.cbSize = sizeof(execInfo);
+    execInfo.fMask = (SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE | SEE_MASK_FLAG_NO_UI);
+    execInfo.lpFile = path.c_str();
+    execInfo.lpVerb = L"runas";
+    execInfo.nShow = SW_HIDE;
+    execInfo.lpParameters = arguments.c_str();
+    THROW_IF_WIN32_BOOL_FALSE(ShellExecuteExW(&execInfo));
+    const wil::unique_handle process{execInfo.hProcess};
+
+    // Get the process exit code.
+    WI_VERIFY(WaitForSingleObject(process.get(), INFINITE) == WAIT_OBJECT_0);
+
+    DWORD exitCode;
+    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(process.get(), &exitCode));
+    return static_cast<int>(exitCode);
 }
 
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()

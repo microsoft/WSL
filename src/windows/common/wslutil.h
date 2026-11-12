@@ -237,6 +237,10 @@ std::wstring GetErrorString(_In_ HRESULT result);
 
 std::optional<std::pair<std::wstring, GitHubReleaseAsset>> GetGitHubAssetFromRelease(const GitHubRelease& Release);
 
+// Returns the time a GitHub rate limit resets, or nothing if the response is not rate limited.
+std::optional<std::chrono::system_clock::time_point> GetGitHubRateLimitReset(
+    uint32_t statusCode, const std::function<std::optional<std::wstring>(LPCWSTR)>& getHeader, std::chrono::system_clock::time_point now);
+
 std::pair<std::wstring, GitHubReleaseAsset> GetLatestGitHubRelease(_In_ bool preRelease);
 
 std::pair<std::wstring, GitHubReleaseAsset> GetLatestGitHubRelease(_In_ bool preRelease, _In_ LPCWSTR releases);
@@ -268,6 +272,8 @@ bool IsRunningInMsix();
 bool IsVhdFile(_In_ const std::filesystem::path& path);
 
 bool IsVirtualMachinePlatformInstalled();
+
+int LaunchElevated(_In_ LPCWSTR CommandLine);
 
 std::vector<DWORD> ListRunningProcesses();
 
