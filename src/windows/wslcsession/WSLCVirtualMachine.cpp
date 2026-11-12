@@ -436,18 +436,7 @@ void WSLCVirtualMachine::ConfigureLocalhost()
 {
     constexpr std::string_view c_hosts = "127.0.0.1\tlocalhost\n::1\tlocalhost ip6-localhost ip6-loopback\n";
 
-    wsl::shared::MessageWriter<WSLC_WRITE_FILE> message;
-    message.WriteString(message->PathIndex, "/etc/hosts");
-    message->ContentLength = static_cast<unsigned int>(c_hosts.size());
-    gsl::copy(gsl::as_bytes(gsl::make_span(c_hosts.data(), c_hosts.size())), message.InsertBuffer(message->ContentIndex, c_hosts.size()));
-    message->OpenFlags = c_lxOWriteOnly | c_lxOCreate | c_lxOTruncate | c_lxOCloseOnExec | c_lxONoFollow;
-    message->Permissions = 0644;
-
-    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
-    if (response.Result != 0)
-    {
-        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcLocalhostWriteFailed("/etc/hosts", response.Result));
-    }
+    WriteGuestFile("/etc/hosts", c_hosts);
 }
 
 void WSLCVirtualMachine::ConfigureNetworking()
@@ -553,17 +542,7 @@ void WSLCVirtualMachine::ConfigureBuildKitPolicy()
 
     const auto policyJson = BuildBuildKitSourcePolicyJson(hosts);
 
-    auto message = wsl::shared::MessageWriter<WSLC_WRITE_FILE>{};
-    message.WriteString(message->PathIndex, c_buildKitPolicyPath);
-    message->ContentLength = static_cast<unsigned int>(policyJson.size());
-    gsl::copy(
-        gsl::as_bytes(gsl::make_span(policyJson.data(), policyJson.size())),
-        message.InsertBuffer(message->ContentIndex, policyJson.size()));
-    message->OpenFlags = c_lxOWriteOnly | c_lxOCreate | c_lxOTruncate | c_lxOCloseOnExec | c_lxONoFollow;
-    message->Permissions = 0644;
-
-    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
-    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Guest failed to write %hs: %d", c_buildKitPolicyPath, response.Result);
+    WriteGuestFile(c_buildKitPolicyPath, policyJson);
 
     m_buildKitPolicyState = BuildKitPolicyState::Configured;
 }
@@ -711,6 +690,51 @@ std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Pa
     THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
 
     return wsl::shared::string::ArrayFromSpan(responseSpan, response.EntriesIndex);
+}
+
+void WSLCVirtualMachine::WriteGuestFile(const std::string& Path, std::string_view Content, unsigned int Flags)
+{
+    wsl::shared::MessageWriter<WSLC_WRITE_FILE> message;
+    message.WriteString(message->PathIndex, Path);
+    message->ContentLength = gsl::narrow<unsigned int>(Content.size());
+    gsl::copy(gsl::as_bytes(gsl::make_span(Content.data(), Content.size())), message.InsertBuffer(message->ContentIndex, Content.size()));
+    message->OpenFlags = c_lxOWriteOnly | c_lxOCreate | c_lxOTruncate | c_lxOCloseOnExec | c_lxONoFollow;
+    message->Permissions = 0644;
+    message->Flags = Flags;
+
+    std::lock_guard lock{m_lock};
+    const auto& response = m_initChannel.Transaction<WSLC_WRITE_FILE>(message.Span(), nullptr, m_initChannelTimeout);
+
+    if (response.Result != 0)
+    {
+        THROW_HR_WITH_USER_ERROR_MSG(
+            E_FAIL,
+            wsl::shared::Localization::MessageWslcGuestFileWriteFailed(wsl::shared::string::MultiByteToWide(Path), response.Result),
+            "Failed to write '%hs', init returned: %d",
+            Path.c_str(),
+            response.Result);
+    }
+}
+
+std::string WSLCVirtualMachine::ReadGuestFile(const std::string& Path, size_t MaxSize)
+{
+    wsl::shared::MessageWriter<WSLC_READ_FILE> message;
+    message.WriteString(message->PathIndex, Path);
+    message->MaxSize = gsl::narrow<unsigned int>(MaxSize);
+
+    std::lock_guard lock{m_lock};
+
+    gsl::span<gsl::byte> responseSpan;
+    const auto& response = m_initChannel.Transaction<WSLC_READ_FILE>(message.Span(), &responseSpan, m_initChannelTimeout);
+
+    THROW_WIN32_IF_MSG(ERROR_FILE_NOT_FOUND, response.Result == ENOENT, "File not found: '%hs'", Path.c_str());
+    THROW_WIN32_IF_MSG(ERROR_FILE_TOO_LARGE, response.Result == EFBIG, "'%hs' is larger than %zu bytes", Path.c_str(), MaxSize);
+    THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to read '%hs', init returned: %d", Path.c_str(), response.Result);
+    THROW_HR_IF_MSG(E_UNEXPECTED, response.ContentIndex > responseSpan.size(), "Invalid read response for '%hs'", Path.c_str());
+
+    // The content fills the rest of the message.
+    const auto content = responseSpan.subspan(response.ContentIndex);
+    return {reinterpret_cast<const char*>(content.data()), content.size()};
 }
 
 void WSLCVirtualMachine::Unmount(_In_ const char* Path)
