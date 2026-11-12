@@ -13,6 +13,5 @@ void CreateCompose(CLIExecutionContext& context);
 void StartCompose(CLIExecutionContext& context);
 void StopCompose(CLIExecutionContext& context);
 void UpCompose(CLIExecutionContext& context);
-void ValidateComposeOptions(CLIExecutionContext& context);
 
 } // namespace wsl::windows::wslc::task

@@ -23,10 +23,11 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
-std::vector<Argument> ComposeCreateCommand::GetComposeArguments() const
+std::vector<Argument> ComposeCreateCommand::GetArguments() const
 {
     return {
         Argument::Create(ArgType::Path, {.Required = true, .Desc = Localization::WSLCCLI_ComposePathArgDescription()}),
+        Argument::Create(ArgType::ComposeDryRun),
     };
 }
 
@@ -42,7 +43,7 @@ std::wstring ComposeCreateCommand::LongDescription() const
 
 void ComposeCreateCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ValidateComposeOptions << ResolveSession << CreateCompose;
+    context << ResolveSession << CreateCompose;
 }
 
 } // namespace wsl::windows::wslc
