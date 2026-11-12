@@ -581,6 +581,13 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
         lxssKey = s_OpenLxssUserKey(userToken.get());
     }
 
+    try
+    {
+        const auto runAsUser = wil::impersonate_token(userToken.get());
+        wsl::windows::common::helpers::CleanupSwapFiles(lxssKey.get());
+    }
+    CATCH_LOG()
+
     static std::atomic<DWORD> sessionCookie;
 
     m_session = {sessionCookie++, nullptr, &m_userSid.Sid};

@@ -2169,6 +2169,43 @@ Usage:
         VerifyNoVmAccessToVhd(swapVhd.c_str());
     }
 
+    WSL2_TEST_METHOD(SwapFileCleanup)
+    {
+        namespace registry = wsl::windows::common::registry;
+        namespace helpers = wsl::windows::common::helpers;
+
+        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nvmIdleTimeout=60000\n");
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -q '^/dev/' /proc/swaps"), 0u);
+
+        const auto lxssKey = registry::OpenLxssUserKey();
+        const auto journal = registry::OpenKey(lxssKey.get(), helpers::c_swapFilesRegistryKey, KEY_READ);
+        const auto swapFiles = registry::EnumStringValues(journal.get());
+        VERIFY_ARE_EQUAL(size_t{1}, swapFiles.size());
+        const auto& [vmId, swapPath] = *swapFiles.begin();
+        VERIFY_IS_TRUE(std::filesystem::exists(swapPath));
+
+        const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
+        VERIFY_IS_NOT_NULL(manager.get());
+        const wil::unique_schandle service{OpenService(manager.get(), L"wslservice", SERVICE_QUERY_STATUS)};
+        VERIFY_IS_NOT_NULL(service.get());
+        const auto [serviceState, servicePid] = GetServiceState(service.get());
+        VERIFY_ARE_EQUAL(SERVICE_RUNNING, serviceState);
+
+        const wil::unique_handle serviceProcess{OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, servicePid)};
+        VERIFY_IS_NOT_NULL(serviceProcess.get());
+        VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(serviceProcess.get(), 1));
+        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(serviceProcess.get(), 30 * 1000));
+        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_STOPPED, servicePid));
+
+        VERIFY_IS_TRUE(std::filesystem::exists(swapPath));
+        VERIFY_IS_TRUE(registry::ReadOptionalString(journal.get(), nullptr, vmId.c_str()).has_value());
+
+        RestartWslService();
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list --quiet"), 0u);
+        VERIFY_IS_FALSE(std::filesystem::exists(swapPath));
+        VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, vmId.c_str()).has_value());
+    }
+
     TEST_METHOD(InitDoesntBlockSignals)
     {
         auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"grep -iF SigBlk < /proc/1/status");

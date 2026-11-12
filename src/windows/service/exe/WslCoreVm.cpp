@@ -540,7 +540,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 // If no user-specified swap vhd file path was specified, use a
                 // path in the temp directory.
                 auto runAsUser = wil::impersonate_token(m_userToken.get());
-                if (m_vmConfig.SwapFilePath.empty())
+                const bool useDefaultSwapFile = m_vmConfig.SwapFilePath.empty();
+                if (useDefaultSwapFile)
                 {
                     m_vmConfig.SwapFilePath = m_tempPath / L"swap";
                 }
@@ -550,6 +551,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                         m_vmConfig.SwapFilePath.extension().native(), wsl::windows::common::wslutil::c_vhdxFileExtension))
                 {
                     m_vmConfig.SwapFilePath += wsl::windows::common::wslutil::c_vhdxFileExtension;
+                }
+
+                if (useDefaultSwapFile)
+                {
+                    const auto lxssKey = OpenLxssUserKey();
+                    helpers::RegisterSwapFile(lxssKey.get(), m_machineId.c_str(), m_vmConfig.SwapFilePath.c_str());
                 }
 
                 // Create the VHD with an additional page for swap overhead.
@@ -869,7 +876,14 @@ WslCoreVm::~WslCoreVm() noexcept
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
-            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_vmConfig.SwapFilePath.c_str()));
+            if (!DeleteFileW(m_vmConfig.SwapFilePath.c_str()))
+            {
+                const auto error = GetLastError();
+                THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
+            }
+
+            const auto lxssKey = OpenLxssUserKey();
+            helpers::UnregisterSwapFile(lxssKey.get(), m_machineId.c_str());
         }
         CATCH_LOG()
     }
