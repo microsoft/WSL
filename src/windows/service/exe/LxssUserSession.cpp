@@ -583,8 +583,9 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 
     try
     {
+        const auto swapFilesKey = wsl::windows::common::helpers::OpenOrCreateSwapFilesKey(&m_userSid.Sid);
         const auto runAsUser = wil::impersonate_token(userToken.get());
-        wsl::windows::common::helpers::CleanupSwapFiles(lxssKey.get());
+        wsl::windows::common::helpers::CleanupSwapFiles(swapFilesKey.get());
     }
     CATCH_LOG()
 

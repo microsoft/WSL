@@ -555,8 +555,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
                 if (useDefaultSwapFile)
                 {
-                    const auto lxssKey = OpenLxssUserKey();
-                    helpers::RegisterSwapFile(lxssKey.get(), m_machineId.c_str(), m_vmConfig.SwapFilePath.c_str());
+                    const auto swapFilesKey = helpers::OpenOrCreateSwapFilesKey(&m_userSid.Sid);
+                    helpers::RegisterSwapFile(swapFilesKey.get(), m_machineId.c_str(), m_vmConfig.SwapFilePath.c_str());
                 }
 
                 // Create the VHD with an additional page for swap overhead.
@@ -882,8 +882,8 @@ WslCoreVm::~WslCoreVm() noexcept
                 THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
             }
 
-            const auto lxssKey = OpenLxssUserKey();
-            helpers::UnregisterSwapFile(lxssKey.get(), m_machineId.c_str());
+            const auto swapFilesKey = helpers::OpenOrCreateSwapFilesKey(&m_userSid.Sid);
+            helpers::UnregisterSwapFile(swapFilesKey.get(), m_machineId.c_str());
         }
         CATCH_LOG()
     }

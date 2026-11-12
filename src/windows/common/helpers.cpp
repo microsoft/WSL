@@ -823,34 +823,21 @@ UINT64 wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(_In_ UINT64 me
     return c_swiotlbSize;
 }
 
-void wsl::windows::common::helpers::RegisterSwapFile(_In_ HKEY LxssKey, _In_ LPCWSTR VmId, _In_ LPCWSTR Path)
+void wsl::windows::common::helpers::RegisterSwapFile(_In_ HKEY SwapFilesKey, _In_ LPCWSTR VmId, _In_ LPCWSTR Path)
 {
-    const auto key = registry::CreateKey(LxssKey, c_swapFilesRegistryKey);
-    registry::WriteString(key.get(), nullptr, VmId, Path);
-    THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
+    registry::WriteString(SwapFilesKey, nullptr, VmId, Path);
+    THROW_IF_WIN32_ERROR(RegFlushKey(SwapFilesKey));
 }
 
-void wsl::windows::common::helpers::UnregisterSwapFile(_In_ HKEY LxssKey, _In_ LPCWSTR VmId)
+void wsl::windows::common::helpers::UnregisterSwapFile(_In_ HKEY SwapFilesKey, _In_ LPCWSTR VmId)
 {
-    const auto [key, error] = registry::OpenKeyNoThrow(LxssKey, c_swapFilesRegistryKey, KEY_SET_VALUE);
-    if (error != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
-    {
-        THROW_IF_FAILED(error);
-        registry::DeleteValue(key.get(), VmId);
-    }
+    registry::DeleteValue(SwapFilesKey, VmId);
 }
 
-void wsl::windows::common::helpers::CleanupSwapFiles(_In_ HKEY LxssKey)
+void wsl::windows::common::helpers::CleanupSwapFiles(_In_ HKEY SwapFilesKey)
 try
 {
-    const auto [key, error] = registry::OpenKeyNoThrow(LxssKey, c_swapFilesRegistryKey, KEY_QUERY_VALUE);
-    if (error == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
-    {
-        return;
-    }
-
-    THROW_IF_FAILED(error);
-    for (const auto& [vmId, path] : registry::EnumStringValues(key.get()))
+    for (const auto& [vmId, path] : registry::EnumStringValues(SwapFilesKey))
     {
         try
         {
@@ -860,9 +847,16 @@ try
                 THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
             }
 
-            UnregisterSwapFile(LxssKey, vmId.c_str());
+            UnregisterSwapFile(SwapFilesKey, vmId.c_str());
         }
         CATCH_LOG()
     }
 }
 CATCH_LOG()
+
+wil::unique_hkey wsl::windows::common::helpers::OpenOrCreateSwapFilesKey(_In_ PSID UserSid)
+{
+    const auto runAsSelf = wil::run_as_self();
+    const auto path = std::format(L"{}\\{}\\{}", LXSS_REGISTRY_PATH, c_swapFilesRegistryKey, wslutil::SidToString(UserSid).get());
+    return registry::CreateKey(HKEY_LOCAL_MACHINE, path.c_str(), KEY_QUERY_VALUE | KEY_SET_VALUE);
+}

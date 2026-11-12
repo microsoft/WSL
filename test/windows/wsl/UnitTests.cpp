@@ -2177,8 +2177,13 @@ Usage:
         WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nvmIdleTimeout=60000\n");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -q '^/dev/' /proc/swaps"), 0u);
 
-        const auto lxssKey = registry::OpenLxssUserKey();
-        const auto journal = registry::OpenKey(lxssKey.get(), helpers::c_swapFilesRegistryKey, KEY_READ);
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
+        const auto journalPath = std::format(
+            L"{}\\{}\\{}",
+            LXSS_REGISTRY_PATH,
+            helpers::c_swapFilesRegistryKey,
+            wsl::windows::common::wslutil::SidToString(tokenUser->User.Sid).get());
+        const auto journal = registry::OpenKey(HKEY_LOCAL_MACHINE, journalPath.c_str(), KEY_READ);
         const auto swapFiles = registry::EnumStringValues(journal.get());
         VERIFY_ARE_EQUAL(size_t{1}, swapFiles.size());
         const auto& [vmId, swapPath] = *swapFiles.begin();
