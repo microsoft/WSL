@@ -581,18 +581,6 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
         lxssKey = s_OpenLxssUserKey(userToken.get());
     }
 
-    try
-    {
-        const auto runAsUser = wil::impersonate_token(userToken.get());
-        const auto swapPath = wsl::windows::common::helpers::GetDefaultSwapFilePath(userToken.get());
-        if (!DeleteFileW(swapPath.c_str()))
-        {
-            const auto error = GetLastError();
-            THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
-        }
-    }
-    CATCH_LOG()
-
     static std::atomic<DWORD> sessionCookie;
 
     m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
