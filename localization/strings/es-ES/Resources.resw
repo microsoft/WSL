@@ -964,7 +964,7 @@ Revirtiendo a las redes NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Se detectó una configuración de proxy localhost, pero no se refleja en WSL. WSL en modo NAT no admite servidores proxy localhost.</value>
+    <value>Se detectó una configuración de proxy localhost, pero no se refleja en WSL. Esta dirección de proxy no es compatible con la configuración de red actual.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1204,7 +1204,7 @@ Esta solicitud agotará el tiempo de espera en 60 segundos.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Código de error: {}
-Si este error fue inesperado, considere la posibilidad de buscar problemas existentes o presentar un nuevo problema en https://github.com/microsoft/WSL/issues.</value>
+Si este error fue inesperado, considere la posibilidad de buscar problemas existentes o presentar un nuevo problema en https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -4184,6 +4184,14 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se pudo restaurar la marca de tiempo del contenedor '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>No se pudo cargar el estado persistente del contenedor "{}". No se guardarán los cambios en su estado.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>No se pudo guardar el estado persistente del contenedor '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>No se pudo procesar el progreso de importación de imágenes</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4227,8 @@ En la primera ejecución, crea el archivo con todas las configuraciones comentad
     <value>No se pudieron instalar certificados raíz de confianza de host en la máquina virtual: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC no pudo escribir "{}" para inicializar la resolución del nombre de host local (error de invitado {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC no pudo escribir '{}' en el invitado (error de invitado {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

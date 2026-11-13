@@ -457,6 +457,7 @@ wil::unique_fd UtilConnectToInteropServer(std::optional<pid_t> Pid)
 Routine Description:
 
     This routine connects to the interop server of the current client process.
+    Connections to this process's own server are rejected.
 
 Arguments:
 
@@ -508,6 +509,14 @@ try
 
             setenv(WSL_INTEROP_ENV, InteropSocketPath, 1);
         }
+    }
+
+    // Comparing file identities also handles the systemd 1_interop symlink.
+    const auto SelfPath = std::format(WSL_INTEROP_SOCKET_FORMAT, WSL_TEMP_FOLDER, getpid(), WSL_INTEROP_SOCKET);
+    std::error_code Error{};
+    if (std::filesystem::equivalent(InteropSocketPath, SelfPath, Error))
+    {
+        return {};
     }
 
     //

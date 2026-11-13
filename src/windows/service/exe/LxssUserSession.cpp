@@ -2581,7 +2581,13 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             std::lock_guard lock(m_instanceLock);
             {
                 auto runAsUser = wil::CoImpersonateClient();
-                _DeleteDistributionLockHeld(configuration);
+                ULONG deleteFlags = LXSS_DELETE_DISTRO_FLAGS_ALL;
+                if (WI_IsFlagSet(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE))
+                {
+                    WI_ClearFlag(deleteFlags, LXSS_DELETE_DISTRO_FLAGS_ROOTFS);
+                }
+
+                _DeleteDistributionLockHeld(configuration, deleteFlags);
             }
 
             WslOfflineDistributionInformation distributionInfo;

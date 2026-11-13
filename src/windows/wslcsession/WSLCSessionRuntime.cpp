@@ -16,6 +16,7 @@ Abstract:
 #include "WSLCSessionRuntime.h"
 #include "WSLCSession.h"
 #include "WSLCSessionDefaults.h"
+#include "WSLCSharedLockGate.h"
 #include "ExecutionContext.h"
 #include "Localization.h"
 
@@ -28,6 +29,9 @@ constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
 // How long a VM lease waits for an announced stop to complete before logging that it is still
 // blocked. Purely diagnostic: the wait itself is unbounded (see VmLease).
 constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
+
+// How often an ExistingOnly lease retries the runtime lock while another thread holds it exclusively.
+constexpr DWORD c_existingOnlyLockRetryMs = 10;
 
 } // namespace
 
@@ -827,7 +831,15 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
             m_runtime->EnsureVmRunning();
         }
 
-        m_lock = m_runtime->m_lock.lock_shared();
+        if (Policy == VmLeasePolicy::ExistingOnly)
+        {
+            m_lock = LockSharedUnlessTerminating(
+                m_runtime->m_lock, m_runtime->m_sessionTerminatingEvent, c_existingOnlyLockRetryMs, *m_runtime->m_terminating);
+        }
+        else
+        {
+            m_lock = m_runtime->m_lock.lock_shared();
+        }
 
         if (m_runtime->m_vmState.load() == VmState::Running)
         {
@@ -973,9 +985,9 @@ void WSLCSessionRuntime::Shutdown(
 
     // Notify with m_lock dropped, then re-lock for the teardown. The handler may call back into the
     // session (e.g. WSLCCreateProcess) which takes a VM lease and this lock; firing under it would
-    // deadlock. m_terminating is set, so any such reentrant lease fails at EnsureVmRunning's gate
-    // rather than restarting the VM, and the reacquire can't block on it. A throwing handler must not
-    // skip the teardown below -- the session is terminating either way.
+    // deadlock. m_terminating is set, so any such reentrant lease fails (see VmLeasePolicy) rather
+    // than restarting the VM, and the reacquire can't block on it. A throwing handler must not skip
+    // the teardown below -- the session is terminating either way.
     runtimeLock.reset();
     try
     {
