@@ -98,6 +98,7 @@ public:
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags,
         WSLCContainerRestartPolicy RestartPolicy,
+        ULONG RestartMaximumRetryCount,
         const WSLCPersistedContainerState& PersistentState,
         HRESULT PersistentStateLoadError);
 
@@ -238,6 +239,12 @@ private:
     // Logs a failure to save the persisted state and warns the caller.
     void ReportStateSaveFailure(HRESULT Result) noexcept;
 
+    // Records that a stop or kill request ended the container. Callers skip requests issued by session termination.
+    __requires_exclusive_lock_held(m_lock) void PersistManuallyStoppedLockHeld() noexcept;
+
+    // Evaluates the restart policy for a run that ended with ExitCode against the persisted lifecycle state.
+    __requires_lock_held(m_lock) bool PolicyRestartsContainerLockHeld(int ExitCode) const;
+
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld();
@@ -347,6 +354,12 @@ private:
     // VM leases protect accepted work; pending policy work holds activity and cannot create a VM.
     // Run duration is captured once at exit and reused for deferred policy decisions.
     const WSLCContainerRestartPolicy m_restartPolicy;
+
+    // Maximum number of policy restarts for the on-failure policy; 0 means unlimited.
+    const ULONG m_restartMaximumRetryCount;
+
+    // Exit code of the container's last run, used by the on-failure policy.
+    _Guarded_by_(m_lock) int m_lastExitCode = 0;
 
     // Successful stop or kill requests suppress restart for the run. In-flight requests defer the exit decision.
     _Guarded_by_(m_lock) WSLCExitRequestState m_exitRequests;

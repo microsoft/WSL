@@ -680,7 +680,7 @@ models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std:
     throw ArgumentException(Localization::WSLCCLI_InvalidPullPolicyError(argName, input, supportedValues));
 }
 
-WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input, const std::wstring& argName)
+models::RestartPolicy GetRestartPolicyFromString(const std::wstring& input, const std::wstring& argName)
 {
     enum class RestartPolicyName
     {
@@ -700,7 +700,7 @@ WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input,
     // Docker parity: an empty policy is the same as "no".
     if (input.empty())
     {
-        return WSLCContainerRestartPolicyNo;
+        return {};
     }
 
     const auto parts = SplitKeyValue(input, L':');
@@ -723,7 +723,8 @@ WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input,
         }
 
         const auto [ptr, error] = std::from_chars(retryView.data(), retryView.data() + retryView.size(), maximumRetryCount);
-        if (retryView.empty() || error != std::errc{} || ptr != retryView.data() + retryView.size() || maximumRetryCount < 0)
+        if (retryView.empty() || error != std::errc{} || ptr != retryView.data() + retryView.size() || maximumRetryCount < 0 ||
+            maximumRetryCount > std::numeric_limits<ULONG>::max())
         {
             throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));
         }
@@ -747,14 +748,16 @@ WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input,
     switch (match->second)
     {
     case RestartPolicyName::No:
-        return WSLCContainerRestartPolicyNo;
+        return {WSLCContainerRestartPolicyNo, 0};
 
     case RestartPolicyName::Always:
-        return WSLCContainerRestartPolicyAlways;
+        return {WSLCContainerRestartPolicyAlways, 0};
 
     case RestartPolicyName::OnFailure:
+        return {WSLCContainerRestartPolicyOnFailure, static_cast<ULONG>(maximumRetryCount)};
+
     case RestartPolicyName::UnlessStopped:
-        throw ArgumentException(Localization::WSLCCLI_UnsupportedRestartPolicyError(std::wstring{match->first}));
+        return {WSLCContainerRestartPolicyUnlessStopped, 0};
     }
 
     throw ArgumentException(Localization::WSLCCLI_InvalidRestartPolicyError(argName, input));

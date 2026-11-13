@@ -46,15 +46,18 @@ namespace wsl::windows::service::wslc {
 
 class WSLCSessionRuntime;
 
-// Diagnostic state: losing it must never prevent a container from being started, stopped, or removed.
+// Lifecycle state: losing it must never prevent a container from being started, stopped, or removed.
 struct WSLCPersistedContainerState
 {
     // Number of restarts performed by the container's restart policy since the last explicit start.
     std::uint32_t RestartCount{};
 
+    // Set by a successful stop or kill request and cleared by an explicit start. Read by the unless-stopped policy.
+    bool ManuallyStopped{};
+
     bool operator==(const WSLCPersistedContainerState&) const = default;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCPersistedContainerState, RestartCount);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCPersistedContainerState, RestartCount, ManuallyStopped);
 };
 
 class WSLCContainerStateStore
