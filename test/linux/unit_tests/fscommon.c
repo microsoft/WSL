@@ -1231,8 +1231,8 @@ Return Value:
     // Test that opening a directory with O_CREAT always fails with EISDIR.
     //
 
-    LxtCheckErrnoFailure(open(FS_TEST_DIR_PARENT, O_RDONLY | O_CREAT), EISDIR);
-    LxtCheckErrnoFailure(open(FS_TEST_DIR_PARENT, O_RDONLY | O_CREAT | O_EXCL), EEXIST);
+    LxtCheckErrnoFailure(open(FS_TEST_DIR_PARENT, O_RDONLY | O_CREAT, 0666), EISDIR);
+    LxtCheckErrnoFailure(open(FS_TEST_DIR_PARENT, O_RDONLY | O_CREAT | O_EXCL, 0666), EEXIST);
 
 ErrorExit:
     return Result;
@@ -1422,7 +1422,7 @@ Return Value:
     // Try to open the file through the link with O_CREAT and write some data.
     //
 
-    LxtCheckErrno(Fd = open(LinkPath, O_RDWR | O_CREAT));
+    LxtCheckErrno(Fd = open(LinkPath, O_RDWR | O_CREAT, 0666));
     LxtCheckErrno(BytesWritten = write(Fd, "test", 4));
     LxtCheckEqual(BytesWritten, 4, "%ld");
     LxtCheckErrnoZeroSuccess(close(Fd));
@@ -1443,7 +1443,7 @@ Return Value:
 
     LxtCheckErrnoZeroSuccess(unlink(LinkPath));
     LxtCheckErrnoZeroSuccess(symlink("/dev/null", LinkPath));
-    LxtCheckErrno(Fd = open(LinkPath, O_RDWR | O_CREAT));
+    LxtCheckErrno(Fd = open(LinkPath, O_RDWR | O_CREAT, 0666));
     LxtCheckErrno(BytesWritten = write(Fd, "test", 4));
     LxtCheckEqual(BytesWritten, 4, "%ld");
     LxtCheckErrnoZeroSuccess(close(Fd));
@@ -1769,13 +1769,13 @@ Return Value:
     // Using O_EXCL will fail even if the target does not exist.
     //
 
-    LxtCheckErrnoFailure(Fd = open(SymlinkPath, O_CREAT | O_EXCL), EEXIST);
+    LxtCheckErrnoFailure(Fd = open(SymlinkPath, O_CREAT | O_EXCL, 0666), EEXIST);
 
     //
     // Using O_NOFOLLOW will fail as usual.
     //
 
-    LxtCheckErrnoFailure(Fd = open(SymlinkPath, O_CREAT | O_NOFOLLOW), ELOOP);
+    LxtCheckErrnoFailure(Fd = open(SymlinkPath, O_CREAT | O_NOFOLLOW, 0666), ELOOP);
     LxtCheckErrnoFailure(open(SymlinkPath, O_RDONLY), ENOENT);
     LxtCheckErrnoFailure(open(SymlinkTargetAbsolute, O_RDONLY), ENOENT);
 
@@ -1783,7 +1783,7 @@ Return Value:
     // Create the target through the symlink, and check it got created.
     //
 
-    LxtCheckErrno(Fd = open(SymlinkPath, O_CREAT));
+    LxtCheckErrno(Fd = open(SymlinkPath, O_CREAT, 0666));
     LxtCheckErrnoZeroSuccess(close(Fd));
     Fd = -1;
     LxtCheckErrnoZeroSuccess(access(SymlinkTargetAbsolute, F_OK));
@@ -2321,7 +2321,7 @@ Return Value:
     LxtCheckErrno(Fd = open(FS_TRAILING_TEST_DIR "//", O_RDONLY | O_DIRECTORY));
     LxtCheckErrnoZeroSuccess(close(Fd));
     Fd = -1;
-    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_DIR "/", O_RDONLY | O_CREAT), EISDIR);
+    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_DIR "/", O_RDONLY | O_CREAT, 0666), EISDIR);
 
     //
     // Create a symlink to a directory.
@@ -2361,7 +2361,7 @@ Return Value:
     LxtCheckErrnoFailure(open(FS_TRAILING_TEST_FILE "//", O_RDONLY), ENOTDIR);
     LxtCheckErrnoFailure(stat(FS_TRAILING_TEST_FILE "/", &Stat), ENOTDIR);
     LxtCheckErrnoFailure(stat(FS_TRAILING_TEST_FILE "//", &Stat), ENOTDIR);
-    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_FILE "/", O_RDONLY | O_CREAT), EISDIR);
+    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_FILE "/", O_RDONLY | O_CREAT, 0666), EISDIR);
 
     //
     // Create a symlink to a file and test using with a trailing slash.
@@ -2384,7 +2384,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(symlink(FS_TRAILING_TEST_FILE "/", FS_TRAILING_TEST_LINK));
 
     LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK, O_RDONLY), ENOTDIR);
-    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK, O_RDONLY | O_CREAT), EISDIR);
+    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK, O_RDONLY | O_CREAT, 0666), EISDIR);
 
     LxtCheckErrnoFailure(stat(FS_TRAILING_TEST_LINK, &Stat), ENOTDIR);
 
@@ -2414,7 +2414,7 @@ Return Value:
     LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK "/", O_RDONLY), ENOENT);
     LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK "/", O_RDONLY | O_NOFOLLOW), ENOENT);
 
-    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK "/", O_RDONLY | O_CREAT), EISDIR);
+    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK "/", O_RDONLY | O_CREAT, 0666), EISDIR);
 
     LxtCheckErrnoFailure(stat(FS_TRAILING_TEST_LINK "/", &Stat), ENOENT);
     LxtCheckErrnoFailure(lstat(FS_TRAILING_TEST_LINK "/", &Stat), ENOENT);
@@ -2427,7 +2427,7 @@ Return Value:
     LxtCheckErrnoZeroSuccess(symlink(FS_TRAILING_TEST_FILE "/", FS_TRAILING_TEST_LINK));
 
     LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK, O_RDONLY), ENOENT);
-    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK, O_RDONLY | O_CREAT), EISDIR);
+    LxtCheckErrnoFailure(open(FS_TRAILING_TEST_LINK, O_RDONLY | O_CREAT, 0666), EISDIR);
 
     LxtCheckErrnoFailure(stat(FS_TRAILING_TEST_LINK, &Stat), ENOENT);
 

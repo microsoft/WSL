@@ -22,6 +22,16 @@ public interface IWslConfigService
     /// </summary>
     IReadOnlyList<WslConfigPendingChange> GetPendingChanges();
     uint CommitPendingChanges();
+
+    /// <summary>
+    /// Returns the value currently saved in .wslconfig, ignoring any pending (unapplied) change for that entry.
+    /// </summary>
+    IWslConfigSetting GetSavedWslConfigSetting(WslConfigEntry wslConfigEntry);
+
+    /// <summary>
+    /// Writes a single config value to disk immediately, bypassing (and discarding) any pending change for that specific entry.
+    /// </summary>
+    uint CommitWslConfigSetting(WslConfigEntry wslConfigEntry, object value);
     public delegate void WslConfigChangedEventHandler();
     event WslConfigChangedEventHandler WslConfigChanged;
     public delegate void PendingChangesChangedEventHandler();

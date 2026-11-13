@@ -3,6 +3,7 @@
 #include "precomp.h"
 #include "Common.h"
 #include "string.hpp"
+#include "WslCoreNetworkEndpointSettings.h"
 
 using wsl::windows::common::string::c_reclaimedSpacePrecision;
 using wsl::windows::common::string::Ellipsis;
@@ -74,6 +75,28 @@ namespace StringUnitTests {
 class StringUnitTests
 {
     WSL_TEST_CLASS(StringUnitTests)
+
+    TEST_METHOD(ScopedIpv6AddressesRemainValidProtocolAddresses)
+    {
+        MIB_UNICASTIPADDRESS_ROW addressRow{};
+        addressRow.Address = wsl::windows::common::string::StringToSockAddrInet(L"fe80::1");
+        addressRow.Address.Ipv6.sin6_scope_id = 12;
+        addressRow.OnLinkPrefixLength = 64;
+        const wsl::core::networking::EndpointIpAddress address{addressRow};
+        VERIFY_ARE_EQUAL(std::wstring{L"fe80::1"}, address.AddressString);
+
+        IN6_ADDR parsed{};
+        VERIFY_ARE_EQUAL(1, InetPtonW(AF_INET6, address.AddressString.c_str(), &parsed));
+        VERIFY_ARE_EQUAL(0, memcmp(&parsed, &addressRow.Address.Ipv6.sin6_addr, sizeof(parsed)));
+
+        MIB_IPFORWARD_ROW2 routeRow{};
+        routeRow.NextHop = addressRow.Address;
+        routeRow.DestinationPrefix.Prefix = addressRow.Address;
+        routeRow.DestinationPrefix.PrefixLength = 64;
+        const wsl::core::networking::EndpointRoute route{routeRow};
+        VERIFY_ARE_EQUAL(std::wstring{L"fe80::1"}, route.NextHopString);
+        VERIFY_ARE_EQUAL(std::wstring{L"fe80::1/64"}, route.GetFullDestinationPrefix());
+    }
 
     TEST_METHOD(FormatUtf8StringAsWideString)
     {

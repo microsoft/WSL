@@ -52,6 +52,16 @@ struct WSLCVolumeMount
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCVolumeMount, HostPath, ParentVMPath, ContainerPath, ReadOnly, SourceFilename, CreateSourceIfMissing);
 };
 
+// Where a container's persisted state lives and in which format.
+enum class WSLCContainerStateStorage : std::uint32_t
+{
+    // The container predates persisted state; a missing document means default state.
+    None = 0,
+
+    // A WSLCPersistedContainerState JSON document in the container's directory on the guest.
+    GuestFileV1 = 1,
+};
+
 struct WSLCContainerMetadataV1
 {
     WSLCContainerFlags Flags{WSLCContainerFlagsNone};
@@ -59,8 +69,10 @@ struct WSLCContainerMetadataV1
     std::string Image;
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
+    WSLCContainerRestartPolicy RestartPolicy{WSLCContainerRestartPolicyNo};
+    WSLCContainerStateStorage StateStorage{WSLCContainerStateStorage::None};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes, RestartPolicy, StateStorage);
 };
 
 struct WSLCContainerMetadata

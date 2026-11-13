@@ -73,8 +73,9 @@ __requires_lock_held(m_lock) void WSLCVolumes::OpenVolumeExclusiveLockHeld(const
 
 void WSLCVolumes::OnVolumeEvent(const std::string& volumeName, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano)
 {
-    // Publish every event, including those skipped below, only once it has been applied and m_lock released,
-    // so that a consumer of the event observes the volume state it describes.
+    // Publish every Docker volume event, including those skipped below, after m_lock is released. A create or destroy that
+    // is applied is visible to a consumer of its event. If opening a created volume fails, or the volume was already deleted,
+    // the event is still published but the volume isn't tracked.
     auto publish = wil::scope_exit([&]() {
         if (m_onVolumeEvent)
         {

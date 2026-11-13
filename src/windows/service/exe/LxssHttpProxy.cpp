@@ -34,37 +34,50 @@ try
 {
     static wil::shared_hmodule winHttpModule;
     static std::once_flag winHttpLoadFlag;
+    static HRESULT loadResult = E_UNEXPECTED;
 
-    // Load Winhttp dll only once
     std::call_once(winHttpLoadFlag, [&]() {
-        winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
-        THROW_LAST_ERROR_IF(!winHttpModule);
+        loadResult = [&]() {
+            winHttpModule.reset(LoadLibraryEx(c_winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
+            RETURN_LAST_ERROR_IF(!winHttpModule);
+
+            // Initialize dynamic functions for the WinHttp Proxy OS APIs
+            // Not using the throwing constructor
+            // as failures should not show up in the Error logs as they can falsely flag failure to start the container
+            LxssDynamicFunction<decltype(RegisterProxyChangeNotification)> local_WinHttpRegisterProxyChangeNotification{
+                DynamicFunctionErrorLogs::None};
+
+            LxssDynamicFunction<decltype(UnregisterProxyChangeNotification)> local_WinHttpUnregisterProxyChangeNotification{
+                DynamicFunctionErrorLogs::None};
+
+            LxssDynamicFunction<decltype(GetProxySettingsEx)> local_WinHttpGetProxySettingsEx{DynamicFunctionErrorLogs::None};
+            LxssDynamicFunction<decltype(GetProxySettingsResultEx)> local_WinHttpGetProxySettingsResultEx{DynamicFunctionErrorLogs::None};
+            LxssDynamicFunction<decltype(FreeProxySettingsEx)> local_WinHttpFreeProxySettingsEx{DynamicFunctionErrorLogs::None};
+
+            // try to load each function - only save if all succeed
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpRegisterProxyChangeNotification.load(winHttpModule, "WinHttpRegisterProxyChangeNotification"));
+
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpUnregisterProxyChangeNotification.load(winHttpModule, "WinHttpUnregisterProxyChangeNotification"));
+
+            RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsEx.load(winHttpModule, "WinHttpGetProxySettingsEx"));
+
+            RETURN_IF_FAILED_EXPECTED(
+                local_WinHttpGetProxySettingsResultEx.load(winHttpModule, "WinHttpGetProxySettingsResultEx"));
+
+            RETURN_IF_FAILED_EXPECTED(local_WinHttpFreeProxySettingsEx.load(winHttpModule, "WinHttpFreeProxySettingsEx"));
+
+            s_WinHttpRegisterProxyChangeNotification.emplace(std::move(local_WinHttpRegisterProxyChangeNotification));
+            s_WinHttpUnregisterProxyChangeNotification.emplace(std::move(local_WinHttpUnregisterProxyChangeNotification));
+            s_WinHttpGetProxySettingsEx.emplace(std::move(local_WinHttpGetProxySettingsEx));
+            s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
+            s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
+            return S_OK;
+        }();
     });
 
-    // Initialize dynamic functions for the WinHttp Proxy OS APIs
-    // Not using the throwing constructor
-    // as failures should not show up in the Error logs as they can falsely flag failure to start the container
-    LxssDynamicFunction<decltype(RegisterProxyChangeNotification)> local_WinHttpRegisterProxyChangeNotification{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(UnregisterProxyChangeNotification)> local_WinHttpUnregisterProxyChangeNotification{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(GetProxySettingsEx)> local_WinHttpGetProxySettingsEx{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(GetProxySettingsResultEx)> local_WinHttpGetProxySettingsResultEx{DynamicFunctionErrorLogs::None};
-    LxssDynamicFunction<decltype(FreeProxySettingsEx)> local_WinHttpFreeProxySettingsEx{DynamicFunctionErrorLogs::None};
-
-    // try to load each function - only save if all succeed
-    RETURN_IF_FAILED_EXPECTED(
-        local_WinHttpRegisterProxyChangeNotification.load(winHttpModule, "WinHttpRegisterProxyChangeNotification"));
-    RETURN_IF_FAILED_EXPECTED(
-        local_WinHttpUnregisterProxyChangeNotification.load(winHttpModule, "WinHttpUnregisterProxyChangeNotification"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsEx.load(winHttpModule, "WinHttpGetProxySettingsEx"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpGetProxySettingsResultEx.load(winHttpModule, "WinHttpGetProxySettingsResultEx"));
-    RETURN_IF_FAILED_EXPECTED(local_WinHttpFreeProxySettingsEx.load(winHttpModule, "WinHttpFreeProxySettingsEx"));
-
-    s_WinHttpRegisterProxyChangeNotification.emplace(std::move(local_WinHttpRegisterProxyChangeNotification));
-    s_WinHttpUnregisterProxyChangeNotification.emplace(std::move(local_WinHttpUnregisterProxyChangeNotification));
-    s_WinHttpGetProxySettingsEx.emplace(std::move(local_WinHttpGetProxySettingsEx));
-    s_WinHttpGetProxySettingsResultEx.emplace(std::move(local_WinHttpGetProxySettingsResultEx));
-    s_WinHttpFreeProxySettingsEx.emplace(std::move(local_WinHttpFreeProxySettingsEx));
-    return S_OK;
+    return loadResult;
 }
 CATCH_RETURN()
 
@@ -250,7 +263,8 @@ try
     {
         auto dataLock = m_proxySettingsLock.lock();
 
-        FilterProxySettingsByNetworkConfiguration(newProxySettings, m_networkMode);
+        m_unfilteredProxySettings = newProxySettings;
+        FilterProxySettingsByNetworkConfiguration(newProxySettings, m_networkMode, m_localhostRelayEnabled);
 
         if (!AreProxyStringsIdentical(newProxySettings))
         {
@@ -302,7 +316,7 @@ try
 }
 CATCH_LOG()
 
-UnsupportedProxyReason HttpProxyStateTracker::IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode configuration) noexcept
+UnsupportedProxyReason HttpProxyStateTracker::IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode configuration, bool localhostRelayEnabled) noexcept
 try
 {
     if (!proxyString)
@@ -353,22 +367,23 @@ try
         return UnsupportedProxyReason::Supported;
     }
 
-    // v4 loopback is only supported in mirrored mode
     if (configuration != wsl::core::NetworkingMode::Mirrored)
     {
         in_addr addrV4{};
         if (SUCCEEDED_WIN32(RtlIpv4StringToAddressW(portRemoved.c_str(), true, &pStringEnd, &addrV4)))
         {
-            if (IN4_IS_ADDR_LOOPBACK(&addrV4))
+            const bool consommeLoopbackSupported = configuration == wsl::core::NetworkingMode::Consomme &&
+                                                   localhostRelayEnabled && addrV4.s_addr == htonl(INADDR_LOOPBACK);
+            if (IN4_IS_ADDR_LOOPBACK(&addrV4) && !consommeLoopbackSupported)
             {
-                return UnsupportedProxyReason::LoopbackNotMirrored;
+                return UnsupportedProxyReason::LoopbackNotSupported;
             }
             return UnsupportedProxyReason::Supported;
         }
 
         if (wsl::shared::string::IsEqual(portRemoved, c_loopback, true) || wsl::shared::string::IsEqual(portRemoved, c_localhost, true))
         {
-            return UnsupportedProxyReason::LoopbackNotMirrored;
+            return UnsupportedProxyReason::LoopbackNotSupported;
         }
 
         DWORD size = 0;
@@ -392,7 +407,7 @@ try
 
         if (wsl::shared::string::IsEqual(computerName, portRemoved, true))
         {
-            return UnsupportedProxyReason::LoopbackNotMirrored;
+            return UnsupportedProxyReason::LoopbackNotSupported;
         }
     }
     return UnsupportedProxyReason::Supported;
@@ -403,11 +418,13 @@ catch (...)
     return UnsupportedProxyReason::UnsupportedError;
 }
 
-void HttpProxyStateTracker::FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode) noexcept
+void HttpProxyStateTracker::FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept
 try
 {
-    const auto proxySupportState = IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.Proxy).c_str(), mode);
-    const auto secureProxySupportState = IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.SecureProxy).c_str(), mode);
+    const auto proxySupportState =
+        IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.Proxy).c_str(), mode, localhostRelayEnabled);
+    const auto secureProxySupportState =
+        IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.SecureProxy).c_str(), mode, localhostRelayEnabled);
     if (proxySupportState != UnsupportedProxyReason::Supported)
     {
         settings.Proxy.clear();
@@ -522,8 +539,9 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
     }
 }
 
-HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, wsl::core::NetworkingMode mode) :
+HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, wsl::core::NetworkingMode mode, bool localhostRelayEnabled) :
     m_networkMode{mode},
+    m_localhostRelayEnabled{localhostRelayEnabled},
     m_initialQueryTimeout{ProxyTimeout},
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
@@ -569,13 +587,17 @@ std::optional<HttpProxySettings> HttpProxyStateTracker::WaitForInitialProxySetti
     return m_proxySettings;
 }
 
-void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode) noexcept
+void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept
+try
 {
     auto lock = m_proxySettingsLock.lock();
-    // if we fall back to NAT mode need to strip bad settings
-    if (m_proxySettings.has_value() && mode != m_networkMode)
+    if (m_unfilteredProxySettings.has_value() && (mode != m_networkMode || localhostRelayEnabled != m_localhostRelayEnabled))
     {
-        FilterProxySettingsByNetworkConfiguration(m_proxySettings.value(), mode);
+        auto proxySettings = m_unfilteredProxySettings.value();
+        FilterProxySettingsByNetworkConfiguration(proxySettings, mode, localhostRelayEnabled);
+        m_proxySettings = std::move(proxySettings);
     }
     m_networkMode = mode;
+    m_localhostRelayEnabled = localhostRelayEnabled;
 }
+CATCH_LOG()

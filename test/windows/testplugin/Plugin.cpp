@@ -50,6 +50,9 @@ std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
 
+// Set by the WslcContainerStoppingDuringTerminate test once the terminating session announces the VM stop.
+wil::unique_event g_terminateVmStopping{wil::EventOptions::ManualReset};
+
 std::vector<char> ReadFromSocket(SOCKET socket)
 {
     // Simplified error handling for the sake of the demo.
@@ -221,6 +224,16 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
 
         return S_OK;
     }
+    else if (g_testType == PluginTestType::CgroupIsolation)
+    {
+        const auto moduleName = std::filesystem::path(wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get()).filename().string();
+        const char* arguments[] = {moduleName.c_str(), "3600", nullptr};
+        for (int processIndex = 0; processIndex < 2; ++processIndex)
+        {
+            wil::unique_socket socket;
+            RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, "/bin/sleep", arguments, &socket));
+        }
+    }
 
     return S_OK;
 }
@@ -321,6 +334,19 @@ HRESULT OnDistroStarted(const WSLSessionInformation* Session, const WSLDistribut
         const GUID guid{};
         g_logfile << "Invalid distro launch returned:  "
                   << g_api->ExecuteBinaryInDistribution(Session->SessionId, &guid, arguments[0], arguments.data(), &socket) << std::endl;
+
+        // Verify that plugin-launched processes do not inherit init's ignored SIGTERM disposition.
+        arguments = {"/bin/sh", "-c", "printf 'ready\\n'; kill -TERM $$; printf 'survived\\n'", nullptr};
+        socket.reset();
+        RETURN_IF_FAILED(g_api->ExecuteBinaryInDistribution(Session->SessionId, &Distribution->Id, arguments[0], arguments.data(), &socket));
+        output = ReadFromSocket(socket.get());
+        if (std::string(output.begin(), output.end()) != "ready\n")
+        {
+            g_logfile << "Unexpected output after SIGTERM: " << std::string(output.begin(), output.end()) << std::endl;
+            return E_ABORT;
+        }
+
+        g_logfile << "Process terminated by SIGTERM" << std::endl;
     }
 
     return S_OK;
@@ -660,10 +686,35 @@ try
 CATCH_RETURN();
 
 HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId)
+try
 {
     g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << ContainerId << std::endl;
+
+    if (g_testType == PluginTestType::WslcContainerStoppingDuringTerminate)
+    {
+        wil::unique_event entered;
+        entered.open(c_containerStoppingEnteredEvent, EVENT_MODIFY_STATE);
+
+        // Reenter only once the test has started terminating the session and its teardown has begun.
+        entered.SetEvent();
+        THROW_WIN32_IF(ERROR_TIMEOUT, !g_terminateVmStopping.wait(30000));
+
+        std::vector<const char*> args = {"/bin/true", nullptr};
+        WSLCProcessHandle process = nullptr;
+        const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+        g_logfile << std::format("WSLC Container stopping reentrant WSLCCreateProcess: {:#x}", static_cast<uint32_t>(processHr)) << std::endl;
+        if (SUCCEEDED(processHr))
+        {
+            g_api->WSLCReleaseProcess(process);
+        }
+
+        const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "/test-plugin/container-stopping-mount", TRUE);
+        g_logfile << std::format("WSLC Container stopping reentrant WSLCMountFolder: {:#x}", static_cast<uint32_t>(mountHr)) << std::endl;
+    }
+
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
@@ -749,6 +800,24 @@ CATCH_RETURN();
 HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::WslcVmExitDuringSessionRelease)
+    {
+        wil::unique_event entered;
+        entered.open(c_vmStoppingEnteredEvent, EVENT_MODIFY_STATE);
+        wil::unique_event release;
+        release.open(c_vmStoppingReleaseEvent, SYNCHRONIZE);
+
+        entered.SetEvent();
+        THROW_WIN32_IF(ERROR_TIMEOUT, !release.wait(30000));
+        return S_OK;
+    }
+
+    if (g_testType == PluginTestType::WslcContainerStoppingDuringTerminate)
+    {
+        g_terminateVmStopping.SetEvent();
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcVmNeverStarted)
     {
         g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
@@ -867,7 +936,10 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
+        THROW_HR_IF(
+            E_INVALIDARG,
+            static_cast<DWORD>(g_testType) <= 0 ||
+                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerStoppingDuringTerminate));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

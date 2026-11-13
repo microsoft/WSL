@@ -302,3 +302,8 @@ stages:
                   $request = ConvertTo-Json @($rawRequest);
                   $uri = "$(System.CollectionUri)$(System.TeamProject)/_apis/build/retention/leases?api-version=6.0-preview.1";
                   Invoke-RestMethod -uri $uri -method POST -Headers $headers -ContentType $contentType -Body $request;
+
+          - ${{ if eq(variables['preventPublishing'], true) }}:
+            - pwsh: |
+                throw 'Publishing stages were included for manual pipeline validation. Failing the package stage intentionally to prevent publishing.'
+              displayName: Prevent publishing from manual validation run

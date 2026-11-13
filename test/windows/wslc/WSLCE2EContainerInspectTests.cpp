@@ -79,6 +79,30 @@ class WSLCE2EContainerInspectTests
         VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_NameRoundTrip)
+    {
+        auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
+        createResult.Verify({.Stderr = L"", .ExitCode = 0});
+
+        auto result = RunWslc(std::format(L"container inspect {}", TestContainerName1));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto inspectData =
+            wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(result.Stdout.value().c_str());
+        VERIFY_ARE_EQUAL(1u, inspectData.size());
+        VERIFY_ARE_EQUAL("/" + WideToMultiByte(TestContainerName1), inspectData[0].Name);
+
+        for (const auto* command : {L"inspect", L"inspect --type container", L"container inspect"})
+        {
+            auto roundTrip = RunWslc(std::format(L"{} {}", command, MultiByteToWide(inspectData[0].Name)));
+            roundTrip.Verify({.Stderr = L"", .ExitCode = 0});
+            const auto roundTripData =
+                wsl::shared::FromJson<std::vector<wsl::windows::common::wslc_schema::InspectContainer>>(roundTrip.Stdout.value().c_str());
+            VERIFY_ARE_EQUAL(1u, roundTripData.size());
+            VERIFY_ARE_EQUAL(inspectData[0].Id, roundTripData[0].Id);
+            VERIFY_ARE_EQUAL(inspectData[0].Name, roundTripData[0].Name);
+        }
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Inspect_SizeOption)
     {
         auto createResult = RunWslc(std::format(L"container create --name {} {}", TestContainerName1, DebianImage.NameAndTag()));
