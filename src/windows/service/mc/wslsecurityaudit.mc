@@ -50,21 +50,7 @@ Language=Neutral
 %2%n%n%4
 .
 
-MessageId=62017 SymbolicName=MSG_NETWORK_LISTEN
-Severity=Success
-Facility=Audit
-Language=Neutral
-%2%n%n%4
-.
-
 MessageId=62018 SymbolicName=MSG_NETWORK_ACCEPT
-Severity=Success
-Facility=Audit
-Language=Neutral
-%2%n%n%4
-.
-
-MessageId=62019 SymbolicName=MSG_NETWORK_SENDMSG
 Severity=Success
 Facility=Audit
 Language=Neutral
@@ -85,21 +71,7 @@ Language=Neutral
 %2%n%n%4
 .
 
-MessageId=62022 SymbolicName=MSG_FILESYSTEM_VIEW_CHANGE
-Severity=Success
-Facility=Audit
-Language=Neutral
-%2%n%n%4
-.
-
 MessageId=62023 SymbolicName=MSG_NAMESPACE_CHANGE
-Severity=Success
-Facility=Audit
-Language=Neutral
-%2%n%n%4
-.
-
-MessageId=62024 SymbolicName=MSG_TIME_CHANGE
 Severity=Success
 Facility=Audit
 Language=Neutral

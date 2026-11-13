@@ -1627,10 +1627,8 @@ enum class LX_NETWORK_AUDIT_OPERATION : uint32_t
     Socket,
     Connect,
     Bind,
-    Listen,
-    Accept,
-    SendMessage,
-    Accept4
+    Accept = 4,
+    Accept4 = 6
 };
 
 enum LX_NETWORK_AUDIT_FIELDS : uint32_t
@@ -1673,18 +1671,9 @@ enum class LX_SYSTEM_AUDIT_OPERATION : uint32_t
     FinitModule,
     SetUid,
     SetGid,
-    SetResUid,
-    SetResGid,
-    Capset,
-    Mount,
-    Unmount,
-    PivotRoot,
-    SetNamespace,
-    Unshare,
-    ClockSetTime,
-    ClockAdjtime,
-    SetTimeOfDay,
-    Adjtimex
+    SetResGid = 5,
+    SetNamespace = 10,
+    Unshare
 };
 
 enum LX_SYSTEM_AUDIT_FIELDS : uint32_t

@@ -121,13 +121,20 @@ int RunSecurityAudit(int socket, bool includeCommandLine)
     std::array<char, 8192> error{};
     // The SDK's fork selector controls task_newtask for clone/fork/vfork/clone3, excluding CLONE_THREAD.
     const syscall_config syscalls[] = {
-        {__NR_execve, true},   {__NR_fork, true},           {__NR_socket, false},        {__NR_connect, false},
-        {__NR_bind, false},    {__NR_listen, false},        {__NR_accept, false},        {__NR_accept4, false},
-        {__NR_sendmsg, false}, {__NR_init_module, false},   {__NR_finit_module, false},  {__NR_setuid, false},
-        {__NR_setgid, false},  {__NR_setresuid, false},     {__NR_setresgid, false},     {__NR_capset, false},
-        {__NR_mount, false},   {__NR_umount2, false},       {__NR_pivot_root, false},    {__NR_setns, false},
-        {__NR_unshare, false}, {__NR_clock_settime, false}, {__NR_clock_adjtime, false}, {__NR_settimeofday, false},
-        {__NR_adjtimex, false}};
+        {__NR_execve, true},
+        {__NR_fork, true},
+        {__NR_socket, false},
+        {__NR_connect, false},
+        {__NR_bind, false},
+        {__NR_accept, false},
+        {__NR_accept4, false},
+        {__NR_init_module, false},
+        {__NR_finit_module, false},
+        {__NR_setuid, false},
+        {__NR_setgid, false},
+        {__NR_setresgid, false},
+        {__NR_setns, false},
+        {__NR_unshare, false}};
     const auto info = ebpf_plugin_start(
         "/wsl-security-audit",
         PERF_FEATURES_BTF | FEATURE_RINGBUFF | FEATURE_ENRICHMENT_AT_SOURCE | FEATURE_RUNTIME_MAP_FLIGHTING | FEATURE_PID_NS_ID_QUERY,

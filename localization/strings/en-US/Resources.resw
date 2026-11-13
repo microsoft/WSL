@@ -4305,21 +4305,9 @@ Creating Process Namespaces:
     <value>A Linux bind operation was observed in WSL.</value>
     <comment>{Locked="Linux"}{Locked="WSL"}Security event description; observation does not imply the operation succeeded.</comment>
   </data>
-  <data name="MessageSecurityAuditNetworkListen" xml:space="preserve">
-    <value>A Linux listen operation was observed in WSL.</value>
-    <comment>{Locked="Linux"}{Locked="WSL"}Occurrence-only security event; no additional operation fields are collected.</comment>
-  </data>
   <data name="MessageSecurityAuditNetworkAccept" xml:space="preserve">
     <value>A Linux accept operation was observed in WSL.</value>
     <comment>{Locked="Linux"}{Locked="WSL"}Security event description; observation does not imply the operation succeeded.</comment>
-  </data>
-  <data name="MessageSecurityAuditNetworkSendMessage" xml:space="preserve">
-    <value>A Linux sendmsg operation was observed in WSL.</value>
-    <comment>{Locked="Linux"}{Locked="WSL"}{Locked="sendmsg"}Occurrence-only security event; no additional operation fields are collected.</comment>
-  </data>
-  <data name="MessageSecurityAuditNoAdditionalFields" xml:space="preserve">
-    <value>No additional fields are collected for this event.</value>
-    <comment>Body of an occurrence-only security event. No operation result or success is implied.</comment>
   </data>
   <data name="MessageSecurityAuditNetworkSocketDisplay" xml:space="preserve">
     <value>Process Context:
@@ -4389,17 +4377,9 @@ Outcome:
     <value>A Linux credential operation was observed in WSL.</value>
     <comment>{Locked="Linux"}{Locked="WSL"}Security event description; new credentials are included only when a successful change can be observed.</comment>
   </data>
-  <data name="MessageSecurityAuditFilesystemViewChange" xml:space="preserve">
-    <value>A Linux filesystem view operation was observed in WSL.</value>
-    <comment>{Locked="Linux"}{Locked="WSL"}Security event description for mount, unmount or root-switch operations; success is not implied.</comment>
-  </data>
   <data name="MessageSecurityAuditNamespaceChange" xml:space="preserve">
     <value>A Linux namespace operation was observed in WSL.</value>
     <comment>{Locked="Linux"}{Locked="WSL"}Security event description for namespace entry or unsharing; success is not implied.</comment>
-  </data>
-  <data name="MessageSecurityAuditTimeChange" xml:space="preserve">
-    <value>A Linux time-change operation was observed in WSL.</value>
-    <comment>{Locked="Linux"}{Locked="WSL"}Occurrence-only security event; no time value, caller or operation result is collected.</comment>
   </data>
   <data name="MessageSecurityAuditResultDisplay" xml:space="preserve">
     <value>Outcome:

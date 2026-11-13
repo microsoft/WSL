@@ -20,32 +20,10 @@ namespace {
             return "connect";
         case LX_NETWORK_AUDIT_OPERATION::Bind:
             return "bind";
-        case LX_NETWORK_AUDIT_OPERATION::Listen:
-            return "listen";
         case LX_NETWORK_AUDIT_OPERATION::Accept:
             return "accept";
         case LX_NETWORK_AUDIT_OPERATION::Accept4:
             return "accept4";
-        case LX_NETWORK_AUDIT_OPERATION::SendMessage:
-            return "sendmsg";
-        default:
-            THROW_HR(E_INVALIDARG);
-        }
-    }
-
-    bool NetworkOccurrenceOnly(LX_NETWORK_AUDIT_OPERATION operation)
-    {
-        switch (operation)
-        {
-        case LX_NETWORK_AUDIT_OPERATION::Socket:
-        case LX_NETWORK_AUDIT_OPERATION::Connect:
-        case LX_NETWORK_AUDIT_OPERATION::Bind:
-        case LX_NETWORK_AUDIT_OPERATION::Accept:
-        case LX_NETWORK_AUDIT_OPERATION::Accept4:
-            return false;
-        case LX_NETWORK_AUDIT_OPERATION::Listen:
-        case LX_NETWORK_AUDIT_OPERATION::SendMessage:
-            return true;
         default:
             THROW_HR(E_INVALIDARG);
         }
@@ -73,7 +51,7 @@ namespace {
 } // namespace
 
 static_assert(MSG_NETWORK_SOCKET <= UINT16_MAX && MSG_NETWORK_CONNECT <= UINT16_MAX && MSG_NETWORK_BIND <= UINT16_MAX);
-static_assert(MSG_NETWORK_LISTEN <= UINT16_MAX && MSG_NETWORK_ACCEPT <= UINT16_MAX && MSG_NETWORK_SENDMSG <= UINT16_MAX);
+static_assert(MSG_NETWORK_ACCEPT <= UINT16_MAX);
 
 std::wstring FormatNetworkAudit(gsl::span<gsl::byte> bytes)
 {
@@ -85,57 +63,54 @@ std::wstring FormatNetworkAudit(gsl::span<gsl::byte> bytes)
             event->Header.MessageType != event->Type || (event->Fields & ~(LxNetworkAuditResult | LxNetworkAuditProtocol)) != 0);
 
     Json data{{"schemaVersion", 1}, {"syscall", NetworkSyscallName(event->Operation)}};
-    if (!NetworkOccurrenceOnly(event->Operation))
+    if (event->Pid != 0)
     {
-        if (event->Pid != 0)
+        data["pid"] = event->Pid;
+    }
+    if (event->Uid != UINT32_MAX)
+    {
+        data["uid"] = event->Uid;
+    }
+    if (event->Euid != UINT32_MAX)
+    {
+        data["euid"] = event->Euid;
+    }
+    for (const auto& [name, value] :
+         {std::pair{"pid", event->PidNamespace}, {"mount", event->MountNamespace}, {"network", event->NetworkNamespace}})
+    {
+        if (value != 0)
         {
-            data["pid"] = event->Pid;
+            data["namespaceIds"][name] = value;
         }
-        if (event->Uid != UINT32_MAX)
+    }
+    if (event->Fields & LxNetworkAuditResult)
+    {
+        THROW_HR_IF(E_INVALIDARG, event->Result < -4095);
+        data["result"] = event->Result;
+        if (event->Result < 0)
         {
-            data["uid"] = event->Uid;
+            data["error"] = -event->Result;
         }
-        if (event->Euid != UINT32_MAX)
+    }
+    switch (event->Operation)
+    {
+    case LX_NETWORK_AUDIT_OPERATION::Socket:
+        if (event->Fields & LxNetworkAuditProtocol)
         {
-            data["euid"] = event->Euid;
+            data["protocol"] = event->Protocol;
         }
-        for (const auto& [name, value] :
-             {std::pair{"pid", event->PidNamespace}, {"mount", event->MountNamespace}, {"network", event->NetworkNamespace}})
-        {
-            if (value != 0)
-            {
-                data["namespaceIds"][name] = value;
-            }
-        }
-        if (event->Fields & LxNetworkAuditResult)
-        {
-            THROW_HR_IF(E_INVALIDARG, event->Result < -4095);
-            data["result"] = event->Result;
-            if (event->Result < 0)
-            {
-                data["error"] = -event->Result;
-            }
-        }
-        switch (event->Operation)
-        {
-        case LX_NETWORK_AUDIT_OPERATION::Socket:
-            if (event->Fields & LxNetworkAuditProtocol)
-            {
-                data["protocol"] = event->Protocol;
-            }
-            break;
-        case LX_NETWORK_AUDIT_OPERATION::Bind:
-            AddNetworkEndpoint(data, event->Local, "localIp");
-            break;
-        case LX_NETWORK_AUDIT_OPERATION::Connect:
-        case LX_NETWORK_AUDIT_OPERATION::Accept:
-        case LX_NETWORK_AUDIT_OPERATION::Accept4:
-            AddNetworkEndpoint(data, event->Local, "localIp", "localPort");
-            AddNetworkEndpoint(data, event->Remote, "remoteIp", "remotePort");
-            break;
-        default:
-            break;
-        }
+        break;
+    case LX_NETWORK_AUDIT_OPERATION::Bind:
+        AddNetworkEndpoint(data, event->Local, "localIp");
+        break;
+    case LX_NETWORK_AUDIT_OPERATION::Connect:
+    case LX_NETWORK_AUDIT_OPERATION::Accept:
+    case LX_NETWORK_AUDIT_OPERATION::Accept4:
+        AddNetworkEndpoint(data, event->Local, "localIp", "localPort");
+        AddNetworkEndpoint(data, event->Remote, "remoteIp", "remotePort");
+        break;
+    default:
+        break;
     }
     return wsl::shared::string::MultiByteToWide(EscapeEventParameters(data.dump()));
 }
@@ -144,10 +119,6 @@ std::wstring FormatNetworkAuditDisplay(LX_NETWORK_AUDIT_OPERATION operation, std
 {
     using Json = nlohmann::json;
     using wsl::shared::Localization;
-    if (NetworkOccurrenceOnly(operation))
-    {
-        return FormatSyscallEventDisplay(NetworkSyscallName(operation), Localization::MessageSecurityAuditNoAdditionalFields());
-    }
     const auto data = Json::parse(wsl::shared::string::WideToMultiByte(std::wstring(details)));
     THROW_HR_IF(E_INVALIDARG, !data.is_object());
     const auto namespaces = data.value("namespaceIds", Json::object());
@@ -218,24 +189,16 @@ void ReportNetworkAudit(EventSource& source, const LX_INIT_NETWORK_AUDIT& event,
         eventId = MSG_NETWORK_BIND;
         description = Localization::MessageSecurityAuditNetworkBind();
         break;
-    case LX_NETWORK_AUDIT_OPERATION::Listen:
-        eventId = MSG_NETWORK_LISTEN;
-        description = Localization::MessageSecurityAuditNetworkListen();
-        break;
     case LX_NETWORK_AUDIT_OPERATION::Accept:
     case LX_NETWORK_AUDIT_OPERATION::Accept4:
         eventId = MSG_NETWORK_ACCEPT;
         description = Localization::MessageSecurityAuditNetworkAccept();
         break;
-    case LX_NETWORK_AUDIT_OPERATION::SendMessage:
-        eventId = MSG_NETWORK_SENDMSG;
-        description = Localization::MessageSecurityAuditNetworkSendMessage();
-        break;
     default:
         THROW_HR(E_INVALIDARG);
     }
     std::array<std::wstring, 4> fields{
-        !NetworkOccurrenceOnly(event.Operation) && event.Pid != 0 ? std::to_wstring(event.Pid) : L"",
+        event.Pid != 0 ? std::to_wstring(event.Pid) : L"",
         std::move(description),
         std::wstring(details),
         FormatNetworkAuditDisplay(event.Operation, details)};

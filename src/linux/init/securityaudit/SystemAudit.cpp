@@ -22,30 +22,12 @@ namespace {
             return LX_SYSTEM_AUDIT_OPERATION::SetUid;
         case __NR_setgid:
             return LX_SYSTEM_AUDIT_OPERATION::SetGid;
-        case __NR_setresuid:
-            return LX_SYSTEM_AUDIT_OPERATION::SetResUid;
         case __NR_setresgid:
             return LX_SYSTEM_AUDIT_OPERATION::SetResGid;
-        case __NR_capset:
-            return LX_SYSTEM_AUDIT_OPERATION::Capset;
-        case __NR_mount:
-            return LX_SYSTEM_AUDIT_OPERATION::Mount;
-        case __NR_umount2:
-            return LX_SYSTEM_AUDIT_OPERATION::Unmount;
-        case __NR_pivot_root:
-            return LX_SYSTEM_AUDIT_OPERATION::PivotRoot;
         case __NR_setns:
             return LX_SYSTEM_AUDIT_OPERATION::SetNamespace;
         case __NR_unshare:
             return LX_SYSTEM_AUDIT_OPERATION::Unshare;
-        case __NR_clock_settime:
-            return LX_SYSTEM_AUDIT_OPERATION::ClockSetTime;
-        case __NR_clock_adjtime:
-            return LX_SYSTEM_AUDIT_OPERATION::ClockAdjtime;
-        case __NR_settimeofday:
-            return LX_SYSTEM_AUDIT_OPERATION::SetTimeOfDay;
-        case __NR_adjtimex:
-            return LX_SYSTEM_AUDIT_OPERATION::Adjtimex;
         default:
             return {};
         }
@@ -111,7 +93,6 @@ std::optional<LX_INIT_SYSTEM_AUDIT> DecodeSystemAudit(gsl::span<const gsl::byte>
     {
     case LX_SYSTEM_AUDIT_OPERATION::SetUid:
     case LX_SYSTEM_AUDIT_OPERATION::SetGid:
-    case LX_SYSTEM_AUDIT_OPERATION::SetResUid:
     case LX_SYSTEM_AUDIT_OPERATION::SetResGid:
         // The SDK samples real IDs with bpf_get_current_uid_gid() at syscall exit, not from requested arguments.
         if (hasResult && base.return_code == 0 && base.enriched == 1 && !(base.status & STATUS_CRED))
@@ -127,13 +108,6 @@ std::optional<LX_INIT_SYSTEM_AUDIT> DecodeSystemAudit(gsl::span<const gsl::byte>
                 message.NewGid = base.gid;
             }
         }
-        break;
-    case LX_SYSTEM_AUDIT_OPERATION::Capset:
-    case LX_SYSTEM_AUDIT_OPERATION::ClockSetTime:
-    case LX_SYSTEM_AUDIT_OPERATION::ClockAdjtime:
-    case LX_SYSTEM_AUDIT_OPERATION::SetTimeOfDay:
-    case LX_SYSTEM_AUDIT_OPERATION::Adjtimex:
-        // Capset cannot change UID/GID. Capabilities and all time-change fields are deliberately excluded.
         break;
     default:
         if (hasResult)

@@ -21,30 +21,12 @@ namespace {
             return "setuid";
         case LX_SYSTEM_AUDIT_OPERATION::SetGid:
             return "setgid";
-        case LX_SYSTEM_AUDIT_OPERATION::SetResUid:
-            return "setresuid";
         case LX_SYSTEM_AUDIT_OPERATION::SetResGid:
             return "setresgid";
-        case LX_SYSTEM_AUDIT_OPERATION::Capset:
-            return "capset";
-        case LX_SYSTEM_AUDIT_OPERATION::Mount:
-            return "mount";
-        case LX_SYSTEM_AUDIT_OPERATION::Unmount:
-            return "umount2";
-        case LX_SYSTEM_AUDIT_OPERATION::PivotRoot:
-            return "pivot_root";
         case LX_SYSTEM_AUDIT_OPERATION::SetNamespace:
             return "setns";
         case LX_SYSTEM_AUDIT_OPERATION::Unshare:
             return "unshare";
-        case LX_SYSTEM_AUDIT_OPERATION::ClockSetTime:
-            return "clock_settime";
-        case LX_SYSTEM_AUDIT_OPERATION::ClockAdjtime:
-            return "clock_adjtime";
-        case LX_SYSTEM_AUDIT_OPERATION::SetTimeOfDay:
-            return "settimeofday";
-        case LX_SYSTEM_AUDIT_OPERATION::Adjtimex:
-            return "adjtimex";
         default:
             THROW_HR(E_INVALIDARG);
         }
@@ -56,32 +38,20 @@ namespace {
         {
         case LX_SYSTEM_AUDIT_OPERATION::InitModule:
         case LX_SYSTEM_AUDIT_OPERATION::FinitModule:
-        case LX_SYSTEM_AUDIT_OPERATION::Mount:
-        case LX_SYSTEM_AUDIT_OPERATION::Unmount:
-        case LX_SYSTEM_AUDIT_OPERATION::PivotRoot:
         case LX_SYSTEM_AUDIT_OPERATION::SetNamespace:
         case LX_SYSTEM_AUDIT_OPERATION::Unshare:
             return LxSystemAuditResult;
         case LX_SYSTEM_AUDIT_OPERATION::SetUid:
         case LX_SYSTEM_AUDIT_OPERATION::SetGid:
-        case LX_SYSTEM_AUDIT_OPERATION::SetResUid:
         case LX_SYSTEM_AUDIT_OPERATION::SetResGid:
             return LxSystemAuditUid | LxSystemAuditGid;
-        case LX_SYSTEM_AUDIT_OPERATION::Capset:
-        case LX_SYSTEM_AUDIT_OPERATION::ClockSetTime:
-        case LX_SYSTEM_AUDIT_OPERATION::ClockAdjtime:
-        case LX_SYSTEM_AUDIT_OPERATION::SetTimeOfDay:
-        case LX_SYSTEM_AUDIT_OPERATION::Adjtimex:
-            return 0;
         default:
             THROW_HR(E_INVALIDARG);
         }
     }
 } // namespace
 
-static_assert(
-    MSG_KERNEL_MODULE_LOAD <= UINT16_MAX && MSG_PRIVILEGE_TRANSITION <= UINT16_MAX && MSG_FILESYSTEM_VIEW_CHANGE <= UINT16_MAX &&
-    MSG_NAMESPACE_CHANGE <= UINT16_MAX && MSG_TIME_CHANGE <= UINT16_MAX);
+static_assert(MSG_KERNEL_MODULE_LOAD <= UINT16_MAX && MSG_PRIVILEGE_TRANSITION <= UINT16_MAX && MSG_NAMESPACE_CHANGE <= UINT16_MAX);
 
 std::wstring FormatSystemAudit(gsl::span<gsl::byte> bytes)
 {
@@ -124,14 +94,10 @@ std::wstring FormatSystemAuditDisplay(LX_SYSTEM_AUDIT_OPERATION operation, std::
             SystemSyscallName(operation),
             wsl::shared::Localization::MessageSecurityAuditResultDisplay(FormatEventField(data, "result")));
     }
-    if (allowed == (LxSystemAuditUid | LxSystemAuditGid))
-    {
-        return FormatSyscallEventDisplay(
-            SystemSyscallName(operation),
-            wsl::shared::Localization::MessageSecurityAuditPrivilegeDisplay(
-                FormatEventField(data, "newUid"), FormatEventField(data, "newGid")));
-    }
-    return FormatSyscallEventDisplay(SystemSyscallName(operation), wsl::shared::Localization::MessageSecurityAuditNoAdditionalFields());
+    return FormatSyscallEventDisplay(
+        SystemSyscallName(operation),
+        wsl::shared::Localization::MessageSecurityAuditPrivilegeDisplay(
+            FormatEventField(data, "newUid"), FormatEventField(data, "newGid")));
 }
 
 void ReportSystemAudit(EventSource& source, const LX_INIT_SYSTEM_AUDIT& event, std::wstring_view details)
@@ -147,29 +113,14 @@ void ReportSystemAudit(EventSource& source, const LX_INIT_SYSTEM_AUDIT& event, s
         break;
     case LX_SYSTEM_AUDIT_OPERATION::SetUid:
     case LX_SYSTEM_AUDIT_OPERATION::SetGid:
-    case LX_SYSTEM_AUDIT_OPERATION::SetResUid:
     case LX_SYSTEM_AUDIT_OPERATION::SetResGid:
-    case LX_SYSTEM_AUDIT_OPERATION::Capset:
         eventId = MSG_PRIVILEGE_TRANSITION;
         description = wsl::shared::Localization::MessageSecurityAuditPrivilegeTransition();
-        break;
-    case LX_SYSTEM_AUDIT_OPERATION::Mount:
-    case LX_SYSTEM_AUDIT_OPERATION::Unmount:
-    case LX_SYSTEM_AUDIT_OPERATION::PivotRoot:
-        eventId = MSG_FILESYSTEM_VIEW_CHANGE;
-        description = wsl::shared::Localization::MessageSecurityAuditFilesystemViewChange();
         break;
     case LX_SYSTEM_AUDIT_OPERATION::SetNamespace:
     case LX_SYSTEM_AUDIT_OPERATION::Unshare:
         eventId = MSG_NAMESPACE_CHANGE;
         description = wsl::shared::Localization::MessageSecurityAuditNamespaceChange();
-        break;
-    case LX_SYSTEM_AUDIT_OPERATION::ClockSetTime:
-    case LX_SYSTEM_AUDIT_OPERATION::ClockAdjtime:
-    case LX_SYSTEM_AUDIT_OPERATION::SetTimeOfDay:
-    case LX_SYSTEM_AUDIT_OPERATION::Adjtimex:
-        eventId = MSG_TIME_CHANGE;
-        description = wsl::shared::Localization::MessageSecurityAuditTimeChange();
         break;
     default:
         THROW_HR(E_INVALIDARG);

@@ -20,14 +20,10 @@ namespace {
             return LX_NETWORK_AUDIT_OPERATION::Connect;
         case __NR_bind:
             return LX_NETWORK_AUDIT_OPERATION::Bind;
-        case __NR_listen:
-            return LX_NETWORK_AUDIT_OPERATION::Listen;
         case __NR_accept:
             return LX_NETWORK_AUDIT_OPERATION::Accept;
         case __NR_accept4:
             return LX_NETWORK_AUDIT_OPERATION::Accept4;
-        case __NR_sendmsg:
-            return LX_NETWORK_AUDIT_OPERATION::SendMessage;
         default:
             return {};
         }
@@ -113,25 +109,16 @@ std::optional<LX_INIT_NETWORK_AUDIT> DecodeNetworkAudit(gsl::span<const gsl::byt
         return {};
     }
 
-    const bool occurrenceOnly = *operation == LX_NETWORK_AUDIT_OPERATION::Listen || *operation == LX_NETWORK_AUDIT_OPERATION::SendMessage;
-    const auto expectedSize = occurrenceOnly ? sizeof(event_regular_s) : sizeof(event_socket_s);
-    THROW_ERRNO_IF(EINVAL, data.size() != expectedSize || header.size != expectedSize || header.event_type != (occurrenceOnly ? event_type_regular : event_type_socket));
-    event_end_s trailer{};
-    memcpy(&trailer, data.data() + expectedSize - sizeof(trailer), sizeof(trailer));
-    THROW_ERRNO_IF(EINVAL, trailer.code_bytes_end != CODE_BYTES);
+    event_socket_s event{};
+    THROW_ERRNO_IF(EINVAL, data.size() != sizeof(event) || header.size != sizeof(event) || header.event_type != event_type_socket);
+    memcpy(&event, data.data(), sizeof(event));
+    THROW_ERRNO_IF(EINVAL, event.end.code_bytes_end != CODE_BYTES);
 
     LX_INIT_NETWORK_AUDIT message{};
     message.Header.MessageType = message.Type;
     message.Header.MessageSize = sizeof(message);
     message.Operation = *operation;
     message.Uid = message.Euid = INVALID_CRED;
-    if (occurrenceOnly)
-    {
-        return message;
-    }
-
-    event_socket_s event{};
-    memcpy(&event, data.data(), sizeof(event));
     message.Pid = event.base.pid;
     if (!(event.base.status & STATUS_CRED))
     {
