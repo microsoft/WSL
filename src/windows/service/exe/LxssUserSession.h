@@ -584,7 +584,7 @@ private:
     /// Creates a distribution registration for legacy installs.
     /// </summary>
     _Requires_exclusive_lock_held_(m_instanceLock)
-    void _CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ HANDLE UserToken);
+    void _CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ const wil::shared_handle& UserToken);
 
     /// <summary>
     /// Creates the set of WSL mounts required for setup and ext4 conversion.
@@ -705,7 +705,7 @@ private:
     /// this routine also marks this distribution as the default.
     /// </summary>
     _Requires_lock_held_(m_instanceLock)
-    static void _SetDistributionInstalled(_In_ HKEY LxssKey, _In_ const GUID& DistroGuid);
+    static void _SetDistributionInstalled(_In_ const wil::shared_handle& UserToken, _In_ HKEY LxssKey, _In_ const GUID& DistroGuid);
 
     /// <summary>
     /// Terminates the distribution only if its current instance matches the callback's lifetime registration.
