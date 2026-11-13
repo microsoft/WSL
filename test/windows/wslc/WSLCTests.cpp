@@ -272,7 +272,7 @@ class WSLCTests
         auto cleanup = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsNone).first); });
 
-        VERIFY_SUCCEEDED(m_defaultS ession->PushImage(registryImage.c_str(), registryAuth.c_str(), FALSE, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultSession->PushImage(registryImage.c_str(), registryAuth.c_str(), FALSE, nullptr, nullptr));
 
         return registryImage;
     }
