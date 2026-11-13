@@ -309,6 +309,8 @@ public:
         return m_runtime;
     }
 
+    std::vector<std::string> GetProxyEnvironment() const;
+
     bool IsTerminating() const noexcept
     {
         return m_terminating.load();
@@ -410,7 +412,11 @@ private:
     void OnContainerdExited();
     void OnDockerdExited();
     ServiceRunningProcess StartProcess(
-        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+        const std::string& Executable,
+        const std::vector<std::string>& Args,
+        PCSTR LogSource,
+        std::function<void()>&& ExitCallback,
+        const std::vector<std::string>& ExtraEnvironment = {});
     void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
@@ -462,6 +468,9 @@ private:
     std::optional<std::wstring> m_settingsCreatorProcessName;
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
+    std::optional<std::string> m_settingsHostLoopback;
+    std::vector<std::string> m_proxyEnvironmentOverrides;
+    std::vector<LPCSTR> m_proxyEnvironmentOverrideValues;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};

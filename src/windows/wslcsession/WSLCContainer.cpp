@@ -25,6 +25,7 @@ Abstract:
 #include "WSLCVolumes.h"
 #include "APICompat.h"
 #include "MountSpecParsing.h"
+#include "wslc/WSLCProxy.h"
 #include "lxinitshared.h"
 #include <unordered_set>
 
@@ -2785,6 +2786,11 @@ std::shared_ptr<WSLCContainerImpl> WSLCContainerImpl::Create(
     }
 
     request.Env = StringArrayToVector(containerOptions.InitProcessOptions.Environment);
+    for (auto& entry : request.Env)
+    {
+        entry = wsl::windows::wslc::CanonicalizeProxyEnvironmentVariable(entry);
+    }
+    wsl::windows::wslc::AddProxyEnvironmentDefaults(request.Env, wslcSession.GetProxyEnvironment());
 
     if (containerOptions.StopSignal != WSLCSignalNone)
     {

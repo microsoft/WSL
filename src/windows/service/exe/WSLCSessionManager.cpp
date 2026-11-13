@@ -31,6 +31,7 @@ Abstract:
 #include "HcsVirtualMachine.h"
 #include "WSLCUserSettings.h"
 #include "WSLCSessionDefaults.h"
+#include "wslc/WSLCProxy.h"
 #include "WSLCPluginNotifier.h"
 #include "PluginManager.h"
 #include "ExecutionContext.h"
@@ -234,7 +235,11 @@ try
 CATCH_LOG()
 
 void WSLCSessionManagerImpl::CreateSession(
-    _In_ const WSLCSessionSettings* Settings, _In_ WSLCSessionFlags Flags, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
+    _In_ const WSLCSessionSettings* Settings,
+    _In_ WSLCSessionFlags Flags,
+    _In_opt_ const WSLCStringArray* ProxyEnvironment,
+    _In_opt_ IWarningCallback* WarningCallback,
+    _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF_NULL(E_POINTER, WslcSession);
 
@@ -347,7 +352,26 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_IF_FAILED(factory->GetProcessHandle(hostProcess.put()));
         wil::unique_handle sessionJob = CreateSessionProcessJob(hostProcess.get());
 
-        const auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
+        std::vector<std::string> proxyEnvironment;
+        if (ProxyEnvironment != nullptr)
+        {
+            THROW_HR_IF(E_INVALIDARG, ProxyEnvironment->Count != 0 && ProxyEnvironment->Values == nullptr);
+            for (const auto* entry : wil::make_range(ProxyEnvironment->Values, ProxyEnvironment->Count))
+            {
+                THROW_HR_IF(E_INVALIDARG, entry == nullptr || !wsl::windows::wslc::IsProxyEnvironmentVariable(entry));
+                proxyEnvironment.emplace_back(wsl::windows::wslc::CanonicalizeProxyEnvironmentVariable(entry));
+            }
+        }
+
+        if (Settings->NetworkingMode == WSLCNetworkingModeConsomme && Settings->HostLoopback != nullptr)
+        {
+            wsl::windows::wslc::ResolveProxyEnvironmentLoopback(proxyEnvironment, Settings->HostLoopback);
+        }
+
+        std::vector<LPCSTR> proxyValues;
+        std::ranges::transform(proxyEnvironment, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
+        auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
+        sessionSettings.ProxyEnvironmentOverrides = {proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
         wil::com_ptr<IWSLCSession> session;
         wil::com_ptr<IWSLCSessionReference> serviceRef;
         const auto factoryHr =
@@ -518,14 +542,18 @@ void WSLCSessionManagerImpl::ListSessions(_Out_ WSLCSessionListEntry** Sessions,
 }
 
 void WSLCSessionManagerImpl::EnterSession(
-    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, _In_opt_ IWarningCallback* WarningCallback, _Out_ IWSLCSession** WslcSession)
+    _In_ LPCWSTR DisplayName,
+    _In_ LPCWSTR StoragePath,
+    _In_opt_ const WSLCStringArray* ProxyEnvironment,
+    _In_opt_ IWarningCallback* WarningCallback,
+    _Out_ IWSLCSession** WslcSession)
 {
     THROW_HR_IF(E_POINTER, DisplayName == nullptr || StoragePath == nullptr);
     THROW_HR_IF(E_INVALIDARG, DisplayName[0] == L'\0' || StoragePath[0] == L'\0');
 
     const auto callerToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     auto sessionSettings = SessionSettings::Custom(callerToken.get(), DisplayName, StoragePath, WSLCSessionStorageFlagsNoCreate);
-    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, WarningCallback, WslcSession);
+    CreateSession(&sessionSettings.Settings, WSLCSessionFlagsNone, ProxyEnvironment, WarningCallback, WslcSession);
 }
 
 WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
@@ -544,6 +572,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
+    sessionSettings.HostLoopback = Settings->HostLoopback;
     return sessionSettings;
 }
 
@@ -662,20 +691,25 @@ try
 CATCH_RETURN();
 
 HRESULT WSLCSessionManager::CreateSession(
-    const WSLCSessionSettings* WslcSessionSettings, WSLCSessionFlags Flags, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+    const WSLCSessionSettings* WslcSessionSettings,
+    WSLCSessionFlags Flags,
+    const WSLCStringArray* ProxyEnvironment,
+    IWarningCallback* WarningCallback,
+    IWSLCSession** WslcSession)
 try
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, WarningCallback, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::CreateSession, WslcSessionSettings, Flags, ProxyEnvironment, WarningCallback, WslcSession);
 }
 CATCH_RETURN();
 
-HRESULT WSLCSessionManager::EnterSession(_In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
+HRESULT WSLCSessionManager::EnterSession(
+    _In_ LPCWSTR DisplayName, _In_ LPCWSTR StoragePath, const WSLCStringArray* ProxyEnvironment, IWarningCallback* WarningCallback, IWSLCSession** WslcSession)
 {
     COMServiceExecutionContext context;
 
-    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, WarningCallback, WslcSession);
+    return CallImpl(&WSLCSessionManagerImpl::EnterSession, DisplayName, StoragePath, ProxyEnvironment, WarningCallback, WslcSession);
 }
 
 HRESULT WSLCSessionManager::ListSessions(_Out_ WSLCSessionListEntry** Sessions, _Out_ ULONG* SessionsCount)
@@ -731,12 +765,12 @@ try
     Microsoft::WRL::ComPtr<IWSLCSession> session;
     if (Settings == nullptr)
     {
-        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(static_cast<const WSLCSessionSettings*>(nullptr), Flags, nullptr, warning.Get(), &session));
     }
     else
     {
         const auto settings = apicompat::Convert(*Settings);
-        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
+        RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, nullptr, warning.Get(), &session));
     }
 
     RETURN_HR_IF_NULL(E_UNEXPECTED, session);
@@ -757,7 +791,7 @@ try
     const auto settings = apicompat::Convert(*Settings);
 
     Microsoft::WRL::ComPtr<IWSLCSession> session;
-    RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, warning.Get(), &session));
+    RETURN_IF_FAILED(CreateSession(settings.Get(), Flags, nullptr, warning.Get(), &session));
     RETURN_HR_IF_NULL(E_UNEXPECTED, session);
 
     return session.CopyTo(Session);

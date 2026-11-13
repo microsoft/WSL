@@ -4,7 +4,6 @@ set(SOURCES
     LxssUserSession.cpp
     LxssUserSessionFactory.cpp
     LxssIptables.cpp
-    LxssHttpProxy.cpp
     LxssInstance.cpp
     PluginManager.cpp
     ServiceMain.cpp
@@ -35,7 +34,6 @@ set(HEADERS
     LxssUserSession.h
     LxssUserSessionFactory.h
     LxssIptables.h
-    LxssHttpProxy.h
     PluginManager.h
     LxssInstance.h
     BridgedNetworking.h

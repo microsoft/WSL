@@ -4437,39 +4437,7 @@ CreateLxProcessContext LxssUserSessionImpl::s_GetCreateProcessContext(_In_ const
 void LxssUserSessionImpl::s_AddHttpProxyToEnvironment(_In_ const HttpProxySettings& proxySettings, _Inout_ std::vector<std::string>& environment) noexcept
 try
 {
-    if (!proxySettings.Proxy.empty())
-    {
-        // Note that we add both lower and uppercase as some Linux apps use upper, others lower.
-        environment.emplace_back(std::format("{}={}", c_httpProxyLower, proxySettings.Proxy));
-        environment.emplace_back(std::format("{}={}", c_httpProxyUpper, proxySettings.Proxy));
-    }
-
-    if (!proxySettings.SecureProxy.empty())
-    {
-        environment.emplace_back(std::format("{}={}", c_httpsProxyLower, proxySettings.SecureProxy));
-        environment.emplace_back(std::format("{}={}", c_httpsProxyUpper, proxySettings.SecureProxy));
-    }
-
-    if (!proxySettings.ProxyBypassesComma.empty())
-    {
-        environment.emplace_back(std::format("{}={}", c_proxyBypassLower, proxySettings.ProxyBypassesComma));
-        environment.emplace_back(std::format("{}={}", c_proxyBypassUpper, proxySettings.ProxyBypassesComma));
-    }
-
-    if (!proxySettings.PacUrl.empty())
-    {
-        // We only add uppercase as there is no standard environment variable for PAC proxies.
-        // This at least makes the PAC url available to the user in case they wish to use it.
-        environment.emplace_back(std::format("{}={}", c_pacProxy, proxySettings.PacUrl));
-
-        // When PAC is used, the reply only populates the proxy field.
-        // Set both envs to this value as best effort since PAC is not functional in headless Linux.
-        if (proxySettings.SecureProxy.empty() && !proxySettings.Proxy.empty())
-        {
-            environment.emplace_back(std::format("{}={}", c_httpsProxyLower, proxySettings.Proxy));
-            environment.emplace_back(std::format("{}={}", c_httpsProxyUpper, proxySettings.Proxy));
-        }
-    }
+    proxySettings.AddToEnvironment(environment);
 }
 CATCH_LOG()
 

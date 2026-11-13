@@ -31,36 +31,6 @@ using wsl::shared::hns::GuestEndpointResourceType;
 using wsl::shared::hns::ModifyGuestEndpointSettingRequest;
 using wsl::shared::hns::ModifyRequestType;
 
-bool TryLoadWinhttpProxyMethods() noexcept
-{
-    constexpr auto winhttpModuleName = L"Winhttp.dll";
-    const wil::shared_hmodule winhttpModule{LoadLibraryEx(winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)};
-    if (!winhttpModule)
-    {
-        return false;
-    }
-
-    try
-    {
-        // attempt to find the functions for the Winhttp proxy APIs.
-        static LxssDynamicFunction<decltype(WinHttpRegisterProxyChangeNotification)> WinHttpRegisterProxyChangeNotification{
-            winhttpModule, "WinHttpRegisterProxyChangeNotification"};
-        static LxssDynamicFunction<decltype(WinHttpUnregisterProxyChangeNotification)> WinHttpUnregisterProxyChangeNotification{
-            winhttpModule, "WinHttpUnregisterProxyChangeNotification"};
-        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsEx)> WinHttpGetProxySettingsEx{
-            winhttpModule, "WinHttpGetProxySettingsEx"};
-        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsResultEx)> WinHttpGetProxySettingsResultEx{
-            winhttpModule, "WinHttpGetProxySettingsResultEx"};
-        static LxssDynamicFunction<decltype(WinHttpFreeProxySettingsEx)> WinHttpFreeProxySettingsEx{
-            winhttpModule, "WinHttpFreeProxySettingsEx"};
-    }
-    catch (...)
-    {
-        return false;
-    }
-    return true;
-}
-
 #define HYPERV_FIREWALL_TEST_ONLY() \
     { \
         WINDOWS_11_TEST_ONLY(); \
@@ -91,15 +61,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
         if (!TryLoadDnsResolverMethods()) \
         { \
             LogSkipped("DNS tunneling APIs not present on this OS. Skipping test..."); \
-            return; \
-        } \
-    }
-
-#define WINHTTP_PROXY_TEST_ONLY() \
-    { \
-        if (!TryLoadWinhttpProxyMethods()) \
-        { \
-            LogSkipped("Winhttp proxy APIs not present on this OS. Skipping test..."); \
             return; \
         } \
     }

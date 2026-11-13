@@ -127,7 +127,7 @@ Session SessionService::OpenOrCreateDefaultSession(Terminal& terminal)
     // Null Settings = default session with server-determined name and settings. The warning callback
     // is consumed during CreateSession (session initialization); it is not retained afterwards.
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, &warningCallback, &session));
+    THROW_IF_FAILED(manager->CreateSession(nullptr, WSLCSessionFlagsNone, nullptr, &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
     return Session(std::move(session));
@@ -196,7 +196,7 @@ int SessionService::Enter(Terminal& terminal, const std::wstring& storagePath, c
     auto sessionManager = CreateSessionManager();
 
     wil::com_ptr<IWSLCSession> session;
-    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), &warningCallback, &session));
+    THROW_IF_FAILED(sessionManager->EnterSession(displayName.c_str(), storagePath.c_str(), nullptr, &warningCallback, &session));
     wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
     terminal.Info(L"{}\n", Localization::MessageWslcCreatedSession(displayName));
 
