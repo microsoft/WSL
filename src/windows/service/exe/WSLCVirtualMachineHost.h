@@ -4,40 +4,38 @@ Copyright (c) Microsoft. All rights reserved.
 
 Module Name:
 
-    HcsVirtualMachine.h
+    WSLCVirtualMachineHost.h
 
 Abstract:
 
-    Implementation of IWSLCVirtualMachine - represents a single HCS-based VM instance.
-    This class encapsulates a VM and all operations on it.
+    Implementation of IWSLCVirtualMachine - the service-side WSLC VM host.
+    This class owns WSLC policy and an IVirtualMachineBackend.
 
 --*/
 
 #pragma once
 
-#include <atomic>
 #include "wslc.h"
-#include "hcs.hpp"
-#include "GuestDeviceManager.h"
+#include "IVirtualMachineBackend.h"
 #include "Dmesg.h"
 #include "INetworkingEngine.h"
 #include "RuntimeClass.h"
 #include "WslCoreConfig.h"
 #include <filesystem>
-#include <map>
+#include <functional>
 #include <optional>
 #include <string>
 
-#define MAX_VHD_COUNT 254
-
 namespace wsl::windows::service::wslc {
 
-class HcsVirtualMachine
+using WSLCVirtualMachineBackendFactory = std::function<std::unique_ptr<IVirtualMachineBackend>(const VmCreateRequest&)>;
+
+class WSLCVirtualMachineHost
     : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::WinRtClassicComMix>, IWSLCVirtualMachine, IFastRundown>
 {
 public:
-    HcsVirtualMachine(_In_ const WSLCSessionSettings* Settings);
-    ~HcsVirtualMachine();
+    WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* Settings, WSLCVirtualMachineBackendFactory BackendFactory);
+    ~WSLCVirtualMachineHost();
 
     // IWSLCVirtualMachine implementation
     IFACEMETHOD(GetId)(_Out_ GUID* VmId) override;
@@ -56,80 +54,39 @@ public:
     IFACEMETHOD(GetTerminationReason)(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details) override;
 
 private:
-    struct DiskInfo
-    {
-        std::wstring Path;
-        bool AccessGranted = false;
-    };
-
     bool FeatureEnabled(WSLCFeatureFlags Value) const;
-    static void CALLBACK OnVmExitCallback(HCS_EVENT* Event, void* Context);
-    void OnExit(const HCS_EVENT* Event);
-    void OnCrash(const HCS_EVENT* Event);
-
-    std::filesystem::path GetCrashDumpFolder();
-    void CreateVmSavedStateFile(HANDLE UserToken);
-    void EnforceVmSavedStateFileLimit();
-    void WriteCrashLog(const std::wstring& crashLog);
-
-    ULONG AllocateLun();
-    void FreeLun(ULONG Lun);
 
     std::recursive_mutex m_lock;
 
-    wsl::windows::common::hcs::unique_hcs_system m_computeSystem;
-    GUID m_vmId{};
-    std::wstring m_vmIdString;
+    std::unique_ptr<IVirtualMachineBackend> m_backend;
+    std::filesystem::path m_bootFilesPath;
     ULONG m_bootTimeoutMs{};
 
-    wil::shared_handle m_userToken;
     WSLCFeatureFlags m_featureFlags{};
     WSLCNetworkingMode m_networkingMode{};
     std::string m_hostLoopback;
 
     bool m_swiotlbConfigured = false;
 
-    wil::unique_socket m_listenSocket;
+    VmGuestListener m_guestListener;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
-    std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;
     std::optional<wsl::core::Config> m_natConfig;
-    std::unique_ptr<wsl::core::INetworkingEngine> m_networkEngine;
-
-    std::map<ULONG, DiskInfo> m_attachedDisks;
-    std::bitset<MAX_VHD_COUNT> m_lunBitmap;
-
-    // Shares: key is ShareId, value is nullopt for Plan9 or the aggregate DeviceInstanceId for VirtioFS.
-    std::map<GUID, std::optional<GUID>, wsl::windows::common::helpers::GuidLess> m_shares;
-    wil::com_ptr<IPlan9FileSystem> m_plan9Server;
-    std::optional<GUID> m_virtioFsDevice;
-
-    std::filesystem::path m_vmSavedStateFile;
-    std::filesystem::path m_crashDumpFolder;
-    std::atomic<bool> m_vmSavedStateCaptured = false;
-    std::atomic<bool> m_crashLogCaptured = false;
-
-    // modified afterward. Publication relies on the event: readers (GetTerminationReason) only access
-    // these after observing m_vmExitEvent signaled, so no lock is needed. Keeping them lock-free also
-    // avoids contending for m_lock from the HCS exit callback, which the destructor holds while the
-    // callback is drained.
-    std::atomic<bool> m_vmExitReported = false;
-    WSLCVirtualMachineTerminationReason m_terminationReason{WSLCVirtualMachineTerminationReasonUnknown};
-    std::wstring m_terminationDetails;
+    std::unique_ptr<wsl::core::INetworkingEngine> m_networkingEngine;
 };
 
 //
 // WSLCVirtualMachineFactory - Implements IWSLCVirtualMachineFactory.
 //
 // Owns a deep copy of the WSLCSessionSettings needed to construct a VM and creates a
-// fresh HcsVirtualMachine on demand. This lets the per-user session recreate a VM that
+// fresh WSLCVirtualMachineHost on demand. This lets the per-user session recreate a VM that
 // was idle-terminated, without the SYSTEM service holding a VM up front.
 //
 class WSLCVirtualMachineFactory
     : public common::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWSLCVirtualMachineFactory, IFastRundown>
 {
 public:
-    explicit WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings);
+    WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings, WSLCVirtualMachineBackendFactory BackendFactory);
 
     IFACEMETHOD(CreateVirtualMachine)(_Out_ IWSLCVirtualMachine** Vm) override;
 
@@ -155,6 +112,7 @@ private:
     WSLCFeatureFlags m_featureFlags{};
     std::string m_hostLoopback;
     WSLCSessionStorageFlags m_storageFlags{};
+    WSLCVirtualMachineBackendFactory m_backendFactory;
 };
 
 } // namespace wsl::windows::service::wslc

@@ -1,0 +1,641 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCVirtualMachineHost.cpp
+
+Abstract:
+
+    Implementation of IWSLCVirtualMachine - the service-side WSLC VM host.
+
+--*/
+
+#include "precomp.h"
+#include "WSLCVirtualMachineHost.h"
+#include <string>
+#include <string_view>
+#include "wslsecurity.h"
+#include "wslutil.h"
+#include "lxinitshared.h"
+#include "DnsResolver.h"
+#include "GnsChannel.h"
+#include "HcsVirtualMachineBackend.h"
+#include "NatNetworking.h"
+#include "ConsommeNetworking.h"
+#include "string.hpp"
+
+using namespace wsl::windows::common;
+using helpers::WindowsBuildNumbers;
+using wsl::windows::service::wslc::WSLCVirtualMachineHost;
+namespace {
+
+SOCKADDR_INET CreateListenAddress(LPCSTR Address, uint16_t HostPort)
+{
+    auto listenAddr = wsl::windows::common::string::StringToSockAddrInet(wsl::shared::string::MultiByteToWide(Address));
+
+    if (listenAddr.si_family == AF_INET)
+    {
+        listenAddr.Ipv4.sin_port = HostPort;
+    }
+    else if (listenAddr.si_family == AF_INET6)
+    {
+        listenAddr.Ipv6.sin6_port = HostPort;
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Unsupported address family: %d", listenAddr.si_family);
+    }
+
+    return listenAddr;
+}
+
+// Replace any character outside the conservative ASCII allowlist with '_'.
+std::wstring SanitizeHostingProcessNameSuffix(std::wstring_view name)
+{
+    constexpr std::wstring_view c_allowed = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    std::wstring sanitized{name};
+    for (auto& c : sanitized)
+    {
+        if (c_allowed.find(c) == std::wstring_view::npos)
+        {
+            c = L'_';
+        }
+    }
+
+    return sanitized;
+}
+
+} // namespace
+
+WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* Settings, WSLCVirtualMachineBackendFactory BackendFactory)
+{
+    THROW_HR_IF(E_POINTER, Settings == nullptr);
+    THROW_HR_IF(E_INVALIDARG, !BackendFactory);
+
+    const auto userToken = wil::shared_handle{wsl::windows::common::security::GetUserToken(TokenImpersonation).release()};
+    auto cleanupBootFilesOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+        if (!m_bootFilesPath.empty())
+        {
+            try
+            {
+                const auto runAsUser = wil::impersonate_token(userToken.get());
+                LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_bootFilesPath.c_str()));
+            }
+            CATCH_LOG()
+        }
+    });
+    std::lock_guard lock(m_lock);
+
+    GUID vmId{};
+    THROW_IF_FAILED(CoCreateGuid(&vmId));
+    m_featureFlags = Settings->FeatureFlags;
+    m_networkingMode = Settings->NetworkingMode;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
+    m_bootTimeoutMs = Settings->BootTimeoutMs;
+
+    VmCreateRequest request{};
+    request.Identity = {vmId, userToken};
+    request.Owner = Settings->DisplayName ? Settings->DisplayName : L"WSLC";
+    request.Processor.Count = Settings->CpuCount;
+    request.Processor.PerfmonPmu = VmFeatureRequest::Preferred;
+    request.Processor.PerfmonLbr = VmFeatureRequest::Preferred;
+    request.Memory.SizeBytes = static_cast<UINT64>(Settings->MemoryMb & ~0x1UL) * _1MB;
+    request.Memory.AllowOvercommit = VmFeatureRequest::Required;
+    request.Memory.DeferredCommit = VmFeatureRequest::Required;
+    request.Memory.ColdDiscard = VmFeatureRequest::Required;
+    const bool densityMemorySupported = helpers::GetWindowsVersion().BuildNumber >= WindowsBuildNumbers::Germanium;
+    if (densityMemorySupported)
+    {
+        request.Memory.SmallPageBacking = VmFeatureRequest::Preferred;
+        request.Memory.FaultClusterSizeShift = 4;
+        request.Memory.DirectMapFaultClusterSizeShift = 4;
+    }
+
+    request.Memory.PageReportingOrder = densityMemorySupported ? 5 : 9;
+    request.Memory.HostingProcessNameSuffix =
+        Settings->DisplayName ? std::optional{SanitizeHostingProcessNameSuffix(Settings->DisplayName)} : std::nullopt;
+
+    const auto basePath = wslutil::GetBasePath();
+    std::filesystem::path kernelPath;
+#ifdef WSL_KERNEL_PATH
+    kernelPath = TEXT(WSL_KERNEL_PATH);
+#else
+    kernelPath = basePath / L"tools" / LXSS_VM_MODE_KERNEL_NAME;
+#endif
+    request.Boot.KernelPath = kernelPath;
+    request.Boot.Method = wsl::shared::Arm64 ? VmBootMethod::Uefi : VmBootMethod::LinuxDirect;
+    if constexpr (!wsl::shared::Arm64)
+    {
+        request.Boot.InitrdPath = basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME;
+    }
+    else if (kernelPath.parent_path() != basePath / L"tools")
+    {
+        const auto vmIdString = wsl::shared::string::GuidToString<wchar_t>(vmId, wsl::shared::string::GuidToStringFlags::Uppercase);
+        const auto runAsUser = wil::impersonate_token(userToken.get());
+        m_bootFilesPath = filesystem::GetTempFolderPath(userToken.get()) / L"wslc" / vmIdString;
+        wil::CreateDirectoryDeep(m_bootFilesPath.c_str());
+
+        const auto initrdPath = basePath / L"tools" / LXSS_VM_MODE_INITRD_NAME;
+        THROW_IF_WIN32_BOOL_FALSE(CopyFileW(initrdPath.c_str(), (m_bootFilesPath / LXSS_VM_MODE_INITRD_NAME).c_str(), TRUE));
+        const auto stagedKernelPath = m_bootFilesPath / LXSS_VM_MODE_KERNEL_NAME;
+        THROW_IF_WIN32_BOOL_FALSE(CopyFileW(kernelPath.c_str(), stagedKernelPath.c_str(), TRUE));
+        request.Boot.KernelPath = stagedKernelPath;
+    }
+
+    auto swiotlbSizeBytes = (FeatureEnabled(WslcFeatureFlagsVirtioFs) || m_networkingMode == WSLCNetworkingModeConsomme)
+                                ? helpers::ComputeDefaultSwiotlbConfig(static_cast<UINT64>(Settings->MemoryMb) * _1MB)
+                                : 0;
+    request.Boot.KernelCommandLine = L"initrd=\\" LXSS_VM_MODE_INITRD_NAME L" " TEXT(WSLC_ROOT_INIT_ENV) L"=1 panic=-1";
+    helpers::AppendCommonKernelCommandLine(
+        request.Boot.KernelCommandLine, request.Memory.PageReportingOrder.value(), swiotlbSizeBytes, Settings->CpuCount);
+    constexpr std::uint32_t c_maxVmCrashFiles = 3;
+    const auto crashDumpFolder = filesystem::GetTempFolderPath(userToken.get()) / L"wslc-crashes";
+    request.CrashCapture =
+        VmCrashCaptureRequest{crashDumpFolder, c_maxVmCrashFiles, crashDumpFolder, c_maxVmCrashFiles, VmSelectionPolicy::Preferred};
+
+    wil::unique_handle dmesgOutputHandle;
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
+    {
+        dmesgOutputHandle.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
+    }
+
+    m_dmesgCollector = DmesgCollector::Create(
+        vmId, m_vmExitEvent.get(), true, false, L"", FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg), std::move(dmesgOutputHandle));
+    if (FeatureEnabled(WslcFeatureFlagsEarlyBootDmesg))
+    {
+        request.Boot.KernelCommandLine += wsl::shared::Arm64 ? L" earlycon=pl011,0xeffec000,115200" : L" earlycon=uart8250,io,0x3f8,115200";
+        request.Consoles.push_back({VmConsoleRole::EarlyBoot, VmSerialConsole{0, m_dmesgCollector->EarlyConsoleName()}});
+    }
+    if (helpers::IsVirtioSerialConsoleSupported())
+    {
+        request.Boot.KernelCommandLine += L" console=hvc0 debug";
+        request.Consoles.push_back({VmConsoleRole::KernelConsole, VmVirtioConsole{0, L"hvc0", m_dmesgCollector->VirtioConsoleName()}});
+    }
+
+#ifdef WSL_KERNEL_MODULES_PATH
+    const auto kernelModulesPath = std::filesystem::path(TEXT(WSL_KERNEL_MODULES_PATH));
+#else
+    const auto kernelModulesPath = basePath / L"tools" / L"artifacts.vhd";
+#endif
+    std::filesystem::path rootVhdPath = Settings->RootVhdOverride ? Settings->RootVhdOverride
+#ifdef WSL_SYSTEM_DISTRO_PATH
+                                                                  : std::filesystem::path(TEXT(WSL_SYSTEM_DISTRO_PATH));
+#else
+                                                                  : std::filesystem::path(wslutil::GetMsiPackagePath().value()) /
+                                                                        L"system.vhd";
+#endif
+
+    auto addBootDisk = [&](std::wstring key, const std::filesystem::path& path, bool grantHostAccess) {
+        VmBootDiskRequest disk{};
+        disk.Key = std::move(key);
+        disk.Disk.Source = VmVirtualDiskSource{path};
+        disk.Disk.ReadOnly = true;
+        disk.GrantHostAccess = grantHostAccess;
+        request.BootDisks.emplace_back(std::move(disk));
+    };
+    addBootDisk(L"root", rootVhdPath, Settings->RootVhdOverride != nullptr);
+    addBootDisk(L"kernel-modules", kernelModulesPath, false);
+
+    m_backend = BackendFactory(request);
+    auto cleanupBackendOnFailure = wil::scope_exit([&] { m_backend.reset(); });
+    THROW_IF_NULL_ALLOC(m_backend);
+    m_backend->RegisterTerminationCallback([this](GUID) { m_vmExitEvent.SetEvent(); });
+
+    m_guestListener = m_backend->CreateGuestListener(GuestServicePort{LX_INIT_UTILITY_VM_INIT_PORT});
+    m_backend->Start();
+    if (FeatureEnabled(WslcFeatureFlagsGPU))
+    {
+        m_backend->AddGpu({});
+    }
+
+    cleanupBackendOnFailure.release();
+    cleanupBootFilesOnFailure.release();
+}
+
+WSLCVirtualMachineHost::~WSLCVirtualMachineHost()
+{
+    // The guest normally exits after the session closes its mini_init channel.
+    const bool forceTerminate = !m_vmExitEvent.wait(30000);
+    WSL_LOG("WSLCTerminateVm", TraceLoggingValue(forceTerminate, "forced"));
+    if (forceTerminate)
+    {
+        try
+        {
+            m_backend->Terminate();
+        }
+        CATCH_LOG()
+    }
+
+    m_networkingEngine.reset();
+    const auto userToken = m_backend->GetDescription().Identity.UserToken;
+    m_backend.reset();
+    if (!m_bootFilesPath.empty())
+    {
+        try
+        {
+            const auto runAsUser = wil::impersonate_token(userToken.get());
+            LOG_IF_FAILED(wil::RemoveDirectoryRecursiveNoThrow(m_bootFilesPath.c_str()));
+        }
+        CATCH_LOG()
+    }
+}
+
+bool WSLCVirtualMachineHost::FeatureEnabled(WSLCFeatureFlags Value) const
+{
+    return static_cast<ULONG>(m_featureFlags) & static_cast<ULONG>(Value);
+}
+
+HRESULT WSLCVirtualMachineHost::GetId(_Out_ GUID* VmId)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, VmId);
+
+    *VmId = m_backend->GetDescription().Identity.VmId;
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::AcceptConnection(_Out_ HANDLE* Socket)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Socket);
+
+    auto socket = socket::CancellableAccept(m_guestListener.Socket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+    THROW_HR_IF(E_ABORT, !socket.has_value());
+    *Socket = reinterpret_cast<HANDLE>(socket->release());
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket)
+try
+{
+    std::lock_guard lock(m_lock);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED), m_networkingEngine != nullptr);
+
+    if (m_networkingMode == WSLCNetworkingModeNone)
+    {
+        return S_OK;
+    }
+
+    // Duplicate the socket handles - COM manages the lifetime of the marshalled handles,
+    // so we need our own copies to take ownership.
+    wil::unique_socket gnsSocketHandle{reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(GnsSocket))};
+    wil::unique_socket dnsSocketHandle;
+
+    // The DNS hvsocket is only allocated for NAT mode.
+    THROW_HR_IF(E_INVALIDARG, (FeatureEnabled(WslcFeatureFlagsDnsTunneling) && m_networkingMode == WSLCNetworkingModeNAT) != (DnsSocket != nullptr));
+
+    // The check still applies to Consomme because the host Consomme NAT uses the same Windows DNS APIs.
+    if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
+    {
+        const auto result = wsl::core::networking::DnsResolver::LoadDnsResolverMethods();
+        if (FAILED(result))
+        {
+            LOG_HR_MSG(result, "Failed to load DNS resolver methods, DNS tunneling will be disabled");
+            WI_ClearFlag(m_featureFlags, WslcFeatureFlagsDnsTunneling);
+        }
+    }
+
+    if (DnsSocket != nullptr && FeatureEnabled(WslcFeatureFlagsDnsTunneling))
+    {
+        dnsSocketHandle.reset(reinterpret_cast<SOCKET>(wslutil::DuplicateHandle(*DnsSocket)));
+    }
+
+    const auto description = m_backend->GetDescription();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), description.Backend != BackendKind::Hcs);
+
+    // The existing networking engines still need HCS and GuestDeviceManager, as in WslCoreVm.
+    auto& hcsBackend = static_cast<HcsVirtualMachineBackend&>(*m_backend);
+    if (m_networkingMode == WSLCNetworkingModeNAT)
+    {
+        m_natConfig.emplace(nullptr);
+        if (!wsl::core::NatNetworking::IsHyperVFirewallSupported(*m_natConfig))
+        {
+            m_natConfig->FirewallConfig.reset();
+        }
+
+        if (FeatureEnabled(WslcFeatureFlagsDnsTunneling))
+        {
+            m_natConfig->EnableDnsTunneling = true;
+            in_addr address{};
+            WI_VERIFY(inet_pton(AF_INET, LX_INIT_DNS_TUNNELING_IP_ADDRESS, &address) == 1);
+            m_natConfig->DnsTunnelingIpAddress = address.S_un.S_addr;
+        }
+
+        m_networkingEngine = std::make_unique<wsl::core::NatNetworking>(
+            hcsBackend.GetComputeSystemHandle(),
+            wsl::core::NatNetworking::CreateNetwork(*m_natConfig),
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)),
+            *m_natConfig,
+            std::move(dnsSocketHandle),
+            nullptr);
+    }
+    else if (m_networkingMode == WSLCNetworkingModeConsomme)
+    {
+        auto flags = wsl::core::ConsommeNetworkingFlags::Ipv6;
+        WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, FeatureEnabled(WslcFeatureFlagsDnsTunneling));
+        WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, !FeatureEnabled(WslcFeatureFlagsPortRelayWslRelay));
+
+        m_networkingEngine = std::make_unique<wsl::core::ConsommeNetworking>(
+            wsl::core::GnsChannel(std::move(gnsSocketHandle)),
+            flags,
+            nullptr,
+            m_hostLoopback.c_str(),
+            hcsBackend.GetGuestDeviceManager(),
+            description.Identity.UserToken);
+    }
+    else
+    {
+        THROW_HR_MSG(E_INVALIDARG, "Invalid networking mode: %lu", m_networkingMode);
+    }
+
+    m_networkingEngine->Initialize();
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::AttachDisk(_In_ LPCWSTR Path, _In_ BOOL ReadOnly, _Out_ ULONG* Lun)
+try
+{
+    RETURN_HR_IF(E_POINTER, Path == nullptr || Lun == nullptr);
+
+    std::lock_guard lock(m_lock);
+    VmDiskRequest request{};
+    request.Source = VmVirtualDiskSource{Path};
+    request.ReadOnly = ReadOnly;
+    request.UserDisk = true;
+    const auto attachment = m_backend->AttachDisk(request);
+    *Lun = attachment.GuestAddress.Lun;
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::DetachDisk(_In_ ULONG Lun)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    const auto disks = m_backend->GetAttachedDisks();
+    const auto disk = std::ranges::find_if(
+        disks, [&](const VmDiskAttachment& candidate) { return candidate.UserDisk && candidate.GuestAddress.Lun == Lun; });
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), disk == disks.end());
+    m_backend->DetachDisk(disk->Id);
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::AddShare(_In_ LPCWSTR WindowsPath, _In_ BOOL ReadOnly, _Out_ GUID* ShareId)
+try
+{
+    RETURN_HR_IF(E_POINTER, WindowsPath == nullptr || ShareId == nullptr);
+
+    std::lock_guard lock(m_lock);
+
+    GUID shareIdLocal;
+    THROW_IF_FAILED(CoCreateGuid(&shareIdLocal));
+    auto shareName = wsl::shared::string::GuidToString<wchar_t>(shareIdLocal, wsl::shared::string::None);
+
+    const auto userToken = m_backend->GetDescription().Identity.UserToken;
+
+    if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
+    {
+        auto device = m_backend->GetFileSystemDevice([](const VmFileSystemDevice& candidate) {
+            const auto* transport = std::get_if<VmPlan9SocketDevice>(&candidate.Transport);
+            return transport != nullptr && transport->Port.Value == LX_INIT_UTILITY_VM_PLAN9_PORT;
+        });
+        if (!device)
+        {
+            VmFileSystemDeviceRequest deviceRequest{};
+            deviceRequest.UserToken = wil::shared_handle{wslutil::DuplicateHandle(userToken.get())};
+            deviceRequest.Transport =
+                VmPlan9SocketDevice{GuestServicePort{LX_INIT_UTILITY_VM_PLAN9_PORT}, [](HANDLE userToken) {
+                                        return wslutil::CreateComServerAsUser<p9fs::Plan9FileSystem, IPlan9FileSystem>(userToken);
+                                    }};
+            device = m_backend->CreateFileSystemDevice(deviceRequest);
+        }
+
+        VmFileSystemShareRequest shareRequest{};
+        shareRequest.HostPath = WindowsPath;
+        shareRequest.Name = shareName;
+        shareRequest.ReadOnly = ReadOnly;
+        shareRequest.Options = VmPlan9ShareOptions{false, false, false, true, false};
+        shareRequest.UserToken = wil::shared_handle{wslutil::DuplicateHandle(userToken.get())};
+        m_backend->AddFileSystemShare(device->Id, shareRequest);
+    }
+    else
+    {
+        auto device = m_backend->GetFileSystemDevice([](const VmFileSystemDevice& candidate) {
+            const auto* transport = std::get_if<VmVirtioFsDevice>(&candidate.Transport);
+            return transport != nullptr && transport->Layout == VmVirtioFsLayout::Aggregate && transport->Tag == TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
+        });
+        if (!device)
+        {
+            VmFileSystemDeviceRequest deviceRequest{};
+            deviceRequest.UserToken = wil::shared_handle{wslutil::DuplicateHandle(userToken.get())};
+            deviceRequest.Transport = VmVirtioFsDevice{TEXT(LX_INIT_DRVFS_VIRTIO_TAG), VmVirtioFsLayout::Aggregate};
+            device = m_backend->CreateFileSystemDevice(deviceRequest);
+        }
+
+        VmFileSystemShareRequest shareRequest{};
+        shareRequest.HostPath = WindowsPath;
+        shareRequest.Name = shareName;
+        shareRequest.ReadOnly = ReadOnly;
+        shareRequest.Options = VmVirtioFsShareOptions{.MountOptions = {{L"metadata", L""}}};
+        m_backend->AddFileSystemShare(device->Id, shareRequest);
+    }
+
+    *ShareId = shareIdLocal;
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::RemoveShare(_In_ REFGUID ShareId)
+try
+{
+    std::lock_guard lock(m_lock);
+
+    const auto shareName = wsl::shared::string::GuidToString<wchar_t>(ShareId, wsl::shared::string::None);
+    const auto share = m_backend->GetFileSystemShare([&](const VmFileSystemShare& candidate) {
+        if (const auto* address = std::get_if<VmPlan9SocketShareAddress>(&candidate.GuestAddress))
+        {
+            return address->Port.Value == LX_INIT_UTILITY_VM_PLAN9_PORT && address->AccessName == shareName;
+        }
+
+        if (const auto* address = std::get_if<VmVirtioFsShareAddress>(&candidate.GuestAddress))
+        {
+            return address->Tag == TEXT(LX_INIT_DRVFS_VIRTIO_TAG) && address->ChildName == shareName;
+        }
+
+        return false;
+    });
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), !share);
+    m_backend->RemoveFileSystemShare(share->Id);
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::ApplyGuestCapabilities(_In_ const WSLCGuestCapabilities* Capabilities)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Capabilities);
+
+    std::lock_guard lock(m_lock);
+
+    THROW_HR_IF(E_INVALIDARG, m_swiotlbConfigured);
+
+    if (Capabilities->HvPciSwiotlbBase != 0 && Capabilities->HvPciSwiotlbSize != 0)
+    {
+        m_backend->ConfigureGuestDma({Capabilities->HvPciSwiotlbBase, Capabilities->HvPciSwiotlbSize});
+        m_swiotlbConfigured = true;
+    }
+
+    WSL_LOG(
+        "WSLCApplyGuestCapabilities",
+        TraceLoggingValue(Capabilities->HvPciSwiotlbBase, "HvPciSwiotlbBase"),
+        TraceLoggingValue(Capabilities->HvPciSwiotlbSize, "HvPciSwiotlbSize"));
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::GetTerminationEvent(_Out_ HANDLE* Event)
+try
+{
+    RETURN_HR_IF_NULL(E_POINTER, Event);
+
+    *Event = wslutil::DuplicateHandle(m_vmExitEvent.get());
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::MapVirtioNetPort(
+    _In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress, _Out_ USHORT* AllocatedHostPort)
+try
+{
+    RETURN_HR_IF(E_POINTER, AllocatedHostPort == nullptr || ListenAddress == nullptr);
+
+    *AllocatedHostPort = 0;
+
+    std::lock_guard lock(m_lock);
+
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
+    const auto& consomme = static_cast<wsl::core::ConsommeNetworking&>(*m_networkingEngine);
+    return consomme.MapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol, AllocatedHostPort);
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::UnmapVirtioNetPort(_In_ USHORT HostPort, _In_ USHORT GuestPort, _In_ int Protocol, _In_ LPCSTR ListenAddress)
+try
+{
+    RETURN_HR_IF(E_POINTER, ListenAddress == nullptr);
+
+    std::lock_guard lock(m_lock);
+
+    RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !m_networkingEngine || m_networkingMode != WSLCNetworkingModeConsomme);
+    const auto& consomme = static_cast<wsl::core::ConsommeNetworking&>(*m_networkingEngine);
+    return consomme.UnmapPort(CreateListenAddress(ListenAddress, HostPort), GuestPort, Protocol);
+}
+CATCH_RETURN()
+
+HRESULT WSLCVirtualMachineHost::GetTerminationReason(_Out_ WSLCVirtualMachineTerminationReason* Reason, _Out_ LPWSTR* Details)
+try
+{
+    RETURN_HR_IF(E_POINTER, Reason == nullptr || Details == nullptr);
+
+    *Reason = WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = nullptr;
+
+    const auto information = m_backend->GetTerminationReason();
+    *Reason = information.Reason == VmTerminationReason::Shutdown  ? WSLCVirtualMachineTerminationReasonShutdown
+              : information.Reason == VmTerminationReason::Crashed ? WSLCVirtualMachineTerminationReasonCrashed
+                                                                   : WSLCVirtualMachineTerminationReasonUnknown;
+    *Details = wil::make_cotaskmem_string(information.Details.c_str()).release();
+
+    return S_OK;
+}
+CATCH_RETURN()
+
+namespace wsl::windows::service::wslc {
+
+WSLCVirtualMachineFactory::WSLCVirtualMachineFactory(_In_ const WSLCSessionSettings* Settings, WSLCVirtualMachineBackendFactory BackendFactory) :
+    m_backendFactory(std::move(BackendFactory))
+{
+    THROW_HR_IF(E_POINTER, Settings == nullptr);
+    THROW_HR_IF(E_INVALIDARG, !m_backendFactory);
+
+    m_displayName = Settings->DisplayName ? Settings->DisplayName : L"";
+    m_storagePath = Settings->StoragePath ? Settings->StoragePath : L"";
+
+    if (Settings->RootVhdOverride != nullptr)
+    {
+        m_rootVhdOverride.emplace(Settings->RootVhdOverride);
+    }
+
+    if (Settings->RootVhdTypeOverride != nullptr)
+    {
+        m_rootVhdTypeOverride.emplace(Settings->RootVhdTypeOverride);
+    }
+
+    // Keep our own duplicate of the dmesg sink so recreated VMs can reuse it.
+    if (Settings->DmesgOutput.Handle.File != nullptr && Settings->DmesgOutput.Handle.File != INVALID_HANDLE_VALUE)
+    {
+        m_dmesgOutput.reset(wslutil::DuplicateHandle(wslutil::FromCOMInputHandle(Settings->DmesgOutput), GENERIC_WRITE | SYNCHRONIZE));
+    }
+
+    m_maximumStorageSizeMb = Settings->MaximumStorageSizeMb;
+    m_cpuCount = Settings->CpuCount;
+    m_memoryMb = Settings->MemoryMb;
+    m_bootTimeoutMs = Settings->BootTimeoutMs;
+    m_networkingMode = Settings->NetworkingMode;
+    m_featureFlags = Settings->FeatureFlags;
+    m_hostLoopback = Settings->HostLoopback ? Settings->HostLoopback : "";
+    m_storageFlags = Settings->StorageFlags;
+}
+
+WSLCSessionSettings WSLCVirtualMachineFactory::BuildSettings()
+{
+    WSLCSessionSettings settings{};
+    settings.DisplayName = m_displayName.c_str();
+    settings.StoragePath = m_storagePath.empty() ? nullptr : m_storagePath.c_str();
+    settings.MaximumStorageSizeMb = m_maximumStorageSizeMb;
+    settings.CpuCount = m_cpuCount;
+    settings.MemoryMb = m_memoryMb;
+    settings.BootTimeoutMs = m_bootTimeoutMs;
+    settings.NetworkingMode = m_networkingMode;
+    settings.FeatureFlags = m_featureFlags;
+    settings.HostLoopback = m_hostLoopback.empty() ? nullptr : m_hostLoopback.c_str();
+    settings.StorageFlags = m_storageFlags;
+    settings.RootVhdOverride = m_rootVhdOverride ? m_rootVhdOverride->c_str() : nullptr;
+    settings.RootVhdTypeOverride = m_rootVhdTypeOverride ? m_rootVhdTypeOverride->c_str() : nullptr;
+
+    if (m_dmesgOutput)
+    {
+        settings.DmesgOutput = wslutil::ToCOMInputHandle(m_dmesgOutput.get());
+    }
+
+    return settings;
+}
+
+HRESULT WSLCVirtualMachineFactory::CreateVirtualMachine(_Out_ IWSLCVirtualMachine** Vm)
+try
+{
+    RETURN_HR_IF(E_POINTER, Vm == nullptr);
+    *Vm = nullptr;
+
+    const auto settings = BuildSettings();
+    auto vm = Microsoft::WRL::Make<WSLCVirtualMachineHost>(&settings, m_backendFactory);
+    THROW_IF_NULL_ALLOC(vm);
+
+    *Vm = vm.Detach();
+    return S_OK;
+}
+CATCH_RETURN()
+
+} // namespace wsl::windows::service::wslc

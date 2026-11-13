@@ -19,6 +19,10 @@ Abstract:
 #include "GuestDeviceManager.h"
 #include "hcs.hpp"
 
+namespace HcsVirtualMachineBackendTests {
+class HcsVirtualMachineBackendTests;
+}
+
 class HcsVirtualMachineBackend : public IVirtualMachineBackend
 {
 public:
@@ -73,6 +77,9 @@ public:
     void CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record) override;
 
 private:
+    friend class HcsVirtualMachineBackendTests::HcsVirtualMachineBackendTests;
+    friend struct HcsVirtualMachineBackendTestAccess;
+
     struct HcsDisk
     {
         wsl::windows::common::disk::DiskStateFlags Flags{};
@@ -209,6 +216,7 @@ private:
     std::wstring m_vmIdString;
     wil::shared_event m_terminatingEvent{wil::EventOptions::ManualReset};
     wil::shared_event m_exitEvent{wil::EventOptions::ManualReset};
+    std::atomic<bool> m_exitReported{false};
     wil::shared_event m_vmCrashEvent{wil::EventOptions::ManualReset};
     std::optional<VmCrashCaptureRequest> m_crashCapture;
     // Paths are fixed during initialization, before HCS callbacks are registered.
