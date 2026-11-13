@@ -43,6 +43,7 @@ class BackportTests(unittest.TestCase):
         self.calls = []
         self.labels = [{"name": "backported_3.0"}]
         self.real_fetch = False
+        self.real_push = False
         self.real_remote_urls = False
         self.stack = contextlib.ExitStack()
         self.addCleanup(self.stack.close)
@@ -76,7 +77,8 @@ class BackportTests(unittest.TestCase):
             if self.real_fetch:
                 return self.real_run(*args, input=input, check=check)
         elif args[:2] == ("git", "push"):
-            pass
+            if self.real_push:
+                return self.real_run(*args, input=input, check=check)
         elif args[:3] == ("gh", "repo", "view"):
             value = json.dumps({"defaultBranchRef": {"name": "master"}})
         elif args[:3] == ("gh", "pr", "view"):
@@ -450,6 +452,17 @@ class BackportTests(unittest.TestCase):
             code, _ = self.invoke(generate.main, ["3.0", "1", "--apply"])
             self.assertEqual(code, 0)
             self.assertIn(self.first, utils.backported_commits("HEAD"))
+
+    def test_apply_pushes_only_the_branch_when_follow_tags_is_configured(self):
+        self.local_remote()
+        self.git("tag", "--annotate", "unrelated-tag", self.base, "-m", "Unrelated release tag")
+        self.git("config", "push.followTags", "true")
+        self.real_push = True
+        code, _ = self.invoke(generate.main, ["3.0", "1", "--apply"])
+        self.assertEqual(code, 0)
+        head = "refs/heads/cherrypick/release/3.0/pr-1"
+        self.assertEqual(self.git("ls-remote", "origin", head).split()[0], self.git("rev-parse", head))
+        self.assertEqual(self.git("ls-remote", "--tags", "origin"), "")
 
     def test_relabel_recognizes_trailers_and_ignores_pr_number_mentions(self):
         self.git("switch", "release/3.0")

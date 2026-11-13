@@ -77,7 +77,7 @@ def main(argv=None):
             print("Stopped before push/PR creation. Resolve the cherry-pick or run git cherry-pick --abort.",
                   file=sys.stderr)
             return 2
-        output("git", "push", "--set-upstream", args.remote, f"HEAD:refs/heads/{head}")
+        output("git", "push", "--no-follow-tags", "--set-upstream", args.remote, f"HEAD:refs/heads/{head}")
         command = [
             "gh", "pr", "create", "--repo", REPO, "--base", branch, "--head", head,
             "--title", title, "--body-file", "-",

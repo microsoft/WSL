@@ -74,7 +74,8 @@ Fetches disable configured ref mappings so they cannot update local branches.
 For each selected PR, the generator creates
 `cherrypick/release/3.0/pr-<number>` from the current release tip, cherry-picks the
 original merge commit with `git cherry-pick -x`, pushes without force, and opens
-a PR targeting the release branch. It uses the repository PR template and
+a PR targeting the release branch. Tag following is disabled even if
+`push.followTags` is configured. It uses the repository PR template and
 records the original PR URL and merge SHA. It skips changes already present in
 release history and open/merged backports carrying the original-PR provenance
 line, except for recognized reverted backports. Existing local branches are
