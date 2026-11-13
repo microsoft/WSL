@@ -70,6 +70,7 @@ typedef struct _CREATE_PROCESS_PARSED_COMMON
     uid_t Uid;
     CREATE_PROCESS_SHELL_OPTIONS ShellOptions;
     bool AllowOOBE;
+    bool UserSpecified;
 } CREATE_PROCESS_PARSED_COMMON, *PCREATE_PROCESS_PARSED_COMMON;
 
 typedef struct _CREATE_PROCESS_PARSED
@@ -732,7 +733,7 @@ try
             _exit(1);
         }
 
-        ConfigureUid(manifest.DefaultUid.has_value() ? manifest.DefaultUid.value() : Common->Uid);
+        ConfigureUid(!Common->UserSpecified && manifest.DefaultUid.has_value() ? manifest.DefaultUid.value() : Common->Uid);
     }
     else
     {
@@ -1059,7 +1060,8 @@ try
 
     struct passwd* PasswordEntry = nullptr;
     auto Username = wsl::shared::string::FromSpan(Buffer, Message->UsernameOffset);
-    if (strlen(Username) != 0)
+    Parsed->UserSpecified = strlen(Username) != 0;
+    if (Parsed->UserSpecified)
     {
         PasswordEntry = getpwnam(Username);
         if (PasswordEntry == nullptr)
