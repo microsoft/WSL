@@ -10,6 +10,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <sys/syscall.h>
 #include <linux/unistd.h>
 #include <linux/sock_diag.h>
@@ -319,6 +320,9 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
 
                 wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
                 THROW_LAST_ERROR_IF(!tcpSocket);
+
+                const int noDelay = 1;
+                THROW_LAST_ERROR_IF(setsockopt(tcpSocket.get(), IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay)) < 0);
 
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
