@@ -69,7 +69,7 @@ private:
         const ComposeProgressReporter& progressReporter,
         std::optional<wsl::windows::common::Error>& primaryError);
     static std::vector<WSLCContainerEntry> Remove(
-        const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
+        const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers,
         const ComposeCancellation& cancellation,
         const ComposeProgressReporter& progressReporter);
 
