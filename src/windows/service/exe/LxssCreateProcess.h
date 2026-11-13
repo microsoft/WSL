@@ -22,17 +22,17 @@ Abstract:
 
 #define LXSS_INTEROP_ENABLED(_flags) (((_flags) & LXSS_INTEROP_FLAGS) == LXSS_INTEROP_FLAGS)
 
-using CreateLxProcessConsoleData = struct
+struct CreateLxProcessConsoleData
 {
     wil::unique_handle ConsoleHandle;
     wil::unique_handle ClientProcess;
 };
 
-using CreateLxProcessContext = struct
+struct CreateLxProcessContext
 {
     ULONG Flags;
     std::vector<std::string> DefaultEnvironment;
-    wil::unique_handle UserToken;
+    wil::shared_handle UserToken{};
     bool Elevated;
 };
 

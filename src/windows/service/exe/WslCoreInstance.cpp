@@ -275,9 +275,9 @@ void WslCoreInstance::CreateLxProcess(
         {
             auto oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
-            auto impersonate = wil::CoImpersonateClient();
+            auto impersonate = wil::impersonate_token(CreateProcessContext.UserToken.get());
             auto registration = wsl::windows::service::DistributionRegistration::Open(
-                wsl::windows::common::registry::OpenLxssUserKey().get(), m_configuration.DistroId);
+                CreateProcessContext.UserToken, wsl::windows::common::registry::OpenLxssUserKey().get(), m_configuration.DistroId);
 
             // Wait for a potential previous oobe thread to complete before creating a new one.
             if (m_oobeThread.joinable())
