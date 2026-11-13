@@ -5570,57 +5570,82 @@ class MirroredTests
     static void CaptureNetworkChange(
         const std::function<void()>& reset, const std::function<void()>& change, const std::function<bool(const std::wstring&)>& verifyEvents)
     {
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&] {
-                reset();
+        const auto retryPending = [] {
+            try
+            {
+                throw;
+            }
+            catch (const wil::ResultException& error)
+            {
+                return error.GetErrorCode() == E_PENDING;
+            }
+            catch (...)
+            {
+                return false;
+            }
+        };
 
-                wil::unique_handle readPipe;
-                wil::unique_handle writePipe;
-                VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&readPipe, &writePipe, nullptr, 64 * 1024));
-                VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(writePipe.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+        reset();
 
-                auto command = LxssGenerateWslCommandLine(L"ip -o monitor label address route");
-                NetworkTests::unique_kill_process monitor(LxsstuStartProcess(command.data(), nullptr, writePipe.get(), writePipe.get()));
-                writePipe.reset();
-                change();
+        wil::unique_handle readPipe;
+        wil::unique_handle writePipe;
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreatePipe(&readPipe, &writePipe, nullptr, 64 * 1024));
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(writePipe.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
 
-                std::string output;
-                DWORD available{};
-                for (;;)
+        auto command = LxssGenerateWslCommandLine(L"ip -o monitor label address route");
+        NetworkTests::unique_kill_process monitor(LxsstuStartProcess(command.data(), nullptr, writePipe.get(), writePipe.get()));
+        writePipe.reset();
+
+        std::string output;
+        const auto readEvents = [&] {
+            DWORD available{};
+            for (;;)
+            {
+                VERIFY_WIN32_BOOL_SUCCEEDED(PeekNamedPipe(readPipe.get(), nullptr, 0, nullptr, &available, nullptr));
+                if (available == 0)
                 {
-                    VERIFY_WIN32_BOOL_SUCCEEDED(PeekNamedPipe(readPipe.get(), nullptr, 0, nullptr, &available, nullptr));
-                    if (available == 0)
-                    {
-                        break;
-                    }
-
-                    char buffer[4096];
-                    DWORD bytesRead{};
-                    VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(readPipe.get(), buffer, std::min<DWORD>(sizeof(buffer), available), &bytesRead, nullptr));
-                    VERIFY_ARE_NOT_EQUAL(bytesRead, (DWORD)0);
-                    output.append(buffer, bytesRead);
+                    break;
                 }
 
+                char buffer[4096];
+                DWORD bytesRead{};
+                VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(readPipe.get(), buffer, std::min<DWORD>(sizeof(buffer), available), &bytesRead, nullptr));
+                VERIFY_ARE_NOT_EQUAL(bytesRead, (DWORD)0);
+                output.append(buffer, bytesRead);
+            }
+        };
+
+        GUID markerId{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&markerId));
+        const auto markerTable = 10000 + markerId.Data1 % 1000000000;
+        const auto markerRoute = std::format(L"unreachable 192.0.2.255/32 table {}", markerTable);
+        const auto markerEvent = std::format("table {} ", markerTable);
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&] {
+                LxsstuLaunchWslAndCaptureOutput(L"ip -4 route add " + markerRoute, 0);
+                auto cleanupMarker = wil::scope_exit([&] { LxsstuLaunchWslAndCaptureOutput(L"ip -4 route del " + markerRoute, 0); });
+                readEvents();
+                THROW_HR_IF_MSG(
+                    E_PENDING,
+                    output.find(markerEvent) == std::string::npos,
+                    "The network monitor has not observed the readiness route");
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(10),
+            retryPending));
+
+        output.clear();
+        change();
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&] {
+                readEvents();
                 const auto events = wsl::shared::string::MultiByteToWide(output);
                 LogInfo("Network events:\r\n%ls", NetworkTests::FixLineEndings(events).c_str());
                 THROW_HR_IF_MSG(E_PENDING, !verifyEvents(events), "The expected route-change events have not been observed");
             },
             std::chrono::milliseconds(100),
             std::chrono::seconds(10),
-            [] {
-                try
-                {
-                    throw;
-                }
-                catch (const wil::ResultException& error)
-                {
-                    return error.GetErrorCode() == E_PENDING;
-                }
-                catch (...)
-                {
-                    return false;
-                }
-            }));
+            retryPending));
     }
 
     static bool VerifyRouteMetricChangeOrder(const NetworkTests::Route& route, int newMetric, const std::wstring& events)
