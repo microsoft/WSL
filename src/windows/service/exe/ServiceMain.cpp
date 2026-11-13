@@ -18,7 +18,9 @@ Abstract:
 #include "WslCoreFilesystem.h"
 #include "LxssIpTables.h"
 #include "LxssUserSessionFactory.h"
+#include "ServiceBusyToken.h"
 #include "WSLCSessionManagerFactory.h"
+#include "wslservice.h"
 #include <ctime>
 
 using namespace wsl::windows::common::registry;
@@ -176,6 +178,9 @@ try
     wil::g_fResultFailFastUnknownExceptions = false;
 
     wsl::windows::common::security::ApplyProcessMitigationPolicies();
+
+    // Set up tracking of busy status before COM activation can create any workloads.
+    wsl::windows::service::ServiceBusyToken::Initialize();
 
     // Initialize Winsock.
     WSADATA Data;

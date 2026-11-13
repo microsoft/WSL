@@ -6,6 +6,7 @@ set(SOURCES
     LxssIptables.cpp
     LxssInstance.cpp
     PluginManager.cpp
+    ServiceBusyToken.cpp
     ServiceMain.cpp
     BridgedNetworking.cpp
     GnsRpcServer.cpp
@@ -44,6 +45,7 @@ set(HEADERS
     LxssConsoleManager.h
     LxssCreateProcess.h
     MirroredNetworking.h
+    ServiceBusyToken.h
     WslCoreGuestNetworkService.h
     WslCoreInstance.h
     WslMirroredNetworking.h

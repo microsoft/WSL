@@ -448,6 +448,10 @@ void LxssInstance::Stop()
     m_tempPath.clear();
     m_rootDirectory.reset();
     m_tempDirectory.reset();
+
+    // When an instance stops, it no longer counts as keeping the service busy.
+    m_busyToken.reset();
+
     return;
 }
 

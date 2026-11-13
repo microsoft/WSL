@@ -30,6 +30,8 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "SocketChannel.h"
 #include "DeviceHostProxy.h"
+#include "GuestDeviceManager.h"
+#include "ServiceBusyToken.h"
 
 #define UTILITY_VM_SHUTDOWN_TIMEOUT (30 * 1000)
 #define UTILITY_VM_TERMINATE_TIMEOUT (30 * 1000)
@@ -217,6 +219,9 @@ private:
 
     static std::string s_GetMountTargetName(_In_ PCWSTR Disk, _In_opt_ PCWSTR Name, _In_ int PartitionIndex);
 
+    static void CALLBACK s_OnExit(_In_ HCS_EVENT* Event, _In_opt_ void* Context);
+
+    wsl::windows::service::ServiceBusyToken m_busyToken;
     wil::srwlock m_guestDeviceLock;
     _Guarded_by_(m_guestDeviceLock) std::future<bool> m_drvfsInitialResult;
     _Guarded_by_(m_guestDeviceLock) wil::unique_handle m_drvfsToken;

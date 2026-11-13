@@ -16,6 +16,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
+#include "InstallGuard.h"
 #include "LxssDynamicFunction.h"
 #include "WslCoreNetworkEndpointSettings.h"
 #include <tlhelp32.h>
@@ -2533,6 +2534,15 @@ wil::unique_hkey OpenDistributionKey(LPCWSTR Name)
 bool WslShutdown()
 {
     return VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(WSL_SHUTDOWN_ARG));
+}
+
+void VerifyServiceBecomesIdle()
+{
+    VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+        []() { THROW_HR_IF(E_PENDING, wsl::windows::common::install::IsServiceBusy()); },
+        std::chrono::milliseconds(100),
+        std::chrono::seconds(10),
+        []() { return wil::ResultFromCaughtException() == E_PENDING; }));
 }
 
 void TerminateDistribution(LPCWSTR DistributionName)

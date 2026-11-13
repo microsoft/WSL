@@ -17,15 +17,19 @@ Abstract:
 #include <msiquery.h>
 
 #include "Common.h"
+#include "InstallGuard.h"
 #include "registry.hpp"
 #include "PluginTests.h"
+#include "wslc.h"
 #include "wslcsdk.h"
+#include "WslInstall.h"
 
 using namespace wsl::windows::common::registry;
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
 extern std::wstring g_dumpFolder;
 extern std::wstring g_pipelineBuildId;
+extern std::wstring g_testDistroPath;
 
 class InstallerTests
 {
@@ -181,6 +185,27 @@ class InstallerTests
             LogError("msiexec failed with exit code %lu", exitCode);
             VERIFY_FAIL();
         }
+    }
+
+    DWORD RunDirectMsiInstall(LPCWSTR Args = L"")
+    {
+        PrepareForMsiOperation();
+        const auto previousUi = MsiSetInternalUI(INSTALLUILEVEL_NONE, nullptr);
+        auto restoreUi = wil::scope_exit([&]() { MsiSetInternalUI(previousUi, nullptr); });
+
+        // Call from the test host so CLIENTPROCESSID does not identify an explicit installer.
+        const auto args = std::format(L"MSIRESTARTMANAGERCONTROL=Disable {} REBOOT=ReallySuppress", Args);
+        DWORD exitCode{};
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                exitCode = MsiInstallProductW(m_msiPath.c_str(), args.c_str());
+                THROW_HR_IF(E_ABORT, exitCode == ERROR_INSTALL_ALREADY_RUNNING);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2),
+            []() { return wil::ResultFromCaughtException() == E_ABORT; });
+
+        return exitCode;
     }
 
     std::wstring GetMsiProductCode() const
@@ -803,10 +828,78 @@ class InstallerTests
         VERIFY_IS_LESS_THAN(guard, GetMsiSequenceNumber(database.get(), L"StopServices"));
     }
 
+    TEST_METHOD(MsiDetectsWslCli)
+    {
+        using wsl::windows::common::install::IsExplicitInstallClient;
+
+        const auto application = (m_installedPath / L"wsl.exe").wstring();
+        wsl::windows::common::SubProcess process(application.c_str(), L"not-wsl.exe", CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT);
+        const auto handle = process.Start();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(handle.get(), 0));
+            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(handle.get(), 10000));
+        });
+
+        // Check that a process running wsl.exe is accepted, but not the current test process or invalid PIDs.
+        const auto clientPid = std::to_wstring(GetProcessId(handle.get()));
+        VERIFY_IS_TRUE(IsExplicitInstallClient(clientPid));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(std::to_wstring(GetCurrentProcessId())));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(L""));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(L"0"));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(L"-1"));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(L"4294967296"));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(clientPid + L"abc"));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(L"+" + clientPid));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(L" " + clientPid));
+        VERIFY_IS_FALSE(IsExplicitInstallClient(clientPid + L'\0'));
+
+#ifndef WSL_OFFICIAL_BUILD
+        // The currently running WSL process should not authorize an installation from this test host.
+        const auto previousProductCode = GetMsiProductCode();
+        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, RunDirectMsiInstall(L"WSL_TEST_INSTALL_BUSY=1"));
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
+        ValidatePackageInstalledProperly();
+#endif
+    }
+
+    TEST_METHOD(MsiDetectsMsiexec)
+    {
+        std::wstring systemDirectory;
+        THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
+        const auto application = systemDirectory + L"\\msiexec.exe";
+        wsl::windows::common::SubProcess process(application.c_str(), L"not-msiexec.exe", CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT);
+        const auto handle = process.Start();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(handle.get(), 0));
+            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(handle.get(), 10000));
+        });
+
+        VERIFY_IS_TRUE(wsl::windows::common::install::IsExplicitInstallClient(std::to_wstring(GetProcessId(handle.get()))));
+    }
+
+    TEST_METHOD(MsiClientUsesImageNotCommandLineName)
+    {
+        std::wstring systemDirectory;
+        THROW_IF_FAILED(wil::GetSystemDirectoryW(systemDirectory));
+        const auto application = systemDirectory + L"\\cmd.exe";
+        for (const auto* commandLine : {L"wsl.exe --update", L"msiexec.exe /i wsl.msi"})
+        {
+            wsl::windows::common::SubProcess process(application.c_str(), commandLine, CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT);
+            const auto handle = process.Start();
+            auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                THROW_IF_WIN32_BOOL_FALSE(TerminateProcess(handle.get(), 0));
+                VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(handle.get(), 10000));
+            });
+
+            VERIFY_IS_FALSE(wsl::windows::common::install::IsExplicitInstallClient(std::to_wstring(GetProcessId(handle.get()))));
+        }
+    }
+
     TEST_METHOD(MsiRunningInstanceGuard)
     {
 #ifdef WSL_OFFICIAL_BUILD
-        WEX::Logging::Log::Comment(L"TestSkipped: This test case requires the test-only WSL_TEST_INSTALL_BUSY property");
+        LogSkipped("This test case requires the test-only WSL_TEST_INSTALL_BUSY property");
         return;
 #else
         auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
@@ -819,24 +912,130 @@ class InstallerTests
         const auto previousVersion = wsl::windows::common::registry::ReadString(m_lxssKey.get(), L"MSI", L"Version", L"");
         VERIFY_IS_FALSE(previousVersion.empty());
 
-        const auto runUpgrade = [this](LPCWSTR busy) {
-            PrepareForMsiOperation();
-            return RunMsiExec(
-                std::format(L"/qn /norestart /i \"{}\" WSL_TEST_INSTALL_BUSY={} /L*V \"{}\"", m_msiPath, busy, GenerateMsiLogPath()));
-        };
-
-        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, runUpgrade(L"1"));
+        // Installing with the MSI API should fail when WSL is busy
+        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, RunDirectMsiInstall(L"WSL_TEST_INSTALL_BUSY=1"));
         VERIFY_IS_TRUE(IsMsiPackageInstalled());
         VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
-        ValidatePackageInstalledProperly(previousVersion.c_str());
+        ValidateInstalledVersion(previousVersion.c_str());
+        VERIFY_ARE_EQUAL(previousVersion, wsl::windows::common::registry::ReadString(m_lxssKey.get(), L"MSI", L"Version", L""));
 
-        const auto exitCode = runUpgrade(L"0");
-        VERIFY_IS_TRUE(exitCode == ERROR_SUCCESS || exitCode == ERROR_SUCCESS_REBOOT_REQUIRED);
+        // Installing with msiexec should succeed even if WSL is busy
+        PrepareForMsiOperation();
+        CallMsiExec(std::format(L"/qn /norestart /i \"{}\" WSL_TEST_INSTALL_BUSY=1 /L*V \"{}\"", m_msiPath, GenerateMsiLogPath()));
         VERIFY_IS_TRUE(IsMsiPackageInstalled());
         VERIFY_ARE_NOT_EQUAL(previousProductCode, GetMsiProductCode());
         ValidatePackageInstalledProperly();
         restore.release();
 #endif
+    }
+
+    TEST_METHOD(MsiRunningInstanceGuardAllowsIdleAndUnknown)
+    {
+#ifdef WSL_OFFICIAL_BUILD
+        LogSkipped("This test case requires the test-only WSL_TEST_INSTALL_BUSY property");
+        return;
+#else
+        const auto previousProductCode = GetMsiProductCode();
+        for (const auto* busy : {L"0", L"error"})
+        {
+            // Direct installation should proceed when WSL is not busy, or we fail to determine if it is busy.
+            const auto exitCode = RunDirectMsiInstall(std::format(L"WSL_TEST_INSTALL_BUSY={}", busy).c_str());
+            VERIFY_IS_TRUE(exitCode == ERROR_SUCCESS || exitCode == ERROR_SUCCESS_REBOOT_REQUIRED);
+            VERIFY_IS_TRUE(IsMsiPackageInstalled());
+            VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
+            ValidatePackageInstalledProperly();
+        }
+#endif
+    }
+
+    TEST_METHOD(MsiRunningInstanceGuardAllowsUninstall)
+    {
+#ifdef WSL_OFFICIAL_BUILD
+        LogSkipped("This test case requires the test-only WSL_TEST_INSTALL_BUSY property");
+        return;
+#else
+        auto restore = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { InstallMsi(); });
+
+        const auto exitCode = RunDirectMsiInstall(L"REMOVE=ALL WSL_TEST_INSTALL_BUSY=1");
+        VERIFY_IS_TRUE(exitCode == ERROR_SUCCESS || exitCode == ERROR_SUCCESS_REBOOT_REQUIRED);
+        VERIFY_IS_FALSE(IsMsiPackageInstalled());
+#endif
+    }
+
+    TEST_METHOD(MsiRunningInstanceGuardWithLiveWorkload)
+    {
+        WslShutdown();
+        auto shutdownOnExit = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            WslShutdown();
+            VerifyServiceBecomesIdle();
+        });
+        VerifyServiceBecomesIdle();
+
+        auto [inputRead, inputWrite] = CreateSubprocessPipe(true, false);
+        auto [outputRead, outputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        wsl::windows::common::helpers::SetHandleInheritable(outputWrite.get());
+        auto commandLine = LxssGenerateWslCommandLine(L"-e /bin/sh -c \"printf ready; read reply && printf survived\"");
+        const auto process = LxsstuStartProcess(commandLine.data(), inputRead.get(), outputWrite.get(), nullptr);
+        inputRead.reset();
+        outputWrite.reset();
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            inputWrite.reset();
+            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(process.get(), 10000));
+        });
+
+        PartialHandleRead output{outputRead.get()};
+        output.ExpectConsume("ready");
+        const auto previousProductCode = GetMsiProductCode();
+        const auto exitCode = RunDirectMsiInstall();
+        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, exitCode);
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
+        ValidatePackageInstalledProperly();
+
+        // Require a reply from the original Linux process, not just a newly started WSL instance.
+        DWORD bytesWritten{};
+        VERIFY_IS_TRUE(WriteFile(inputWrite.get(), "\n", 1, &bytesWritten, nullptr));
+        VERIFY_ARE_EQUAL(1u, bytesWritten);
+        output.ExpectConsume("survived");
+        VERIFY_ARE_EQUAL(0u, wsl::windows::common::SubProcess::GetExitCode(process.get(), 10000));
+    }
+
+    TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(MsiRunningInstanceGuardWithLiveWslcSession)
+    TEST_METHOD_PROPERTY(L"TestCategory", L"WSLC")
+    TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
+    TEST_METHOD(MsiRunningInstanceGuardWithLiveWslcSession)
+    {
+        WslShutdown();
+        auto shutdownOnExit = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
+            WslShutdown();
+            VerifyServiceBecomesIdle();
+        });
+
+        wil::com_ptr<IWSLCSessionManager> manager;
+        VERIFY_SUCCEEDED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+        VerifyServiceBecomesIdle();
+
+        WSLCSessionSettings settings{};
+        settings.DisplayName = L"wsl-installer-test";
+        settings.CpuCount = 1;
+        settings.MemoryMb = 2048;
+        settings.BootTimeoutMs = 30 * 1000;
+
+        wil::com_ptr<IWSLCSession> session;
+        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
+        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { VERIFY_SUCCEEDED(session->Terminate()); });
+
+        VERIFY_IS_TRUE(wsl::windows::common::install::IsServiceBusy());
+        const auto previousProductCode = GetMsiProductCode();
+        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, RunDirectMsiInstall());
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
+
+        WSLCSessionState state{};
+        VERIFY_SUCCEEDED(session->GetState(&state));
+        VERIFY_ARE_EQUAL(WSLCSessionStateRunning, state);
     }
 
     TEST_METHOD(MsiUpgradeFailureRestoresFiles)

@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include <optional>
 #include "LxssIpTables.h"
 #include "LxssConsoleManager.h"
 #include "helpers.hpp"
@@ -22,6 +23,7 @@ Abstract:
 #include "LxssServerPort.h"
 #include "filesystem.hpp"
 #include "WslCoreHostDnsInfo.h"
+#include "ServiceBusyToken.h"
 
 class LxssInstance;
 
@@ -202,6 +204,8 @@ protected:
     void _UpdateNetworkConfigurationFiles(_In_ bool UpdateAlways);
 
 private:
+    std::optional<wsl::windows::service::ServiceBusyToken> m_busyToken{std::in_place};
+
     /// <summary>
     /// Basic state of this object - instance identifier, instance handle,
     /// instance terminated event, and termination callback state.
