@@ -212,8 +212,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(
-        IWSLCSession& session, const std::string& name, WSLCContainerFlags flags = WSLCContainerFlagsNone)
+    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name, WSLCContainerFlags flags = WSLCContainerFlagsNone)
     {
         WSLCContainerLauncher launcher(
             "debian:latest",
@@ -273,8 +272,7 @@ class WSLCTests
         auto cleanup = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_FAILED(DeleteImageNoThrow(registryImage, WSLCDeleteImageFlagsNone).first); });
 
-        VERIFY_SUCCEEDED(m_defaultS
-            ession->PushImage(registryImage.c_str(), registryAuth.c_str(), FALSE, nullptr, nullptr));
+        VERIFY_SUCCEEDED(m_defaultS ession->PushImage(registryImage.c_str(), registryAuth.c_str(), FALSE, nullptr, nullptr));
 
         return registryImage;
     }
@@ -11177,8 +11175,7 @@ sys.exit(1 if queries else 0)
     {
         auto restoreSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { ResetTestSession(); });
 
-        auto container =
-            LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-terminate-pending-stop", WSLCContainerFlagsRm);
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-terminate-pending-stop", WSLCContainerFlagsRm);
         auto initProcess = container.GetInitProcess();
         auto outputHandle = initProcess.GetStdHandle(1);
 
