@@ -3546,12 +3546,14 @@ Return Value:
         //     return SECCOMP_RET_ALLOW;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
-    // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls.
+    // On x86, 32-bit bind()/listen() can use direct syscalls or socketcall with
+    // SYS_BIND/SYS_LISTEN as its first argument.
 #ifdef __x86_64__
         // 32bit:
-        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_bind, 5, 0),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_listen, 4, 0),
+        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 4),
         // if syscall arg0 == SYS_BIND then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(0)),

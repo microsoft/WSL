@@ -4,7 +4,14 @@ CFLAGS=-ggdb -Werror -Wno-format-truncation -Wno-format-overflow -D_GNU_SOURCE=1
 LDFLAGS=-pthread -lutil -lmount
 LDLIBFLAGS=-L.
 
+CFLAGS_X86=$(CFLAGS) -m32 -ffreestanding -fno-pie -fno-stack-protector
+LDFLAGS_X86=-nostdlib -static -no-pie -Wl,-e,_start
+
 TEST_BINARY=wsl_unit_tests
+
+ifeq ($(ARCH),x86_64)
+ADDITIONAL_TEST_BINARIES=socket_i386
+endif
 
 UNIT_TEST_HEADER=unittests.h
 
@@ -81,12 +88,16 @@ TEST_BINARY_OBJECTS=$(UNIT_TEST_OBJECTS) $(TEST_BINARY_$(ARCH)_OBJECTS)
 
 .PHONY: clean all
 
-all: $(TEST_BINARY)
+all: $(TEST_BINARY) $(ADDITIONAL_TEST_BINARIES)
 
 clean:
 	rm -f *.o
 	rm -f *.a
 	rm -f $(TEST_BINARY)
+	rm -f $(ADDITIONAL_TEST_BINARIES)
 
 $(TEST_BINARY): $(TEST_BINARY_OBJECTS)
 	$(CC) $^ $(LDFLAGS) $(LDLIBFLAGS) -o $@
+
+socket_i386: socket_i386.c
+	$(CC) $(CFLAGS_X86) $< $(LDFLAGS_X86) $(LDLIBFLAGS) -o $@

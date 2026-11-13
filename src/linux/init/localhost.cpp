@@ -516,6 +516,12 @@ int RunPortTracker(int Argc, char** Argv)
     seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
+    seccompDispatcher->RegisterHandler(I386_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(I386_NR_listen, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
 #else
     seccompDispatcher->RegisterHandler(ARMV7_NR_bind, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
