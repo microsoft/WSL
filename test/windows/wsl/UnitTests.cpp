@@ -9428,13 +9428,18 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
     WSL2_TEST_METHOD(MissingWindowsStdinDeliversEof)
     {
+        constexpr DWORD c_timeout = 30 * 1000;
         const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
         const auto wslPath = installPath.value() + L"wsl.exe";
 
         for (const auto stdinHandle : {static_cast<HANDLE>(nullptr), INVALID_HANDLE_VALUE})
         {
-            auto [stdoutRead, stdoutWrite] = CreateSubprocessPipe(false, true);
-            auto [stderrRead, stderrWrite] = CreateSubprocessPipe(false, true);
+            auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            auto [stderrRead, stderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            wsl::windows::common::helpers::SetHandleInheritable(stdoutWrite.get());
+            wsl::windows::common::helpers::SetHandleInheritable(stderrWrite.get());
+            PartialHandleRead stdoutReader{std::move(stdoutRead)};
+            PartialHandleRead stderrReader{std::move(stderrRead)};
             auto commandLine = std::format(L"\"{}\" --exec /bin/sh -c \"cat && printf stdout && printf stderr >&2 && exit 42\"", wslPath);
 
             STARTUPINFOW startupInfo{};
@@ -9452,16 +9457,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
             stdoutWrite.reset();
             stderrWrite.reset();
-            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(processInfo.hProcess, 30000));
+            stdoutReader.ExpectClosed(c_timeout);
+            stderrReader.ExpectClosed(c_timeout);
+            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(processInfo.hProcess, c_timeout));
             cleanup.release();
             VERIFY_ARE_EQUAL(42u, wsl::windows::common::SubProcess::GetExitCode(processInfo.hProcess, 0));
 
-            std::array<char, 32> buffer{};
-            DWORD bytesRead{};
-            VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(stdoutRead.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr));
-            VERIFY_ARE_EQUAL(std::string("stdout"), std::string(buffer.data(), bytesRead));
-            VERIFY_WIN32_BOOL_SUCCEEDED(ReadFile(stderrRead.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &bytesRead, nullptr));
-            VERIFY_ARE_EQUAL(std::string("stderr"), std::string(buffer.data(), bytesRead));
+            VERIFY_ARE_EQUAL(std::string("stdout"), stdoutReader.GetData());
+            VERIFY_ARE_EQUAL(std::string("stderr"), stderrReader.GetData());
         }
     }
 
