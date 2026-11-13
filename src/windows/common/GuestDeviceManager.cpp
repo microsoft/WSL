@@ -42,6 +42,10 @@ std::map<std::wstring, std::wstring> ParseVirtioFsMountOptions(_In_ std::wstring
         {
             key = option.substr(0, pos);
             value = option.substr(pos + 1);
+            if (key == L"uid" || key == L"gid")
+            {
+                key.insert(0, L"default_");
+            }
         }
 
         if (!key.empty())
