@@ -334,6 +334,30 @@ class BackportTests(unittest.TestCase):
                      "-m", f"Quoted history:\n\nThis reverts commit {self.first}.")
         self.assertIn(self.first, utils.backported_commits("HEAD"))
 
+    def test_squash_merged_revert_and_reapply_subjects_with_pr_suffixes(self):
+        for restored in (False, True):
+            with self.subTest(restored=restored):
+                self.git("switch", "--detach", self.base)
+                self.git("cherry-pick", "-x", self.first)
+                backport = self.git("rev-parse", "HEAD")
+                self.git("revert", "--no-commit", backport)
+                self.git("commit", "--no-verify", "-m", 'Revert "first.txt" (#123)',
+                         "-m", f"This reverts commit {backport}.")
+                if restored:
+                    reversal = self.git("rev-parse", "HEAD")
+                    self.git("revert", "--no-commit", reversal)
+                    self.git("commit", "--no-verify", "-m", 'Reapply "first.txt" (#124)',
+                             "-m", f"This reverts commit {reversal}.")
+                self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+                self.assertEqual(self.first in utils.backported_commits("HEAD"), restored)
+                code, text = self.invoke(generate.main, ["3.0", "1"])
+                self.assertEqual(code, 0)
+                self.assertEqual("already present" in text, restored)
+                self.calls.clear()
+                self.invoke(relabel.main, ["3.0", "--apply"])
+                edits = [args for args, _ in self.calls if args[:3] == ("gh", "pr", "edit")]
+                self.assertEqual([args[3] for args in edits], ["1"] if restored else [])
+
     def test_merge_revert_annotation_requires_review_even_if_target_object_is_absent(self):
         message = f"This reverts commit {'a' * 40}, reversing\nchanges made to {'b' * 40}."
         self.git("commit", "--allow-empty", "--no-verify", "-m", message)

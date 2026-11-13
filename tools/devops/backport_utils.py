@@ -109,7 +109,10 @@ def backported_commits(ref):
     for identity, message in records:
         sha = identity[0]
         # Squash messages can quote old revert bodies without reverting anything.
-        reversal = re.match(r'(?:(?:Revert|Reapply) "[^\n]*"\n\n)?This reverts commit ([0-9a-f]{40})[.,]', message)
+        reversal = re.match(
+            r'(?:(?:Revert|Reapply) "[^\n]*"(?: \(#[1-9][0-9]*\))?\n\n)?'
+            r'This reverts commit ([0-9a-f]{40})[.,]', message,
+        )
         targets = [reversal.group(1)] if reversal else []
         if any(target in seen_targets for target in targets):
             raise ValueError(
