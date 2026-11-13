@@ -86,7 +86,6 @@ private:
 
     GUID m_id{};
     wil::unique_hkey m_key;
-    // Retain the opening caller's identity for cleanup and asynchronous OOBE writes.
     wil::shared_handle m_userToken;
 };
 
