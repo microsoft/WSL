@@ -1145,9 +1145,6 @@ void WSLCVirtualMachine::LaunchPortRelay()
     process.InheritHandle(m_vmTerminatingEvent.get());
     process.SetJobObject(m_processJobObject.get());
     process.Start();
-
-    readPipe.release();
-    writePipe.release();
 }
 
 void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
