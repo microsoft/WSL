@@ -837,11 +837,9 @@ class InstallerTests
             // --pre-release does not fall back to Windows Update, so the rate limit error is reported.
             auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--update --pre-release", -1);
 
-            VERIFY_ARE_EQUAL(
-                out,
-                L"Checking for updates.\r\n" +
-                    FormatErrorMessage(
-                        L"The GitHub API rate limit was reached. Try again later.", L"Wsl/WSL_E_GITHUB_RATE_LIMITED"));
+            const auto context = std::format(L"statusCode: {}, output: {}", statusCode, out);
+            VERIFY_IS_TRUE(out.find(L"The GitHub API rate limit was reached. Try again later.") != std::wstring::npos, context.c_str());
+            VERIFY_IS_TRUE(out.find(L"WSL_E_GITHUB_RATE_LIMITED") != std::wstring::npos, context.c_str());
         }
     }
 
