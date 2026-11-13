@@ -50,6 +50,7 @@ set(HEADERS
     WSLCProcessIO.h
     WSLCSession.h
     WSLCSessionRuntime.h
+    WSLCSharedLockGate.h
     WSLCIdleState.h
     WSLCSessionFactory.h
     WSLCSessionReference.h
