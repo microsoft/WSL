@@ -27,6 +27,7 @@ Abstract:
 #include "HttpHeaderEndDetector.h"
 #include "WSLCSessionDefaults.h"
 #include <nlohmann/json.hpp>
+#include <TlHelp32.h>
 
 using namespace std::chrono;
 using namespace std::literals::chrono_literals;
@@ -4052,6 +4053,103 @@ sys.exit(1 if queries else 0)
     TEST_METHOD(PortMappingConsomme)
     {
         ValidatePortMapping(WSLCNetworkingModeConsomme);
+    }
+
+    // Returns the IDs of the wslrelay.exe processes launched by WSLC sessions.
+    static std::set<DWORD> ListSessionRelays()
+    {
+        const wil::unique_handle snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)};
+        THROW_LAST_ERROR_IF(!snapshot);
+
+        std::vector<PROCESSENTRY32W> processes;
+        PROCESSENTRY32W entry{};
+        entry.dwSize = sizeof(entry);
+        for (auto result = Process32FirstW(snapshot.get(), &entry); result; result = Process32NextW(snapshot.get(), &entry))
+        {
+            processes.push_back(entry);
+        }
+
+        auto hasName = [](const PROCESSENTRY32W& process, std::wstring_view name) {
+            return wsl::shared::string::IsEqual(process.szExeFile, name, true);
+        };
+
+        std::set<DWORD> relays;
+        for (const auto& relay : processes)
+        {
+            if (!hasName(relay, L"wslrelay.exe"))
+            {
+                continue;
+            }
+
+            if (std::ranges::any_of(processes, [&](const auto& parent) {
+                    return parent.th32ProcessID == relay.th32ParentProcessID && hasName(parent, L"wslcsession.exe");
+                }))
+            {
+                relays.insert(relay.th32ProcessID);
+            }
+        }
+
+        return relays;
+    }
+
+    static void SuspendProcessThreads(DWORD Pid)
+    {
+        const wil::unique_handle snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)};
+        THROW_LAST_ERROR_IF(!snapshot);
+
+        THREADENTRY32 entry{};
+        entry.dwSize = sizeof(entry);
+        for (auto result = Thread32First(snapshot.get(), &entry); result; result = Thread32Next(snapshot.get(), &entry))
+        {
+            if (entry.th32OwnerProcessID != Pid)
+            {
+                continue;
+            }
+
+            const wil::unique_handle thread{OpenThread(THREAD_SUSPEND_RESUME, FALSE, entry.th32ThreadID)};
+            THROW_LAST_ERROR_IF(!thread);
+            THROW_LAST_ERROR_IF(SuspendThread(thread.get()) == static_cast<DWORD>(-1));
+        }
+    }
+
+    WSLC_TEST_METHOD(PortRelayHangDoesNotBlockTermination)
+    {
+        const auto existingRelays = ListSessionRelays();
+
+        // NAT mode always forwards ports through wslrelay.
+        auto session = CreateSession(GetDefaultSessionSettings(L"port-relay-hang", false, WSLCNetworkingModeNAT));
+
+        wil::unique_handle sessionProcess;
+        VERIFY_SUCCEEDED(session->GetProcessHandle(&sessionProcess));
+
+        // Map a port to confirm the relay is running and responsive.
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
+
+        auto relays = ListSessionRelays();
+        std::erase_if(relays, [&](DWORD pid) { return existingRelays.contains(pid); });
+        VERIFY_ARE_EQUAL(relays.size(), 1u);
+
+        // Suspend wslrelay so it never answers the next request.
+        SuspendProcessThreads(*relays.begin());
+
+        std::future<HRESULT> mapResult;
+        std::future<HRESULT> terminateResult;
+
+        // If a call stays stuck, kill the session process to disconnect it so the futures can be destroyed.
+        auto killSession = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(sessionProcess.get(), 1)); });
+
+        mapResult = std::async(std::launch::async, [&]() { return session->MapVmPort(AF_INET, 1235, 81); });
+        VERIFY_ARE_EQUAL(mapResult.wait_for(5s), std::future_status::timeout);
+
+        terminateResult = std::async(std::launch::async, [&]() { return session->Terminate(); });
+
+        VERIFY_ARE_EQUAL(mapResult.wait_for(60s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(mapResult.get(), E_ABORT);
+
+        VERIFY_ARE_EQUAL(terminateResult.wait_for(60s), std::future_status::ready);
+        VERIFY_SUCCEEDED(terminateResult.get());
+
+        killSession.release();
     }
 
     WSLC_TEST_METHOD(StuckVmTermination)
