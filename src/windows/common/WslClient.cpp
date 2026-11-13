@@ -1249,13 +1249,11 @@ int UpdatePackage(std::wstring_view commandLine)
 
     bool preRelease{};
     bool windowsUpdate{};
-    bool windowsUpdateRepair{};
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(preRelease, WSL_UPDATE_ARG_PRE_RELEASE_OPTION_LONG);
 
-    // Hidden options used by the elevated Windows Update fallback.
+    // Hidden option used by the elevated Windows Update fallback.
     parser.AddArgument(windowsUpdate, WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG);
-    parser.AddArgument(windowsUpdateRepair, WSL_UPDATE_ARG_WINDOWS_UPDATE_REPAIR_OPTION_LONG);
 
     // Options kept for compatibility with inbox WSL.
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_WEB_DOWNLOAD_OPTION_LONG);
@@ -1263,7 +1261,7 @@ int UpdatePackage(std::wstring_view commandLine)
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_PROMPT_OPTION_LONG);
     parser.Parse();
 
-    if (!windowsUpdate && !windowsUpdateRepair)
+    if (!windowsUpdate)
     {
         return wsl::windows::common::install::UpdatePackage(preRelease, false);
     }
@@ -1272,7 +1270,7 @@ int UpdatePackage(std::wstring_view commandLine)
         HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
         !wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token().get()));
 
-    return wsl::windows::common::install::UpdateViaWindowsUpdate(windowsUpdateRepair);
+    return wsl::windows::common::install::UpdateViaWindowsUpdate();
 }
 
 int Uninstall()
@@ -1532,38 +1530,10 @@ int RunDebugShell()
     THROW_HR(HCS_E_CONNECTION_CLOSED);
 }
 
-bool IsWindowsUpdateCommand(_In_ std::wstring_view commandLine)
-{
-    // Matches the elevated fallback command line: wsl.exe [--parent-console <pid>] --update --windows-update[-repair]
-    int argc{};
-    const wil::unique_hlocal_ptr<LPWSTR[]> argv{CommandLineToArgvW(std::wstring(commandLine).c_str(), &argc)};
-    if (!argv)
-    {
-        return false;
-    }
-
-    int index = 1;
-    if (index < argc && wcscmp(argv[index], WSL_PARENT_CONSOLE_ARG) == 0)
-    {
-        index += 2;
-    }
-
-    if (index >= argc || wcscmp(argv[index], WSL_UPDATE_ARG) != 0)
-    {
-        return false;
-    }
-
-    return std::any_of(&argv[index + 1], &argv[argc], [](LPCWSTR argument) {
-        return wcscmp(argument, WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG) == 0 ||
-               wcscmp(argument, WSL_UPDATE_ARG_WINDOWS_UPDATE_REPAIR_OPTION_LONG) == 0;
-    });
-}
-
 int WslMain(_In_ std::wstring_view commandLine)
 {
-    // Call the MSI package if we're in an MSIX context. The Windows Update fallback is excluded because it repairs or
-    // updates the MSI package and can be launched from the MSIX package.
-    if (!IsWindowsUpdateCommand(commandLine) && wsl::windows::common::wslutil::IsRunningInMsix())
+    // Call the MSI package if we're in an MSIX context
+    if (wsl::windows::common::wslutil::IsRunningInMsix())
     {
         const bool launchedViaAppActivation = winrt::Windows::ApplicationModel::AppInstance::GetActivatedEventArgs() != nullptr;
         const auto exitCode = wsl::windows::common::install::CallMsiPackage();

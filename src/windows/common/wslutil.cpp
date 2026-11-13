@@ -381,37 +381,15 @@ std::regex BuildImageReferenceRegex()
 
 void ThrowIfGitHubRateLimited(const winrt::Windows::Web::Http::HttpResponseMessage& response)
 {
-    const auto headers = response.Headers();
-    auto getHeader = [&headers](LPCWSTR name) -> std::optional<std::wstring> {
-        if (!headers.HasKey(name))
-        {
-            return {};
-        }
-
-        return std::wstring{headers.Lookup(name)};
-    };
-
-    const auto statusCode = static_cast<uint32_t>(response.StatusCode());
-    const auto reset = GetGitHubRateLimitReset(statusCode, getHeader, std::chrono::system_clock::now());
-    if (!reset.has_value())
+    const auto statusCode = response.StatusCode();
+    if (statusCode != winrt::Windows::Web::Http::HttpStatusCode::Forbidden && statusCode != winrt::Windows::Web::Http::HttpStatusCode::TooManyRequests)
     {
         return;
     }
 
-    WSL_LOG(
-        "GitHubRateLimited",
-        TraceLoggingValue(statusCode, "statusCode"),
-        TraceLoggingValue(getHeader(L"x-ratelimit-limit").value_or(L"").c_str(), "limit"),
-        TraceLoggingValue(getHeader(L"x-ratelimit-remaining").value_or(L"").c_str(), "remaining"),
-        TraceLoggingValue(getHeader(L"x-ratelimit-reset").value_or(L"").c_str(), "reset"),
-        TraceLoggingValue(getHeader(L"x-ratelimit-resource").value_or(L"").c_str(), "resource"),
-        TraceLoggingValue(getHeader(L"retry-after").value_or(L"").c_str(), "retryAfter"));
+    WSL_LOG("GitHubRateLimited", TraceLoggingValue(static_cast<uint32_t>(statusCode), "statusCode"));
 
-    const auto resetTime = std::chrono::system_clock::to_time_t(reset.value());
-    THROW_HR_WITH_USER_ERROR(
-        WSL_E_GITHUB_RATE_LIMITED,
-        Localization::MessageGitHubRateLimited(
-            wsl::shared::string::MultiByteToWide(wsl::windows::common::timestamp::EpochToLocalDisplayTime(resetTime))));
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited());
 }
 
 } // namespace
@@ -1029,52 +1007,6 @@ std::optional<std::pair<std::wstring, GitHubReleaseAsset>> wsl::windows::common:
     asset = findAsset(L".msixbundle");
 
     return asset.value();
-}
-
-std::optional<std::chrono::system_clock::time_point> wsl::windows::common::wslutil::GetGitHubRateLimitReset(
-    uint32_t statusCode, const std::function<std::optional<std::wstring>(LPCWSTR)>& getHeader, std::chrono::system_clock::time_point now)
-{
-    // See https://docs.github.com/rest/using-the-rest-api/rate-limits-for-the-rest-api
-    if (statusCode != 403 && statusCode != 429)
-    {
-        return {};
-    }
-
-    auto parseInteger = [](const std::optional<std::wstring>& value) -> std::optional<uint64_t> {
-        if (!value.has_value() || value->empty())
-        {
-            return {};
-        }
-
-        wchar_t* end{};
-        const auto result = wcstoull(value->c_str(), &end, 10);
-        if (*end != L'\0')
-        {
-            return {};
-        }
-
-        return result;
-    };
-
-    // A 403 can also be a non rate limit error, so require a rate limit header. A 429 is always a rate limit.
-    const auto retryAfter = getHeader(L"retry-after");
-    const auto remaining = parseInteger(getHeader(L"x-ratelimit-remaining"));
-    if (statusCode == 403 && !retryAfter.has_value() && remaining != 0)
-    {
-        return {};
-    }
-
-    if (const auto seconds = parseInteger(retryAfter))
-    {
-        return now + std::chrono::seconds(*seconds);
-    }
-
-    if (const auto reset = parseInteger(getHeader(L"x-ratelimit-reset")); reset.has_value() && remaining == 0)
-    {
-        return std::chrono::system_clock::time_point{std::chrono::seconds(*reset)};
-    }
-
-    return now + std::chrono::minutes(1);
 }
 
 std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLatestGitHubRelease(bool preRelease)

@@ -7690,50 +7690,6 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         }
     }
 
-    TEST_METHOD(GitHubRateLimitReset)
-    {
-        using namespace std::chrono;
-        using Headers = std::map<std::wstring, std::wstring>;
-
-        const system_clock::time_point now{seconds(1000)};
-        auto getReset = [&](uint32_t statusCode, const Headers& headers) {
-            return wsl::windows::common::wslutil::GetGitHubRateLimitReset(
-                statusCode,
-                [&headers](LPCWSTR name) -> std::optional<std::wstring> {
-                    const auto it = headers.find(name);
-                    if (it == headers.end())
-                    {
-                        return {};
-                    }
-
-                    return it->second;
-                },
-                now);
-        };
-
-        // Not rate limited.
-        VERIFY_IS_FALSE(getReset(200, {{L"x-ratelimit-remaining", L"0"}}).has_value());
-        VERIFY_IS_FALSE(getReset(404, {{L"retry-after", L"30"}}).has_value());
-        VERIFY_IS_FALSE(getReset(403, {}).has_value());
-        VERIFY_IS_FALSE(getReset(403, {{L"x-ratelimit-remaining", L"5"}, {L"x-ratelimit-reset", L"5000"}}).has_value());
-
-        // Primary rate limit uses x-ratelimit-reset.
-        VERIFY_IS_TRUE(
-            getReset(403, {{L"x-ratelimit-remaining", L"0"}, {L"x-ratelimit-reset", L"5000"}}) == system_clock::time_point{seconds(5000)});
-        VERIFY_IS_TRUE(
-            getReset(429, {{L"x-ratelimit-remaining", L"0"}, {L"x-ratelimit-reset", L"5000"}}) == system_clock::time_point{seconds(5000)});
-
-        // Secondary rate limit uses retry-after, which takes precedence over x-ratelimit-reset.
-        VERIFY_IS_TRUE(getReset(403, {{L"retry-after", L"30"}}) == now + seconds(30));
-        VERIFY_IS_TRUE(getReset(429, {{L"retry-after", L"30"}, {L"x-ratelimit-reset", L"5000"}}) == now + seconds(30));
-
-        // Rate limited without a usable reset time waits one minute.
-        VERIFY_IS_TRUE(getReset(403, {{L"x-ratelimit-remaining", L"0"}}) == now + minutes(1));
-        VERIFY_IS_TRUE(getReset(403, {{L"x-ratelimit-remaining", L"0"}, {L"x-ratelimit-reset", L"invalid"}}) == now + minutes(1));
-        VERIFY_IS_TRUE(getReset(429, {}) == now + minutes(1));
-        VERIFY_IS_TRUE(getReset(429, {{L"x-ratelimit-remaining", L"5"}, {L"x-ratelimit-reset", L"5000"}}) == now + minutes(1));
-    }
-
     WSL2_TEST_METHOD(CustomVhdBackingFileFailure)
     {
         const auto vhdPath = std::filesystem::absolute(L"testvhd.vhd").wstring();

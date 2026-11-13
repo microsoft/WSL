@@ -27,8 +27,7 @@ wil::unique_hfile ValidateFileSignature(LPCWSTR Path);
 int UpdatePackage(bool PreRelease, bool Repair, bool CallerOwnsProcess = true);
 
 // Installs the latest package from Windows Update. Requires elevation.
-// When Repair is true, the latest package is installed even if the current version is up to date.
-int UpdateViaWindowsUpdate(bool Repair);
+int UpdateViaWindowsUpdate();
 
 UINT UpgradeViaMsi(_In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& callback);
 

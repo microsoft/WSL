@@ -711,8 +711,7 @@ Arguments:
     <value>Checking for updates.</value>
   </data>
   <data name="MessageGitHubRateLimited" xml:space="preserve">
-    <value>The GitHub API rate limit was reached. Try again after {}.</value>
-    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+    <value>The GitHub API rate limit was reached. Try again later.</value>
   </data>
   <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
     <value>The GitHub API rate limit was reached. Checking for updates using Windows Update.</value>

@@ -830,14 +830,19 @@ class InstallerTests
         RegistryKeyChange<std::wstring> change(
             HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue, endpoint);
 
-        UniqueWebServer server(endpoint, L"{}", 403, {{L"x-ratelimit-remaining", L"0"}, {L"x-ratelimit-reset", L"4102444800"}});
+        for (const auto statusCode : {403u, 429u})
+        {
+            UniqueWebServer server(endpoint, L"{}", statusCode);
 
-        // --pre-release does not fall back to Windows Update, so the rate limit error is reported.
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--update --pre-release", -1);
+            // --pre-release does not fall back to Windows Update, so the rate limit error is reported.
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--update --pre-release", -1);
 
-        const std::wstring expectedPrefix = L"Checking for updates.\r\nThe GitHub API rate limit was reached. Try again after ";
-        VERIFY_IS_TRUE(out.starts_with(expectedPrefix), out.c_str());
-        VERIFY_IS_TRUE(out.find(L"WSL_E_GITHUB_RATE_LIMITED") != std::wstring::npos, out.c_str());
+            VERIFY_ARE_EQUAL(
+                out,
+                L"Checking for updates.\r\n" +
+                    FormatErrorMessage(
+                        L"The GitHub API rate limit was reached. Try again later.", L"Wsl/WSL_E_GITHUB_RATE_LIMITED"));
+        }
     }
 
     TEST_METHOD(InstallRemovesStaleComRegistration)

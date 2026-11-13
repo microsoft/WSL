@@ -79,7 +79,7 @@ bool PromptForKeyPressWithTimeout()
     return waitResult == std::future_status::ready && future.get();
 }
 
-int UpdateViaWindowsUpdateFallback(bool repair, const std::wstring& rateLimitMessage)
+int UpdateViaWindowsUpdateFallback()
 {
     PrintMessage(Localization::MessageGitHubRateLimitedFallback());
 
@@ -88,13 +88,11 @@ int UpdateViaWindowsUpdateFallback(bool repair, const std::wstring& rateLimitMes
     {
         if (wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token().get()))
         {
-            exitCode = UpdateViaWindowsUpdate(repair);
+            exitCode = UpdateViaWindowsUpdate();
         }
         else
         {
-            exitCode = LaunchElevated(
-                repair ? WSL_UPDATE_ARG L" " WSL_UPDATE_ARG_WINDOWS_UPDATE_REPAIR_OPTION_LONG
-                       : WSL_UPDATE_ARG L" " WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG);
+            exitCode = LaunchElevated(WSL_UPDATE_ARG L" " WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG);
         }
     }
     CATCH_LOG()
@@ -104,7 +102,7 @@ int UpdateViaWindowsUpdateFallback(bool repair, const std::wstring& rateLimitMes
         return 0;
     }
 
-    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, rateLimitMessage);
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited());
 }
 
 int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
@@ -114,27 +112,27 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
 
-    // Windows Update doesn't offer pre-release versions and requires elevation, so only fall back for interactive callers.
-    std::optional<std::wstring> rateLimitMessage;
+    // Windows Update doesn't offer pre-release versions or repairs and requires elevation, so only fall back for
+    // interactive updates.
+    bool rateLimited = false;
     std::pair<std::wstring, GitHubReleaseAsset> latestRelease;
     try
     {
         latestRelease = GetLatestGitHubRelease(preRelease);
     }
-    catch (const wil::ResultException& e)
+    catch (...)
     {
-        if (e.GetErrorCode() != WSL_E_GITHUB_RATE_LIMITED || preRelease || !callerOwnsProcess)
+        if (wil::ResultFromCaughtException() != WSL_E_GITHUB_RATE_LIMITED || preRelease || repair || !callerOwnsProcess)
         {
             throw;
         }
 
-        const auto* message = e.GetFailureInfo().pszMessage;
-        rateLimitMessage = message != nullptr ? message : L"";
+        rateLimited = true;
     }
 
-    if (rateLimitMessage.has_value())
+    if (rateLimited)
     {
-        return UpdateViaWindowsUpdateFallback(repair, rateLimitMessage.value());
+        return UpdateViaWindowsUpdateFallback();
     }
 
     const auto& [version, release] = latestRelease;
@@ -435,15 +433,15 @@ int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair, b
     }
 }
 
-int wsl::windows::common::install::UpdateViaWindowsUpdate(bool Repair)
+int wsl::windows::common::install::UpdateViaWindowsUpdate()
 {
     wsl::windows::common::ConsoleProgressBar progressBar;
     auto clearProgress = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&progressBar]() { progressBar.Clear(); });
 
     WindowsUpdateContext context;
-    context.RunUpdateFlow(
-        Repair ? WindowsUpdateContext::UpdateOptions::ResetProductRegistration : WindowsUpdateContext::UpdateOptions::EnsureProductRegistration,
-        [&progressBar](uint32_t percent) { progressBar.Print(percent, 100); });
+    context.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::EnsureProductRegistration, [&progressBar](uint32_t percent) {
+        progressBar.Print(percent, 100);
+    });
 
     clearProgress.reset();
 
