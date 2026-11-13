@@ -210,6 +210,30 @@ class BackportTests(unittest.TestCase):
         self.assertNotIn("Skipping #1", text)
         self.assertEqual(sum(args[:3] == ("gh", "pr", "create") for args, _ in self.calls), 1)
 
+    def test_reverted_cherry_pick_in_merged_backport_allows_a_new_pick(self):
+        self.git("switch", "--detach", self.base)
+        self.git("cherry-pick", "-x", self.first)
+        backport = self.git("rev-parse", "HEAD")
+        self.git("switch", "release/3.0")
+        self.git("merge", "--no-ff", "-m", "Merge backport", backport)
+        merge = self.git("rev-parse", "HEAD")
+        self.git("revert", "--no-edit", backport)
+        self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+        self.candidates = [
+            {"number": 10, "state": "MERGED", "url": "reverted",
+             "body": "Clean cherry pick of PR #1", "mergeCommit": {"oid": merge}},
+        ]
+        present = utils.backported_commits("HEAD")
+        self.assertIn(merge, present)
+        self.assertNotIn(self.first, present)
+        self.assertEqual(self.invoke(relabel.main, ["3.0", "--apply"])[0], 0)
+        self.assertEqual(self.mutations(), [])
+        code, text = self.invoke(generate.main, ["3.0", "1", "--apply"])
+        self.assertEqual(code, 0)
+        self.assertNotIn("Skipping #1", text)
+        self.assertEqual(sum(args[:3] == ("gh", "pr", "create") for args, _ in self.calls), 1)
+        self.assertEqual(Path("first.txt").read_text(encoding="utf-8"), "first\n")
+
     def test_revert_of_revert_and_reapplication_restore_completion(self):
         for reapply in (False, True):
             with self.subTest(reapply=reapply):
@@ -284,11 +308,14 @@ class BackportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "manual review"):
             utils.backported_commits("HEAD")
 
-    def test_merged_backport_requires_an_unreverted_commit_in_release(self):
+    def test_merged_backport_without_source_provenance_requires_manual_review(self):
         candidate = {
-            "state": "MERGED", "body": "Clean cherry pick of PR #1", "mergeCommit": {"oid": self.base},
+            "state": "MERGED", "url": "unrecognized", "body": "Clean cherry pick of PR #1",
+            "mergeCommit": {"oid": self.base},
         }
-        self.assertEqual(utils.active_backports(self.prs[1], [candidate], {self.base}), [candidate])
+        with self.assertRaisesRegex(ValueError, "manual review"):
+            utils.active_backports(self.prs[1], [candidate], {self.base})
+        self.assertEqual(utils.active_backports(self.prs[1], [candidate], {self.base, self.first}), [candidate])
         self.assertEqual(utils.active_backports(self.prs[1], [candidate], set()), [])
 
     def test_all_push_urls_are_checked_before_fetch_or_branch_creation(self):

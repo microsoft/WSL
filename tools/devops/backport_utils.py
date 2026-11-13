@@ -131,15 +131,25 @@ def active_backports(pr, candidates, present):
         rf"|Clean cherry pick of PR #{pr['number']}(?!\d))",
         re.MULTILINE | re.IGNORECASE,
     )
-    return [
-        item for item in candidates
-        if marker.search(item["body"] or "") and (
-            item["state"] == "OPEN" or (
-                item["state"] == "MERGED" and item.get("mergeCommit")
-                and item["mergeCommit"]["oid"] in present
-            )
-        )
-    ]
+    active = []
+    source = pr["mergeCommit"]["oid"]
+    for item in candidates:
+        if not marker.search(item["body"] or ""):
+            continue
+        if item["state"] == "OPEN":
+            active.append(item)
+        elif item["state"] == "MERGED" and item.get("mergeCommit"):
+            merge = item["mergeCommit"]["oid"]
+            if merge not in present:
+                continue
+            if source in present:
+                active.append(item)
+            elif source not in backported_commits(merge):
+                raise ValueError(
+                    f"Merged backport {item['url']} has no recognizable source provenance; "
+                    "manual review is required before generating another backport."
+                )
+    return active
 
 
 def ensure_completed_label(name, branch):

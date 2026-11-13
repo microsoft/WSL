@@ -40,6 +40,8 @@ helpers rather than inventing a separate cherry-pick or label-management flow.
    Standard Git reverts keep the change pending; revert-of-revert or reapplication
    can restore completion. Review inverse patches without standard provenance
    manually rather than treating historical merge status as sufficient.
+   A merged backport without recognizable source provenance also requires manual
+   review before retrying; its merge SHA alone does not establish completion.
    An active revert of a merge commit stops automation for manual review;
    reverting that revert restores normal detection.
 

@@ -147,6 +147,8 @@ Standard `This reverts commit <sha>.` messages undo completion; reverting that
 revert or cherry-picking the change again restores completion. Reverted merged
 backport PRs do not suppress a new attempt. Arbitrary inverse patches or edited
 revert messages cannot be recognized automatically and need manual review.
+If a merged backport remains in history without recognizable source provenance,
+the generator stops for manual review rather than assuming it is still active.
 An active revert of a merge commit stops both scripts for manual review rather
 than counting the merged-side changes as present. Reverting that revert restores
 normal detection. This conservative check does not attempt to infer which
