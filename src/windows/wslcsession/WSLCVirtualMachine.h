@@ -198,6 +198,12 @@ public:
     void RemoveDirectory(_In_ const std::string& Path);
     std::vector<std::string> ListDirectory(_In_ const std::string& Path);
 
+    void WriteGuestFile(_In_ const std::string& Path, _In_ std::string_view Content, _In_ unsigned int Flags = WSLCWriteFileFlagsNone);
+
+    // Throws HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) if the file doesn't exist, and
+    // HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE) if it is larger than MaxSize.
+    std::string ReadGuestFile(_In_ const std::string& Path, _In_ size_t MaxSize);
+
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
 

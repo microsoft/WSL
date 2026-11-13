@@ -6033,6 +6033,54 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    WSL2_TEST_METHOD(GuestOnlyAddressBind)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        WslKeepAlive keepAlive;
+        constexpr auto c_ipv4Address = L"192.0.2.1";
+        constexpr auto c_ipv6Address = L"2001:db8::1";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link add bind-test type bridge"), 0L);
+
+        auto cleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link delete bind-test"), 0L); });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"ip addr add {}/32 dev bind-test", c_ipv4Address)), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"ip -6 addr add {}/128 dev bind-test nodad", c_ipv6Address)), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link set bind-test up"), 0L);
+
+        const std::map<std::wstring, std::wstring> cases = {
+            {std::format(L"TCP4-LISTEN:1234,bind={}", c_ipv4Address), std::format(L"TCP4-CONNECT:{}:1234,connect-timeout=5", c_ipv4Address)},
+            {std::format(L"UDP4-LISTEN:1234,bind={}", c_ipv4Address), std::format(L"UDP4-SENDTO:{}:1234", c_ipv4Address)},
+            {std::format(L"TCP6-LISTEN:1235,bind=[::ffff:{}],ipv6only=0", c_ipv4Address),
+             std::format(L"TCP4-CONNECT:{}:1235,connect-timeout=5", c_ipv4Address)},
+            {std::format(L"UDP6-LISTEN:1235,bind=[::ffff:{}],ipv6only=0", c_ipv4Address), std::format(L"UDP4-SENDTO:{}:1235", c_ipv4Address)},
+            {std::format(L"TCP6-LISTEN:1237,bind=[{}],ipv6only=1", c_ipv6Address),
+             std::format(L"TCP6-CONNECT:[{}]:1237,connect-timeout=5", c_ipv6Address)},
+            {std::format(L"UDP6-LISTEN:1237,bind=[{}],ipv6only=1", c_ipv6Address), std::format(L"UDP6-SENDTO:[{}]:1237", c_ipv6Address)},
+        };
+
+        for (const auto& [bindSpec, connectSpec] : cases)
+        {
+            auto [process, read] = NetworkTests::BindGuestPort(std::format(L"-u -T5 {}", bindSpec), true);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo guest-only | socat -T5 -u - {}", connectSpec)), 0L);
+
+            VERIFY_ARE_EQUAL(WaitForSingleObject(process.m_process.get(), 60 * 1000), WAIT_OBJECT_0);
+            VERIFY_ARE_EQUAL(ReadToString(read.get()), std::string("guest-only\n"));
+        }
+
+        // Validate the binding addresses that the guest doesn't have fails.
+        {
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"socat TCP4-LISTEN:1236,bind=1.1.1.1 STDOUT", 1);
+            VERIFY_IS_TRUE(output.empty());
+            VERIFY_ARE_NOT_EQUAL(error.find(L"Cannot assign requested address"), std::wstring::npos);
+        }
+    }
+
     static auto SetTestEphemeralPortRange()
     {
         auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
