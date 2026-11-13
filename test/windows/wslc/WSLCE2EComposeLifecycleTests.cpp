@@ -83,6 +83,49 @@ services:
         VERIFY_ARE_EQUAL(0, up.Wait(120'000));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Compose_SymlinkUsesTargetProjectAndVolumes)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { Cleanup(); });
+        const auto composePath = projectDirectory / L"compose.yaml";
+        const auto linkDirectory = projectDirectory / L"links";
+        const auto linkPath = linkDirectory / L"compose.yaml";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(linkDirectory));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectDirectory / L"data"));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(linkDirectory / L"data"));
+        WriteTestFileContent(projectDirectory / L"data" / L"marker.txt", "target-directory\n");
+        WriteTestFileContent(linkDirectory / L"data" / L"marker.txt", "link-directory\n");
+        WriteTestFileContent(
+            composePath,
+            std::format(
+                R"(
+services:
+ owned:
+   name: {}
+   image: {}
+   command: ["/bin/sleep", "99999"]
+   volumes:
+     - ./data:/work:ro
+)",
+                WideToMultiByte(ContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag())));
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(linkPath.c_str(), composePath.c_str(), 0));
+
+        auto result = RunWslc(std::format(L"compose create \"{}\"", linkPath.wstring()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(WideToMultiByte(ProjectName), InspectContainer(ContainerName).Config.Labels.at("com.microsoft.wslc.compose.project"));
+
+        result = RunWslc(std::format(L"compose start \"{}\"", composePath.wstring()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result = RunWslc(std::format(L"container exec {} cat /work/marker.txt", ContainerName));
+        result.Verify({.Stdout = L"target-directory\n", .Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"compose stop \"{}\"", linkPath.wstring()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(InspectContainer(ContainerName).State.Running);
+    }
+
 private:
     static void Cleanup()
     {

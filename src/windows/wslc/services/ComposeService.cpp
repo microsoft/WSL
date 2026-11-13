@@ -28,7 +28,7 @@ namespace {
         explicit CapturedComposeDocuments(const std::wstring& path)
         {
             std::error_code error;
-            sourcePath = std::filesystem::absolute(path, error).lexically_normal();
+            sourcePath = std::filesystem::canonical(path, error);
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(error.value()), wsl::shared::Localization::MessageWslcComposePathResolveFailed(path), static_cast<bool>(error));
             projectDirectory = sourcePath.parent_path();
