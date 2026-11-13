@@ -447,9 +447,10 @@ class Plan9Tests
 
         // Create a folder that's inaccessible to plan9testuser
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"mkdir -p /tmp/plan9-group-test && groupadd -f plan9testgroup && chown root:plan9testgroup "
-                            L"/tmp/plan9-group-test && "
-                            L"echo -n foo > /tmp/plan9-group-test/bar && chmod 770 /tmp/plan9-group-test"),
+            LxsstuLaunchWsl(
+                L"mkdir -p /tmp/plan9-group-test && groupadd -f plan9testgroup && chown root:plan9testgroup "
+                L"/tmp/plan9-group-test && "
+                L"echo -n foo > /tmp/plan9-group-test/bar && chmod 770 /tmp/plan9-group-test"),
             0u);
 
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
@@ -510,8 +511,8 @@ class Plan9Tests
 
         VERIFY_ARE_EQUAL(
             0u,
-            LxsstuLaunchWsl(std::format(
-                L"cd /data/p9_test && ln '{0}' '{1}' && printf '%s' '{2}' > '{3}' && mv -f '{3}' '{0}'", c_fileName, c_originalFileName, c_replacementData, c_replacementFileName)));
+            LxsstuLaunchWsl(
+                std::format(L"cd /data/p9_test && ln '{0}' '{1}' && printf '%s' '{2}' > '{3}' && mv -f '{3}' '{0}'", c_fileName, c_originalFileName, c_replacementData, c_replacementFileName)));
 
         LARGE_INTEGER size{};
         size.QuadPart = c_truncatedSize;

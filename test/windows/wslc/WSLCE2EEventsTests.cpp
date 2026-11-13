@@ -151,13 +151,14 @@ class WSLCE2EEventsTests
         VerifyContainerIsNotListed(containerId);
 
         const auto until = EpochSeconds() + 1;
-        result = RunWslc(std::format(
-            L"events --since {} --until {} --filter type=container --filter container={} --filter image={} "
-            L"--filter event=create --filter event=start --filter event=die --filter event=destroy",
-            since,
-            until,
-            containerId,
-            DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(
+                L"events --since {} --until {} --filter type=container --filter container={} --filter image={} "
+                L"--filter event=create --filter event=start --filter event=die --filter event=destroy",
+                since,
+                until,
+                containerId,
+                DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         const auto lines = result.GetStdoutLines();
@@ -236,10 +237,11 @@ class WSLCE2EEventsTests
     WSLC_TEST_METHOD(WSLCE2E_Events_ContainerHealth)
     {
         const auto since = EpochSeconds();
-        auto result = RunWslc(std::format(
-            LR"(container create --health-cmd "test -f /tmp/healthy" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
-            c_eventContainerName,
-            DebianImage.NameAndTag()));
+        auto result = RunWslc(
+            std::format(
+                LR"(container create --health-cmd "test -f /tmp/healthy" --health-interval 1s --health-timeout 3s --health-retries 1 --name {} {} sleep infinity)",
+                c_eventContainerName,
+                DebianImage.NameAndTag()));
 
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
@@ -327,8 +329,8 @@ class WSLCE2EEventsTests
         }
 
         // A bare 'health_status' matches every health status action by prefix.
-        result = RunWslc(std::format(
-            L"events --since {} --until {} --filter container={} --filter event=health_status --format json", since, EpochSeconds() + 1, containerId));
+        result = RunWslc(
+            std::format(L"events --since {} --until {} --filter container={} --filter event=health_status --format json", since, EpochSeconds() + 1, containerId));
         result.Verify({.Stderr = L"", .ExitCode = 0});
 
         std::vector<std::string> healthActions;
@@ -466,8 +468,8 @@ class WSLCE2EEventsTests
         const auto createEvent = expectedEvent(L"create");
         WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
 
-        result = RunWslc(std::format(
-            L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         const auto connectEvent = expectedEvent(L"connect", containerId);
@@ -508,8 +510,8 @@ class WSLCE2EEventsTests
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto networkId = InspectNetwork(networkName).Id;
 
-        result = RunWslc(std::format(
-            L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(L"container run -d --name {} --network {} {} sleep infinity", containerName, networkName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = wsl::shared::string::WideToMultiByte(result.GetStdoutOneLine());
 
@@ -523,12 +525,13 @@ class WSLCE2EEventsTests
         std::vector<nlohmann::json> events;
         const auto queryEvents = [&]() {
             const auto until = EpochSeconds() + 1;
-            const auto query = RunWslc(std::format(
-                L"events --since {} --until {} --filter type=network "
-                L"--filter network={} --format json",
-                since,
-                until,
-                networkName));
+            const auto query = RunWslc(
+                std::format(
+                    L"events --since {} --until {} --filter type=network "
+                    L"--filter network={} --format json",
+                    since,
+                    until,
+                    networkName));
             THROW_HR_IF(E_FAIL, query.ExitCode != 0u);
 
             events = ParseNdjsonOutput(query);
@@ -682,8 +685,8 @@ class WSLCE2EEventsTests
         const auto createEvent = std::format(L" volume create {} (driver=local)", volumeName);
         WaitForPseudoConsoleOutput(events, wsl::shared::string::WideToMultiByte(createEvent));
 
-        result = RunWslc(std::format(
-            L"container run -d --name {} --volume {}:/data {} sleep infinity", containerName, volumeName, DebianImage.NameAndTag()));
+        result = RunWslc(
+            std::format(L"container run -d --name {} --volume {}:/data {} sleep infinity", containerName, volumeName, DebianImage.NameAndTag()));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto containerId = result.GetStdoutOneLine();
         const auto mountEvent = std::format(
@@ -708,8 +711,8 @@ class WSLCE2EEventsTests
         VerifyEventLines(output.GetStdoutLines(), {createEvent, mountEvent, unmountEvent, destroyEvent});
 
         // The events are replayed after the volume is gone.
-        result = RunWslc(std::format(
-            L"events --since {} --until {} --filter type=volume --filter volume={} --format json", since, EpochSeconds() + 1, volumeName));
+        result = RunWslc(
+            std::format(L"events --since {} --until {} --filter type=volume --filter volume={} --format json", since, EpochSeconds() + 1, volumeName));
         result.Verify({.Stderr = L"", .ExitCode = 0});
         const auto jsonEvents = ParseNdjsonOutput(result);
 

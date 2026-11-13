@@ -1065,13 +1065,14 @@ class NetworkTests
             L"wsl-{}.invalid", wsl::shared::string::GuidToString<wchar_t>(suffixId, wsl::shared::string::GuidToStringFlags::None));
 
         const auto verifySuffix = [&](bool present) {
-            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-                [&] {
-                    const auto [contents, error] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
-                    THROW_HR_IF(E_PENDING, (contents.find(testSuffix) != std::wstring::npos) != present);
-                },
-                std::chrono::milliseconds(100),
-                std::chrono::seconds(30)));
+            VERIFY_NO_THROW(
+                wsl::shared::retry::RetryWithTimeout<void>(
+                    [&] {
+                        const auto [contents, error] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+                        THROW_HR_IF(E_PENDING, (contents.find(testSuffix) != std::wstring::npos) != present);
+                    },
+                    std::chrono::milliseconds(100),
+                    std::chrono::seconds(30)));
         };
 
         LxsstuLaunchPowershellAndCaptureOutput(
@@ -2168,24 +2169,25 @@ class NetworkTests
 
         bool bound = false;
         int error = 0;
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                bound = bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR;
-                error = bound ? 0 : WSAGetLastError();
-                THROW_HR_IF_MSG(
-                    HRESULT_FROM_WIN32(error),
-                    ExpectSuccess && !bound,
-                    "Host bind failed: port=%u protocol=%d family=%d WSAGetLastError=%d",
-                    Port,
-                    Protocol,
-                    AddressFamily,
-                    error);
-            },
-            std::chrono::milliseconds(100),
-            BindTimeout,
-            [&]() {
-                return ExpectSuccess && BindTimeout > std::chrono::seconds::zero() && (error == WSAEADDRINUSE || error == WSAEACCES);
-            }));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() {
+                    bound = bind(listenSocket.get(), Address, AddressSize) != SOCKET_ERROR;
+                    error = bound ? 0 : WSAGetLastError();
+                    THROW_HR_IF_MSG(
+                        HRESULT_FROM_WIN32(error),
+                        ExpectSuccess && !bound,
+                        "Host bind failed: port=%u protocol=%d family=%d WSAGetLastError=%d",
+                        Port,
+                        Protocol,
+                        AddressFamily,
+                        error);
+                },
+                std::chrono::milliseconds(100),
+                BindTimeout,
+                [&]() {
+                    return ExpectSuccess && BindTimeout > std::chrono::seconds::zero() && (error == WSAEADDRINUSE || error == WSAEACCES);
+                }));
 
         VERIFY_ARE_EQUAL(bound, ExpectSuccess);
 
@@ -2419,18 +2421,19 @@ class NetworkTests
         // Port resolution is asynchronous (deferred to a background thread) for the case where
         // the socket wasn't already bound. Retry until the host port tracker registers the port,
         // blocking the host bind.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&assignedPort]() {
-                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-                THROW_LAST_ERROR_IF(!sock);
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&assignedPort]() {
+                    wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                    THROW_LAST_ERROR_IF(!sock);
 
-                SOCKADDR_IN addr{};
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(assignedPort);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30)));
+                    SOCKADDR_IN addr{};
+                    addr.sin_family = AF_INET;
+                    addr.sin_port = htons(assignedPort);
+                    THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+                },
+                std::chrono::seconds(1),
+                std::chrono::seconds(30)));
 
         if (!verifyRelease)
         {
@@ -2441,18 +2444,19 @@ class NetworkTests
         guestProcess.reset();
 
         // Retry until the host can bind the port again, confirming it was released.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&assignedPort]() {
-                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-                THROW_LAST_ERROR_IF(!sock);
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&assignedPort]() {
+                    wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                    THROW_LAST_ERROR_IF(!sock);
 
-                SOCKADDR_IN addr{};
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(assignedPort);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
-            },
-            std::chrono::seconds(1),
-            std::chrono::minutes(2)));
+                    SOCKADDR_IN addr{};
+                    addr.sin_family = AF_INET;
+                    addr.sin_port = htons(assignedPort);
+                    THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+                },
+                std::chrono::seconds(1),
+                std::chrono::minutes(2)));
     }
 
     static void VerifyPortZeroBindIsTracked(bool verifyRelease = true)
@@ -2467,18 +2471,19 @@ class NetworkTests
 
         // The port-0 resolution is asynchronous (deferred to a background thread).
         // Retry until the host port tracker registers the port, blocking the host bind.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&assignedPort]() {
-                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-                THROW_LAST_ERROR_IF(!sock);
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&assignedPort]() {
+                    wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                    THROW_LAST_ERROR_IF(!sock);
 
-                SOCKADDR_IN addr{};
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(assignedPort);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30)));
+                    SOCKADDR_IN addr{};
+                    addr.sin_family = AF_INET;
+                    addr.sin_port = htons(assignedPort);
+                    THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+                },
+                std::chrono::seconds(1),
+                std::chrono::seconds(30)));
 
         if (!verifyRelease)
         {
@@ -2489,22 +2494,23 @@ class NetworkTests
         guestProcess.reset();
 
         // Retry until the host can bind the port again, confirming it was released.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&assignedPort]() {
-                wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-                THROW_LAST_ERROR_IF(!sock);
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&assignedPort]() {
+                    wil::unique_socket sock(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                    THROW_LAST_ERROR_IF(!sock);
 
-                SOCKADDR_IN addr{};
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(assignedPort);
-                THROW_HR_IF_MSG(
-                    E_FAIL,
-                    bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR,
-                    "Failed to bind port %u",
-                    assignedPort);
-            },
-            std::chrono::seconds(1),
-            std::chrono::minutes(2)));
+                    SOCKADDR_IN addr{};
+                    addr.sin_family = AF_INET;
+                    addr.sin_port = htons(assignedPort);
+                    THROW_HR_IF_MSG(
+                        E_FAIL,
+                        bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR,
+                        "Failed to bind port %u",
+                        assignedPort);
+                },
+                std::chrono::seconds(1),
+                std::chrono::minutes(2)));
     }
 
     static void VerifyPortZeroBindFromThreadIsTracked(bool verifyRelease = true)
@@ -2583,15 +2589,16 @@ class NetworkTests
         // Uses a perl one-liner to perform the entire sequence in a single process,
         // matching the semantics of a native C test (no SO_REUSEADDR, same-process rebind).
         VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(L"perl -MSocket -e '"
-                            L"socket(S1,AF_INET,SOCK_STREAM,0) or die;"
-                            L"bind(S1,sockaddr_in(0,INADDR_ANY)) or die;"
-                            L"my $port=(sockaddr_in(getsockname(S1)))[0];"
-                            L"close(S1);"
-                            L"socket(S2,AF_INET,SOCK_STREAM,0) or die;"
-                            L"bind(S2,sockaddr_in($port,INADDR_ANY)) or die;"
-                            L"close(S2)"
-                            L"'"),
+            LxsstuLaunchWsl(
+                L"perl -MSocket -e '"
+                L"socket(S1,AF_INET,SOCK_STREAM,0) or die;"
+                L"bind(S1,sockaddr_in(0,INADDR_ANY)) or die;"
+                L"my $port=(sockaddr_in(getsockname(S1)))[0];"
+                L"close(S1);"
+                L"socket(S2,AF_INET,SOCK_STREAM,0) or die;"
+                L"bind(S2,sockaddr_in($port,INADDR_ANY)) or die;"
+                L"close(S2)"
+                L"'"),
             0L);
     }
 
@@ -2932,8 +2939,10 @@ class NetworkTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Verify we have connectivity from the networking namespace when using ephemeral port selection.
@@ -3419,8 +3428,8 @@ class NetworkTests
             }
             else if (std::regex_search(line, match, routePattern) && match.size() >= 4)
             {
-                state.Routes.emplace_back(Route{
-                    match.str(2), match.str(3), {match.str(1)}, match.size() > 5 && match[5].matched ? std::stoi(match.str(5)) : 0});
+                state.Routes.emplace_back(
+                    Route{match.str(2), match.str(3), {match.str(1)}, match.size() > 5 && match[5].matched ? std::stoi(match.str(5)) : 0});
             }
         }
 
@@ -5104,12 +5113,15 @@ class MirroredTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Add rule for port forwarding traffic with destination port 8080 to port 80 in the new namespace
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat PREROUTING { type nat hook prerouting priority dstnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat PREROUTING { type nat hook prerouting priority dstnat; }\""), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat PREROUTING tcp dport 8080 dnat to 192.168.15.2:80"), 0);
 
         // Start listeners in root namespace on port 8080 and new namespace on port 80
@@ -5183,8 +5195,10 @@ class MirroredTests
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip addr add 192.168.15.1/24 dev testbridge"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -n testns route add default via 192.168.15.1 dev veth-test"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add table nat"), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft \"add chain nat POSTROUTING { type nat hook postrouting priority srcnat; }\""), 0);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"--system --user root nft add rule nat POSTROUTING ip saddr 192.168.15.0/24 oif != testbridge masquerade"), 0);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sysctl -w net.ipv4.ip_forward=1"), 0);
 
         // Create a listener on the Windows host on port 1234
@@ -5971,12 +5985,13 @@ class ConsommeTests
             auto hostPort = NetworkTests::BindHostPort(1234, SOCK_STREAM, IPPROTO_TCP, true, false, false, std::chrono::minutes(2));
             VERIFY_ARE_EQUAL(listen(hostPort.get(), SOMAXCONN), 0);
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(L"perl -MSocket -MErrno=EADDRINUSE -e '"
-                                L"socket(my $s,AF_INET,SOCK_STREAM,0) or die \"socket: $!\\n\";"
-                                L"bind($s,sockaddr_in(1234,INADDR_ANY)) and die \"bind unexpectedly succeeded\\n\";"
-                                L"$!{EADDRINUSE} or die \"expected EADDRINUSE: $!\\n\";"
-                                L"my ($port)=sockaddr_in(getsockname($s));"
-                                L"$port==0 or die \"failed bind assigned port $port\\n\";'"),
+                LxsstuLaunchWsl(
+                    L"perl -MSocket -MErrno=EADDRINUSE -e '"
+                    L"socket(my $s,AF_INET,SOCK_STREAM,0) or die \"socket: $!\\n\";"
+                    L"bind($s,sockaddr_in(1234,INADDR_ANY)) and die \"bind unexpectedly succeeded\\n\";"
+                    L"$!{EADDRINUSE} or die \"expected EADDRINUSE: $!\\n\";"
+                    L"my ($port)=sockaddr_in(getsockname($s));"
+                    L"$port==0 or die \"failed bind assigned port $port\\n\";'"),
                 0L);
         }
 

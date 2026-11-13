@@ -36,8 +36,8 @@ WSLCVolumes::WSLCVolumes(
     // and dedup naturally against entries inserted by recovery (insert is a no-op for existing keys).
     auto lock = m_lock.lock_exclusive();
 
-    m_volumeEventTracking = eventTracker.RegisterVolumeUpdates(std::bind(
-        &WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+    m_volumeEventTracking = eventTracker.RegisterVolumeUpdates(
+        std::bind(&WSLCVolumes::OnVolumeEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 
     for (const auto& volume : dockerClient.ListVolumes())
     {

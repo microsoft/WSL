@@ -8,7 +8,9 @@ stages:
 - template: build-stage.yml@self
   parameters:
     isRelease: false
-    pool: 'wsl-build'
+    pool:
+      vmImage: windows-2025-vs2026
+    clangFormat: 'C:\Program Files\LLVM\bin\clang-format.exe'
     vsoOrg: shine-oss
     vsoProject: wsl
 

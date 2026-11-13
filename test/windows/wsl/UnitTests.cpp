@@ -341,8 +341,9 @@ class UnitTests
         auto cleanup = EnableSystemd("initTimeout=0");
 
         // Wait for systemd to be started
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Validate that the X11 socket has not been deleted
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
@@ -351,7 +352,8 @@ class UnitTests
     WSL2_TEST_METHOD(SystemdBinfmtIsRestored)
     {
         // Override WSL's binfmt interpreter
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(L"mkdir -p /usr/lib/binfmt.d && echo ':WSLInterop:M::MZ::/bin/echo:PF' > /usr/lib/binfmt.d/dummy.conf"), 0L);
 
         auto cleanupBinfmt = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             LxsstuLaunchWsl(L"rm /usr/lib/binfmt.d/dummy.conf");
@@ -406,14 +408,16 @@ class UnitTests
             for (const bool failStartup : {false, true})
             {
                 VERIFY_ARE_EQUAL(
-                    LxsstuLaunchWsl(std::format(
-                        L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
-                        failStartup ? L"false" : L"true",
-                        overridePath)),
+                    LxsstuLaunchWsl(
+                        std::format(
+                            L"printf '[Service]\\nExecStart=\\nExecStart=/bin/{}\\n' > {} && systemctl daemon-reload",
+                            failStartup ? L"false" : L"true",
+                            overridePath)),
                     0u);
                 VERIFY_ARE_EQUAL(
-                    LxsstuLaunchWsl(L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
-                                    L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
+                    LxsstuLaunchWsl(
+                        L"echo -1 > /proc/sys/fs/binfmt_misc/WSLInterop && "
+                        L"echo ':WSLInterop:M::MZ::/bin/echo:PF' > /proc/sys/fs/binfmt_misc/register"),
                     0u);
 
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemctl restart systemd-binfmt.service"), failStartup ? 1u : 0u);
@@ -469,7 +473,8 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"mountpoint -q /proc/sys/fs/binfmt_misc/status"), 0u);
 
             // Runtime registration via /register still works (we only shadow /status).
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(L"sh -c 'echo \":wsltestbinfmt:M::WSLTESTMAGIC::/bin/echo:\" > /proc/sys/fs/binfmt_misc/register'"), 0L);
 
             // binfmt_misc is VM-global, so a leftover wsltestbinfmt entry would
             // cascade into later tests. Always remove it on scope exit.
@@ -538,16 +543,18 @@ class UnitTests
         WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
         auto revert = EnableSystemd("initTimeout=0");
         // Wait for systemd to start
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_UNEXPECTED, !IsSystemdRunning(L"--system")); }, std::chrono::seconds(1), std::chrono::minutes(1)));
 
         // Kill the WSL init process without relying on an incidental PID allocation.
         const auto wslInitPid = GetWslInitPid();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"kill -9 {}", wslInitPid)), 0L);
 
         // Wait for the distro to exit.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
+        VERIFY_NO_THROW(
+            wsl::shared::retry::RetryWithTimeout<void>(
+                [&]() { THROW_HR_IF(E_ABORT, GetDistroState() == LxssDistributionStateRunning); }, std::chrono::seconds(1), std::chrono::seconds(30)));
 
         // Verify that a new WSL command succeeds (the distro restarts cleanly).
         auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"echo hello");
@@ -656,8 +663,7 @@ class UnitTests
                 LxsstuLaunchWsl(std::format(L"-d {} -- sh -c \"systemctl is-system-running | grep -Eq 'running|degraded'\"", peerDistroName)), 0L);
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
+                LxsstuLaunchWsl(std::format(L"sh -c 'mkdir -p {0} && mount -t tmpfs -o size=4M mount-guard-test {0} && echo survived > {0}/marker'", mountPoint)),
                 0L);
             auto cleanupMount = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
                 LxsstuLaunchWsl(std::format(L"sh -c 'umount {0} 2>/dev/null || true; rmdir {0} 2>/dev/null || true'", mountPoint));
@@ -3436,20 +3442,23 @@ EOF
                 wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(volumeVhdPath.c_str())); });
 
             const auto volumeSize = std::filesystem::file_size(std::filesystem::path(absolutePath) / L"ext4.vhdx") + _1GB;
-            LxsstuLaunchPowershellAndCaptureOutput(std::format(
-                L"$ErrorActionPreference = 'Stop'; New-VHD -Path '{}' -Dynamic -SizeBytes {} | Out-Null", volumeVhdPath.wstring(), volumeSize));
+            LxsstuLaunchPowershellAndCaptureOutput(
+                std::format(
+                    L"$ErrorActionPreference = 'Stop'; New-VHD -Path '{}' -Dynamic -SizeBytes {} | Out-Null", volumeVhdPath.wstring(), volumeSize));
 
             auto unmountVolume = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-                LxsstuLaunchPowershellAndCaptureOutput(std::format(
-                    L"$ErrorActionPreference = 'Stop'; if ((Get-VHD -Path '{0}').Attached) {{ Dismount-VHD -Path '{0}' }}",
-                    volumeVhdPath.wstring()));
+                LxsstuLaunchPowershellAndCaptureOutput(
+                    std::format(
+                        L"$ErrorActionPreference = 'Stop'; if ((Get-VHD -Path '{0}').Attached) {{ Dismount-VHD -Path '{0}' }}",
+                        volumeVhdPath.wstring()));
             });
 
-            auto [driveLetter, _] = LxsstuLaunchPowershellAndCaptureOutput(std::format(
-                L"$ErrorActionPreference = 'Stop'; Mount-VHD -Path '{}' -PassThru | Get-Disk | "
-                L"Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | "
-                L"Format-Volume -FileSystem NTFS -Confirm:$false -Force | Select-Object -ExpandProperty DriveLetter",
-                volumeVhdPath.wstring()));
+            auto [driveLetter, _] = LxsstuLaunchPowershellAndCaptureOutput(
+                std::format(
+                    L"$ErrorActionPreference = 'Stop'; Mount-VHD -Path '{}' -PassThru | Get-Disk | "
+                    L"Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | "
+                    L"Format-Volume -FileSystem NTFS -Confirm:$false -Force | Select-Object -ExpandProperty DriveLetter",
+                    volumeVhdPath.wstring()));
             Trim(driveLetter);
             VERIFY_ARE_EQUAL(size_t{1}, driveLetter.size());
 
@@ -3890,10 +3899,11 @@ EOF
         constexpr auto minimumCompactionDelta = 32ull * 1024 * 1024;
         const auto sizeBeforeWrite = getVhdSizeOnDisk(vhdPath);
 
-        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(
-            L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
-            L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
-            name));
+        std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(
+            std::format(
+                L"-d {} -u root -- sh -c 'mkdir -p /root/vhdx-compact-test && "
+                L"dd if=/dev/zero bs=1M count=128 2>/dev/null | base64 -w 0 > /root/vhdx-compact-test/nonzero.bin && sync'",
+                name));
         VERIFY_ARE_EQUAL(err, L"");
         WslShutdown();
 
@@ -4971,8 +4981,9 @@ localhostForwarding=true
             VERIFY_IS_FALSE(std::filesystem::exists(testDistroRootfsPath));
             VERIFY_IS_TRUE(service.EnumerateDistributions().empty());
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(std::format(
-                    L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
+                LxsstuLaunchWsl(
+                    std::format(
+                        L"--import {} \"{}\" \"{}\" --version 1", testDistro.DistroName, testDistroBasePath, testDistroExported.c_str())),
                 0L);
         }
 
@@ -7885,8 +7896,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         std::filesystem::create_directories(directory);
 
         const auto modulesPath = directory / L"modules.vhdx";
-        LxsstuLaunchPowershellAndCaptureOutput(std::format(
-            L"Convert-VHD -Path '{}' -DestinationPath '{}' -VHDType Dynamic", (toolsPath / L"artifacts.vhd").native(), modulesPath.native()));
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(
+                L"Convert-VHD -Path '{}' -DestinationPath '{}' -VHDType Dynamic",
+                (toolsPath / L"artifacts.vhd").native(),
+                modulesPath.native()));
         VERIFY_IS_TRUE(std::filesystem::exists(modulesPath));
 
         WslConfigChange config{LxssGenerateTestConfig({.kernel = (toolsPath / L"kernel").native(), .kernelModules = modulesPath.native()})};
@@ -8189,8 +8203,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         auto [dmesg, __] = LxsstuLaunchWslAndCaptureOutput(L"dmesg");
         VERIFY_ARE_NOT_EQUAL(
-            dmesg.find(
-                L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
+            dmesg.find(L"Distribution has cgroupv1 enabled, but kernel command line has cgroup_no_v1=all. Falling back to cgroupv2"),
             std::wstring::npos);
     }
 
@@ -8376,14 +8389,15 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             std::vector<gsl::byte> message;
 
             wsl::windows::common::io::MultiHandleWait io;
-            io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
-                wsl::windows::common::io::HandleWrapper{std::move(server)},
-                buffer,
-                pendingBytes,
-                [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
-                    callbackInvoked = true;
-                    message.assign(received.begin(), received.end());
-                }));
+            io.AddHandle(
+                std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                    wsl::windows::common::io::HandleWrapper{std::move(server)},
+                    buffer,
+                    pendingBytes,
+                    [&callbackInvoked, &message](const gsl::span<gsl::byte>& received) {
+                        callbackInvoked = true;
+                        message.assign(received.begin(), received.end());
+                    }));
 
             const auto hr = wil::ResultFromException([&]() { io.Run(std::chrono::seconds(60)); });
             VERIFY_ARE_EQUAL(hr, expectedHr);
@@ -8595,11 +8609,12 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             bool callbackInvoked = false;
             const auto hr = wil::ResultFromException([&]() {
                 wsl::windows::common::io::MultiHandleWait io;
-                io.AddHandle(std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
-                    wsl::windows::common::io::HandleWrapper{std::move(server)},
-                    buffer,
-                    pendingBytes,
-                    [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
+                io.AddHandle(
+                    std::make_unique<wsl::windows::common::io::ReadSocketMessageHandle>(
+                        wsl::windows::common::io::HandleWrapper{std::move(server)},
+                        buffer,
+                        pendingBytes,
+                        [&callbackInvoked](const gsl::span<gsl::byte>&) { callbackInvoked = true; }));
                 io.Run(std::chrono::seconds(60));
             });
             VERIFY_ARE_EQUAL(hr, E_UNEXPECTED);
@@ -8629,13 +8644,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             wsl::windows::common::io::MultiHandleWait io;
             for (size_t i = 0; i < handleCount; ++i)
             {
-                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
-                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
-                        std::lock_guard lock{firedLock};
-                        VERIFY_IS_FALSE(fired[i]);
-                        fired[i] = true;
-                        firedCount.fetch_add(1);
-                    }));
+                io.AddHandle(
+                    std::make_unique<wsl::windows::common::io::EventHandle>(
+                        wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                            std::lock_guard lock{firedLock};
+                            VERIFY_IS_FALSE(fired[i]);
+                            fired[i] = true;
+                            firedCount.fetch_add(1);
+                        }));
             }
 
             for (auto& e : events)
@@ -8667,13 +8683,14 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             wsl::windows::common::io::MultiHandleWait io;
             for (size_t i = 0; i < handleCount; ++i)
             {
-                io.AddHandle(std::make_unique<wsl::windows::common::io::EventHandle>(
-                    wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
-                        std::lock_guard lock{firedLock};
-                        VERIFY_IS_FALSE(fired[i]);
-                        fired[i] = true;
-                        firedCount.fetch_add(1);
-                    }));
+                io.AddHandle(
+                    std::make_unique<wsl::windows::common::io::EventHandle>(
+                        wsl::windows::common::io::HandleWrapper{events[i].get()}, [&fired, &firedCount, &firedLock, i]() {
+                            std::lock_guard lock{firedLock};
+                            VERIFY_IS_FALSE(fired[i]);
+                            fired[i] = true;
+                            firedCount.fetch_add(1);
+                        }));
             }
 
             std::thread signaller([&events]() {
@@ -9057,12 +9074,13 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                 WI_DIAGNOSTICS_INFO, [&]() { LxsstuLaunchWsl(L"-u root rmdir /sys/fs/cgroup/wsl-test-workload"); });
 
             VERIFY_ARE_EQUAL(
-                LxsstuLaunchWsl(L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
-                                L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
-                                L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
-                                L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
-                                L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
-                                L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
+                LxsstuLaunchWsl(
+                    L"-u root /bin/sh -c \"echo 67108864 > /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                    L"echo '100000 100000' > /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                    L"echo 0 > /sys/fs/cgroup/wsl-test-workload/cgroup.procs && "
+                    L"grep -qx 67108864 /sys/fs/cgroup/wsl-test-workload/memory.max && "
+                    L"grep -qx '100000 100000' /sys/fs/cgroup/wsl-test-workload/cpu.max && "
+                    L"grep -qx '0::/wsl-test-workload' /proc/self/cgroup\""),
                 0L);
         }
 

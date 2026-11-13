@@ -127,8 +127,9 @@ VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schem
             }
 
             LOG_CAUGHT_EXCEPTION();
-            EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationDetectionFailed(
-                wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
+            EMIT_USER_WARNING(
+                wsl::shared::Localization::MessageNestedVirtualizationDetectionFailed(
+                    wsl::windows::common::wslutil::ErrorCodeToString(wil::ResultFromCaughtException())));
         }
     }
 

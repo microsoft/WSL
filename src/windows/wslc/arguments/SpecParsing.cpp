@@ -231,10 +231,11 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
             return services::BuildOutput{.Type = L"tar", .Dest = L"-"};
         }
 
-        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
-            spec,
-            L"directory exporters are not supported; write a single file with 'dest=<file>' (type=tar/oci/docker) "
-            L"or stream a tarball to stdout with 'type=tar,dest=-'"));
+        throw ArgumentException(
+            Localization::MessageWslcOutputInvalidSpec(
+                spec,
+                L"directory exporters are not supported; write a single file with 'dest=<file>' (type=tar/oci/docker) "
+                L"or stream a tarball to stdout with 'type=tar,dest=-'"));
     }
 
     services::BuildOutput output;
@@ -311,10 +312,11 @@ services::BuildOutput ParseOutputSpec(const std::wstring& spec)
         // Directory exporters (local, or oci/docker with tar=false) write a Linux directory tree, which
         // cannot be materialized faithfully on a Windows destination, so they are not supported. Point
         // users at the single-file exporters instead.
-        throw ArgumentException(Localization::MessageWslcOutputInvalidSpec(
-            spec,
-            L"directory exporters are not supported; write a single file with 'dest=<file>' (type=tar/oci/docker) "
-            L"or stream a tarball to stdout with 'type=tar,dest=-'"));
+        throw ArgumentException(
+            Localization::MessageWslcOutputInvalidSpec(
+                spec,
+                L"directory exporters are not supported; write a single file with 'dest=<file>' (type=tar/oci/docker) "
+                L"or stream a tarball to stdout with 'type=tar,dest=-'"));
     }
 
     if (output.Type == L"tar" || output.Type == L"oci")

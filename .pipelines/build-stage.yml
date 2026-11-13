@@ -40,6 +40,10 @@ parameters:
         pattern: "wsl.msi,wslcsdkcs.dll,Microsoft.WSL.Containers.winmd"
 
   - name: pool
+    type: object
+    default: ''
+
+  - name: clangFormat
     type: string
     default: ''
 
@@ -126,7 +130,7 @@ stages:
             inputs:
               targetType: "filePath"
               filePath: FormatSource.ps1
-              arguments: "-ModifiedOnly $false -Verify $true"
+              arguments: '-ModifiedOnly $false -Verify $true -ClangFormat "${{ parameters.clangFormat }}"'
             displayName: "Clang-format check"
 
       - template: build-job.yml
