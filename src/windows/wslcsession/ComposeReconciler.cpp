@@ -219,15 +219,13 @@ void ComposeReconciler::Stop(
 }
 
 std::vector<WSLCContainerEntry> ComposeReconciler::Remove(
-    const std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>>& containers,
-    const ComposeCancellation& cancellation,
-    const ComposeProgressReporter& progressReporter)
+    const std::vector<Microsoft::WRL::ComPtr<WSLCContainer>>& containers, const ComposeCancellation& cancellation, const ComposeProgressReporter& progressReporter)
 {
-    std::vector<Microsoft::WRL::ComPtr<IWSLCContainer>> stoppedContainers;
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> stoppedContainers;
     for (const auto& container : containers)
     {
         WSLCContainerState state{};
-        THROW_IF_FAILED(container->GetState(&state));
+        THROW_IF_FAILED(container->GetStateImpl(&state));
         if (state == WslcContainerStateCreated || state == WslcContainerStateExited)
         {
             stoppedContainers.emplace_back(container);
@@ -242,12 +240,18 @@ std::vector<WSLCContainerEntry> ComposeReconciler::Remove(
         if (progressReporter)
         {
             wil::unique_cotaskmem_ansistring name;
-            THROW_IF_FAILED(container->GetName(&name));
+            THROW_IF_FAILED(container->GetNameImpl(&name));
             progressReporter("remove", name.get(), index + 1, stoppedContainers.size(), "container");
             cancellation.Check();
         }
 
-        const HRESULT deleteResult = container->Delete(WSLCDeleteFlagsNone);
+        const HRESULT deleteResult = container->DeleteImpl(WSLCDeleteFlagsNone);
+        if (deleteResult == RPC_E_DISCONNECTED)
+        {
+            WSLCContainerState state{};
+            THROW_IF_FAILED(container->GetStateImpl(&state));
+            THROW_HR_IF(deleteResult, state != WslcContainerStateDeleted);
+        }
         THROW_IF_FAILED_EXCEPT(deleteResult, RPC_E_DISCONNECTED);
         result[index].State = WslcContainerStateDeleted;
     }
