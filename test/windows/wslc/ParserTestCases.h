@@ -143,12 +143,11 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 -t 5 --signal 1 image1)") \
 /* Flag parse tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -? image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?i image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -i?p- image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi?=80:80 image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? 80:80 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p 80:80 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p80:80 -p443:443 image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -i?xp80:80 image1)") \
 \
 /* Validation tests */ \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO image1)") \
