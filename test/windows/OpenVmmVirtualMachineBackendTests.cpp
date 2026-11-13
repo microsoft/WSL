@@ -719,6 +719,7 @@ class OpenVmmVirtualMachineBackendTests
         auto request = CreateRunnableRequest();
         request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false));
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
         const auto description = backend->GetDescription();
         const auto& adapter = description.NetworkAdapters.at(L"eth0");
         wsl::core::networking::DnsInfo dns{{"127.0.0.1", "127.0.0.2", "::1", "::ffff:127.0.0.1", "1.1.1.1"}, {}};
