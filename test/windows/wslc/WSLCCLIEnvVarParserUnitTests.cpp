@@ -114,6 +114,49 @@ class WSLCCLIEnvVarParserUnitTests
         VERIFY_ARE_EQUAL(L"WSLC_TEST_ENV_FROM_FILE=file_process_value", parsed[2]);
     }
 
+    TEST_METHOD(WSLCCLIEnvVarParser_ParseFileSkipsInitialUtf8Bom)
+    {
+        const std::vector<std::string> contents = {"KEY=value\n", "# comment\nKEY=value\n", "  # comment\nKEY=value\n"};
+        for (const auto& content : contents)
+        {
+            std::ofstream file(EnvTestFile, std::ios::binary);
+            VERIFY_IS_TRUE(file.is_open());
+            file << "\xEF\xBB\xBF" << content;
+            file.close();
+
+            const auto parsed = models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
+
+            VERIFY_ARE_EQUAL(1U, parsed.size());
+            VERIFY_ARE_EQUAL(L"KEY=value", parsed[0]);
+        }
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_ParseFileBomOnlyReturnsEmpty)
+    {
+        std::ofstream file(EnvTestFile, std::ios::binary);
+        VERIFY_IS_TRUE(file.is_open());
+        file << "\xEF\xBB\xBF";
+        file.close();
+
+        const auto parsed = models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
+        VERIFY_ARE_EQUAL(0U, parsed.size());
+    }
+
+    TEST_METHOD(WSLCCLIEnvVarParser_ParseFilePreservesBomInValue)
+    {
+        std::ofstream file(EnvTestFile, std::ios::binary);
+        VERIFY_IS_TRUE(file.is_open());
+        file << "KEY=\xEF\xBB\xBF\n";
+        file << "NEXT=\xEF\xBB\xBF\n";
+        file.close();
+
+        const auto parsed = models::EnvironmentVariable::ParseFile(EnvTestFile.wstring());
+
+        VERIFY_ARE_EQUAL(2U, parsed.size());
+        VERIFY_ARE_EQUAL(L"KEY=\uFEFF", parsed[0]);
+        VERIFY_ARE_EQUAL(L"NEXT=\uFEFF", parsed[1]);
+    }
+
     TEST_METHOD(WSLCCLIEnvVarParser_ParseFileThrowsWhenMissing)
     {
         try
