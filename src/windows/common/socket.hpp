@@ -30,10 +30,21 @@ std::optional<wil::unique_socket> CancellableAccept(
 std::pair<DWORD, DWORD> GetResult(
     _In_ SOCKET Socket, _In_ OVERLAPPED& Overlapped, _In_ DWORD Timeout, _In_ HANDLE ExitHandle, _In_ const std::source_location& Location);
 
+std::pair<DWORD, DWORD> GetResult(
+    _In_ SOCKET Socket, _In_ OVERLAPPED& Overlapped, _In_ DWORD Timeout, _In_ gsl::span<const HANDLE> ExitHandles, _In_ const std::source_location& Location);
+
 int Receive(
     _In_ SOCKET Socket,
     _In_ gsl::span<gsl::byte> Buffer,
     _In_opt_ HANDLE ExitHandle = nullptr,
+    _In_ DWORD Flags = MSG_WAITALL,
+    _In_ DWORD Timeout = INFINITE,
+    _In_ const std::source_location& Location = std::source_location::current());
+
+int Receive(
+    _In_ SOCKET Socket,
+    _In_ gsl::span<gsl::byte> Buffer,
+    _In_ gsl::span<const HANDLE> ExitHandles,
     _In_ DWORD Flags = MSG_WAITALL,
     _In_ DWORD Timeout = INFINITE,
     _In_ const std::source_location& Location = std::source_location::current());
@@ -48,6 +59,14 @@ int ReceiveNoThrow(
     _In_ SOCKET Socket,
     _In_ gsl::span<gsl::byte> Buffer,
     _In_opt_ HANDLE ExitHandle = nullptr,
+    _In_ DWORD Flags = MSG_WAITALL,
+    _In_ DWORD Timeout = INFINITE,
+    _In_ const std::source_location& Location = std::source_location::current());
+
+int ReceiveNoThrow(
+    _In_ SOCKET Socket,
+    _In_ gsl::span<gsl::byte> Buffer,
+    _In_ gsl::span<const HANDLE> ExitHandles,
     _In_ DWORD Flags = MSG_WAITALL,
     _In_ DWORD Timeout = INFINITE,
     _In_ const std::source_location& Location = std::source_location::current());

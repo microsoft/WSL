@@ -467,7 +467,11 @@ void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& st
 
     [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(
+        std::move(channel),
+        std::vector<HANDLE>{m_virtualMachine->TerminatingEvent(), m_sessionTerminatingEvent.get()},
+        m_virtualMachine->VmId(),
+        10 * 1000);
 
     // (Re)bind the session-scoped event tracker to this VM's docker client and relay. Existing
     // container subscriptions are preserved across restarts.
