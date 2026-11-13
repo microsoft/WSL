@@ -3271,6 +3271,7 @@ try
 
             UtilCanonicalisePathSeparator(TranslatedPath.data(), PATH_SEP);
             UnescapePathInplace(TranslatedPath.data());
+            TranslatedPath.resize(strlen(TranslatedPath.c_str()));
         }
     }
 
