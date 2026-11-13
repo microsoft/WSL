@@ -823,40 +823,7 @@ UINT64 wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(_In_ UINT64 me
     return c_swiotlbSize;
 }
 
-void wsl::windows::common::helpers::RegisterSwapFile(_In_ HKEY SwapFilesKey, _In_ LPCWSTR VmId, _In_ LPCWSTR Path)
+std::filesystem::path wsl::windows::common::helpers::GetDefaultSwapFilePath(_In_ HANDLE userToken)
 {
-    registry::WriteString(SwapFilesKey, nullptr, VmId, Path);
-    THROW_IF_WIN32_ERROR(RegFlushKey(SwapFilesKey));
-}
-
-void wsl::windows::common::helpers::UnregisterSwapFile(_In_ HKEY SwapFilesKey, _In_ LPCWSTR VmId)
-{
-    registry::DeleteValue(SwapFilesKey, VmId);
-}
-
-void wsl::windows::common::helpers::CleanupSwapFiles(_In_ HKEY SwapFilesKey)
-try
-{
-    for (const auto& [vmId, path] : registry::EnumStringValues(SwapFilesKey))
-    {
-        try
-        {
-            if (!DeleteFileW(path.c_str()))
-            {
-                const auto error = GetLastError();
-                THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
-            }
-
-            UnregisterSwapFile(SwapFilesKey, vmId.c_str());
-        }
-        CATCH_LOG()
-    }
-}
-CATCH_LOG()
-
-wil::unique_hkey wsl::windows::common::helpers::OpenOrCreateSwapFilesKey(_In_ PSID UserSid)
-{
-    const auto runAsSelf = wil::run_as_self();
-    const auto path = std::format(L"{}\\{}\\{}", LXSS_REGISTRY_PATH, c_swapFilesRegistryKey, wslutil::SidToString(UserSid).get());
-    return registry::CreateKey(HKEY_LOCAL_MACHINE, path.c_str(), KEY_QUERY_VALUE | KEY_SET_VALUE);
+    return wsl::windows::common::filesystem::GetTempFolderPath(userToken) / L"wsl-swap" / L"swap.vhdx";
 }

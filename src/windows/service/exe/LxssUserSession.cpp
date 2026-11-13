@@ -583,9 +583,13 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
 
     try
     {
-        const auto swapFilesKey = wsl::windows::common::helpers::OpenOrCreateSwapFilesKey(&m_userSid.Sid);
         const auto runAsUser = wil::impersonate_token(userToken.get());
-        wsl::windows::common::helpers::CleanupSwapFiles(swapFilesKey.get());
+        const auto swapPath = wsl::windows::common::helpers::GetDefaultSwapFilePath(userToken.get());
+        if (!DeleteFileW(swapPath.c_str()))
+        {
+            const auto error = GetLastError();
+            THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
+        }
     }
     CATCH_LOG()
 

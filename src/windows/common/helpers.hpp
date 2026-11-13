@@ -211,14 +211,6 @@ void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int
 
 UINT64 ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes);
 
-inline constexpr auto c_swapFilesRegistryKey = L"SwapFiles";
-
-void RegisterSwapFile(_In_ HKEY SwapFilesKey, _In_ LPCWSTR VmId, _In_ LPCWSTR Path);
-
-void UnregisterSwapFile(_In_ HKEY SwapFilesKey, _In_ LPCWSTR VmId);
-
-void CleanupSwapFiles(_In_ HKEY SwapFilesKey);
-
-wil::unique_hkey OpenOrCreateSwapFilesKey(_In_ PSID UserSid);
+std::filesystem::path GetDefaultSwapFilePath(_In_ HANDLE userToken);
 
 } // namespace wsl::windows::common::helpers

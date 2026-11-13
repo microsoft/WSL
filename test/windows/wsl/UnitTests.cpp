@@ -2131,6 +2131,12 @@ Usage:
             -1);
     }
 
+    static void VerifySwapSize(LPCWSTR Expected)
+    {
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
+        VERIFY_ARE_EQUAL(std::wstring{Expected} + L"\n", output);
+    }
+
     WSL2_TEST_METHOD(TestExistingSwapVhd)
     {
         // Create a 100MB swap vhdx.
@@ -2153,62 +2159,41 @@ Usage:
         const auto escapedSwapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
         WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + escapedSwapVhd);
 
-        auto validateSwapSize = [](LPCWSTR Expected) {
-            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
-
-            VERIFY_ARE_EQUAL(Expected + std::wstring(L"\n"), output);
-        };
-
-        validateSwapSize(L"256M");
+        VerifySwapSize(L"256M");
 
         // Validate that the vhdx is resized correctly if the swap size changes
         configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + escapedSwapVhd);
-        validateSwapSize(L"200M");
+        VerifySwapSize(L"200M");
 
         WslShutdown();
+        VERIFY_IS_TRUE(std::filesystem::exists(swapVhd));
         VerifyNoVmAccessToVhd(swapVhd.c_str());
     }
 
-    WSL2_TEST_METHOD(SwapFileCleanup)
+    WSL2_TEST_METHOD(DefaultSwapFile)
     {
-        namespace registry = wsl::windows::common::registry;
-        namespace helpers = wsl::windows::common::helpers;
-
-        WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nvmIdleTimeout=60000\n");
-        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"grep -q '^/dev/' /proc/swaps"), 0u);
-
+        WslConfigChange configChange(LxssGenerateTestConfig({.vmIdleTimeout = 60000}) + L"\nswap=256MB\n");
+        const auto swapPath = wsl::windows::common::helpers::GetDefaultSwapFilePath(GetCurrentProcessToken());
         const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
-        const auto journalPath = std::format(
-            L"{}\\{}\\{}",
-            LXSS_REGISTRY_PATH,
-            helpers::c_swapFilesRegistryKey,
-            wsl::windows::common::wslutil::SidToString(tokenUser->User.Sid).get());
-        const auto journal = registry::OpenKey(HKEY_LOCAL_MACHINE, journalPath.c_str(), KEY_READ);
-        const auto swapFiles = registry::EnumStringValues(journal.get());
-        VERIFY_ARE_EQUAL(size_t{1}, swapFiles.size());
-        const auto& [vmId, swapPath] = *swapFiles.begin();
-        VERIFY_IS_TRUE(std::filesystem::exists(swapPath));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            WslShutdown();
+            DeleteFileW(swapPath.c_str());
+        });
 
-        const wil::unique_schandle manager{OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT)};
-        VERIFY_IS_NOT_NULL(manager.get());
-        const wil::unique_schandle service{OpenService(manager.get(), L"wslservice", SERVICE_QUERY_STATUS)};
-        VERIFY_IS_NOT_NULL(service.get());
-        const auto [serviceState, servicePid] = GetServiceState(service.get());
-        VERIFY_ARE_EQUAL(SERVICE_RUNNING, serviceState);
-
-        const wil::unique_handle serviceProcess{OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, servicePid)};
-        VERIFY_IS_NOT_NULL(serviceProcess.get());
-        VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(serviceProcess.get(), 1));
-        VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(serviceProcess.get(), 30 * 1000));
-        VERIFY_IS_TRUE(WaitForServiceState(service.get(), SERVICE_STOPPED, servicePid));
-
-        VERIFY_IS_TRUE(std::filesystem::exists(swapPath));
-        VERIFY_IS_TRUE(registry::ReadOptionalString(journal.get(), nullptr, vmId.c_str()).has_value());
-
-        RestartWslService();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list --quiet"), 0u);
-        VERIFY_IS_FALSE(std::filesystem::exists(swapPath));
-        VERIFY_IS_FALSE(registry::ReadOptionalString(journal.get(), nullptr, vmId.c_str()).has_value());
+        for (const bool existingSwap : {false, true})
+        {
+            if (existingSwap)
+            {
+                wsl::core::filesystem::CreateVhd(swapPath.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
+            }
+
+            VerifySwapSize(L"256M");
+            VERIFY_IS_TRUE(std::filesystem::exists(swapPath));
+
+            WslShutdown();
+            VERIFY_IS_FALSE(std::filesystem::exists(swapPath));
+        }
     }
 
     TEST_METHOD(InitDoesntBlockSignals)
