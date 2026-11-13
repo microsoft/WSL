@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "precomp.h"
+#include <linux/limits.h>
 #include "p9protohelpers.h"
 #include "p9errors.h"
 #include "p9defs.h"
@@ -7,6 +8,7 @@
 #include "p9tracelogginghelper.h"
 #include "p9log.h"
 #include "p9data.h"
+#include "p9validate.h"
 #include "p9await.h"
 #include "p9fid.h"
 #include "p9handler.h"
@@ -109,6 +111,7 @@ private:
         LIST_ENTRY Link;
         AsyncEvent Event;
         UINT16 Tag;
+        UINT64 Sequence{};
         bool Cancelled{};
     };
 
@@ -116,6 +119,7 @@ private:
     {
         std::mutex Lock;
         util::LinkedList<RequestInfo> Requests;
+        UINT64 NextSequence{};
     };
 
     class RequestTracker
@@ -126,6 +130,7 @@ private:
         {
             // Insert into the list on construction.
             std::lock_guard<std::mutex> lock{m_requestList->Lock};
+            m_request->Sequence = m_requestList->NextSequence++;
             m_requestList->Requests.Insert(*m_request);
         }
 
@@ -178,7 +183,7 @@ private:
         TraceLogMessage(message);
     }
 
-    Task<LX_INT> HandleMessage(MessageType messageType, SpanReader& reader, MessageResponse& response)
+    Task<LX_INT> HandleMessage(MessageType messageType, RequestInfo& request, SpanReader& reader, MessageResponse& response)
     {
         // Handle async operations.
         switch (messageType)
@@ -190,7 +195,7 @@ private:
             co_return co_await HandleWrite(reader, response);
 
         case MessageType::Tflush:
-            co_return co_await HandleFlush(reader);
+            co_return co_await HandleFlush(reader, request);
 
         default:
             // Default label prevents warning in clang.
@@ -782,7 +787,7 @@ private:
         }
 
         auto [returnType, returnStart, returnLength, returnProcId, returnClientId] = result.Get();
-        response.EnsureSize(MessageType::Rgetlock, 0, m_NegotiatedSize);
+        response.EnsureSize(MessageType::Rgetlock, gsl::narrow<UINT32>(returnClientId.size()), m_NegotiatedSize);
         response.Writer.U8(static_cast<UINT8>(returnType));
         response.Writer.U64(returnStart);
         response.Writer.U64(returnLength);
@@ -822,6 +827,11 @@ private:
         auto name = reader.String();
         const auto size = reader.U64();
         const auto flags = reader.U32();
+
+        if (size > XATTR_SIZE_MAX)
+        {
+            return LX_E2BIG;
+        }
 
         const auto entry = LookupFid(fid);
 
@@ -1124,18 +1134,24 @@ private:
     }
 
     // Cancel an outstanding request.
-    Task<LX_INT> HandleFlush(SpanReader& reader)
+    Task<LX_INT> HandleFlush(SpanReader& reader, const RequestInfo& currentRequest)
     {
         const auto oldTag = reader.U16();
+        if (oldTag == currentRequest.Tag)
+        {
+            // A self-flush cannot wait for its own completion.
+            co_return 0;
+        }
+
         std::unique_ptr<RequestInfo> waitRequest;
 
         {
             std::lock_guard<std::mutex> lock{m_Requests->Lock};
 
-            // Search the list for the specified request.
+            // Only wait on earlier requests, so buffered flushes cannot form a wait cycle.
             for (auto& request : m_Requests->Requests)
             {
-                if (request.Tag == oldTag)
+                if (request.Tag == oldTag && request.Sequence < currentRequest.Sequence)
                 {
                     // A client should not send more than one Tflush on the same request. If it
                     // does, another Tflush request already has ownership and it can't be taken
@@ -1220,7 +1236,7 @@ private:
     }
 
     // Process a message received from a socket.
-    Task<void> ProcessMessage(gsl::span<const gsl::byte> message, CancelToken& sendToken)
+    Task<void> ProcessMessage(gsl::span<const gsl::byte> message, CancelToken& sendToken, RequestInfo& request)
     {
         SpanReader reader{message};
 
@@ -1231,7 +1247,7 @@ private:
         //      EnsureSize since the static buffer is always big enough for that.
         gsl::byte staticBuffer[c_staticBufferSize];
         MessageResponse response{staticBuffer};
-        co_await ProcessMessage(reader, response);
+        co_await ProcessMessage(reader, response, request);
         auto m = response.Writer.Result();
 
         {
@@ -1243,38 +1259,47 @@ private:
     }
 
     // Process a Plan 9 message, and write the response to the specified buffer.
-    Task<void> ProcessMessage(SpanReader& reader, MessageResponse& response)
+    Task<void> ProcessMessage(SpanReader& reader, MessageResponse& response, RequestInfo& request)
     {
-        const auto messageSize = reader.U32(); // message size, already validated
+        const auto messageSize = reader.U32();
         auto messageType = reader.U8();
         const auto messageTag = reader.U16();
         const SpanWriter errorWriter{response.Writer};
 
         LX_INT error{};
 
-        if (const auto minimumMessageSize = GetMessageSize(static_cast<MessageType>(messageType));
-            minimumMessageSize != 0 && messageSize < minimumMessageSize)
+        try
         {
-            error = LX_EINVAL;
+            if (messageSize < HeaderSize || messageSize > reader.Size())
+            {
+                error = LX_EINVAL;
+            }
+            else
+            {
+                const auto message = reader.Span().subspan(0, messageSize);
+                if (!ValidateMessageStructure(static_cast<MessageType>(messageType), message))
+                {
+                    error = LX_EINVAL;
+                }
+                else
+                {
+                    LogMessage(message);
+                    SpanReader declaredReader{message};
+                    declaredReader.Read(HeaderSize);
+                    error = co_await HandleMessage(static_cast<MessageType>(messageType), request, declaredReader, response);
+                }
+            }
         }
-        else
+        catch (...)
         {
-            try
-            {
-                LogMessage(reader.Span());
-
-                error = co_await HandleMessage(static_cast<MessageType>(messageType), reader, response);
-            }
-            catch (...)
-            {
-                LOG_CAUGHT_EXCEPTION();
-                error = util::LinuxErrorFromCaughtException();
-            }
+            LOG_CAUGHT_EXCEPTION();
+            error = util::LinuxErrorFromCaughtException();
         }
 
         if (error != 0)
         {
             response.Writer = errorWriter;
+            response.EnsureSize(MessageType::Rlerror, 0, m_NegotiatedSize);
             response.Writer.U32(static_cast<UINT32>(-error));
             messageType = static_cast<UINT8>(MessageType::Tlerror);
         }
@@ -1286,6 +1311,12 @@ private:
     // Process a message received from virtio.
     void ProcessMessageAsync(std::vector<gsl::byte>&& message, size_t responseSize, HandlerCallback&& callback) override
     {
+        if (message.size() < HeaderSize || responseSize < HeaderSize)
+        {
+            callback({});
+            return;
+        }
+
         // Register the request so Tflush can wait on it if needed.
         const auto tag = SpanReader{gsl::make_span(message).subspan(TagOffset)}.U16();
         RequestTracker request{m_Requests, tag};
@@ -1313,7 +1344,7 @@ private:
                     responseBuffer.resize(responseSize);
                     MessageResponse response{responseBuffer, false};
 
-                    co_await ProcessMessage(reader, response);
+                    co_await ProcessMessage(reader, response, localRequest.Request());
                     responseBuffer.resize(response.Writer.Size());
                 }
                 catch (...)
@@ -1371,7 +1402,7 @@ public:
                  &sendToken]() mutable -> Task<void> {
                     try
                     {
-                        co_await ProcessMessage(localMessage, sendToken);
+                        co_await ProcessMessage(localMessage, sendToken, localRequest.Request());
                     }
                     catch (...)
                     {
