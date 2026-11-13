@@ -5207,10 +5207,21 @@ VERSION_ID="Invalid|Format"
         });
 
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
-        const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
+        RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
-        auto validateOutput = [](LPCWSTR Cmd, LPCWSTR ExpectedOutput, LPCWSTR ExpectedWarnings = L"", DWORD ExpectedExitCode = 0) {
+        auto validateOutput = [](LPCWSTR Cmd,
+                                 LPCWSTR ExpectedOutput,
+                                 LPCWSTR ExpectedWarnings = L"",
+                                 DWORD ExpectedExitCode = 0,
+                                 std::string_view Input = "") {
             auto [read, write] = CreateSubprocessPipe(true, false);
+            if (!Input.empty())
+            {
+                DWORD written = 0;
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), Input.data(), static_cast<DWORD>(Input.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(Input.size()), written);
+            }
+
             write.reset();
 
             wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(Cmd).c_str());
@@ -5335,6 +5346,18 @@ VERSION_ID="Invalid|Format"
                 testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             VERIFY_IS_TRUE(file.is_valid());
             validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
+        }
+
+        {
+            runOOBE.Set(1);
+            defaultUid.Set(0);
+            distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\ndefaultUid = 1010\n");
+            TerminateDistribution();
+
+            validateOutput(L"--user root", L"OOBE\n0\n", L"", 0, "id -u\n");
+            VERIFY_ARE_EQUAL(0, runOOBE.Get());
+            VERIFY_ARE_EQUAL(1010, defaultUid.Get());
+            validateOutput(L"id -u", L"1010\n");
         }
 
         if (LxsstuVmMode())
