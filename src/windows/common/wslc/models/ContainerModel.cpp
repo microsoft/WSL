@@ -238,8 +238,15 @@ std::vector<std::wstring> EnvironmentVariable::ParseFile(const std::wstring& fil
     // Read the file line by line
     std::vector<std::wstring> envVars;
     std::string line;
+    bool firstLine = true;
     while (std::getline(file, line))
     {
+        if (firstLine && line.starts_with("\xEF\xBB\xBF"))
+        {
+            line.erase(0, 3);
+        }
+        firstLine = false;
+
         // Remove leading whitespace
         line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) { return !std::isspace(ch); }));
 
