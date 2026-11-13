@@ -418,37 +418,6 @@ int ImportDistributionInplace(_In_ std::wstring_view commandLine)
     return 0;
 }
 
-int LaunchElevated(_In_ LPCWSTR commandLine)
-{
-    wsl::windows::common::wslutil::PrintMessage(
-        wsl::windows::common::wslutil::GetSystemErrorString(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED)));
-
-    // Add the attach parent process argument to the command line and shell execute an elevated version of wsl.exe.
-    std::wstring arguments;
-    arguments += WSL_PARENT_CONSOLE_ARG L" ";
-    arguments += std::to_wstring(GetCurrentProcessId());
-    arguments += L" ";
-    arguments += commandLine;
-
-    const auto path = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
-    SHELLEXECUTEINFOW execInfo{};
-    execInfo.cbSize = sizeof(execInfo);
-    execInfo.fMask = (SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE | SEE_MASK_FLAG_NO_UI);
-    execInfo.lpFile = path.c_str();
-    execInfo.lpVerb = L"runas";
-    execInfo.nShow = SW_HIDE;
-    execInfo.lpParameters = arguments.c_str();
-    THROW_IF_WIN32_BOOL_FALSE(ShellExecuteExW(&execInfo));
-    const wil::unique_handle process{execInfo.hProcess};
-
-    // Get the process exit code.
-    WI_VERIFY(WaitForSingleObject(process.get(), INFINITE) == WAIT_OBJECT_0);
-
-    DWORD exitCode;
-    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(process.get(), &exitCode));
-    return static_cast<int>(exitCode);
-}
-
 int Install(_In_ std::wstring_view commandLine)
 {
 
@@ -644,7 +613,7 @@ bool InstallPrerequisites(_In_ bool installWslOptionalComponent)
         const auto elevatedCommand = std::format(
             L"{} {} {}", WSL_INSTALL_ARG, WSL_INSTALL_ARG_NO_DISTRIBUTION_OPTION, installWslOptionalComponent ? WSL_INSTALL_ARG_ENABLE_WSL1_LONG : L"");
 
-        const auto exitCode = LaunchElevated(elevatedCommand.c_str());
+        const auto exitCode = wsl::windows::common::wslutil::LaunchElevated(elevatedCommand.c_str());
         if (exitCode != 0)
         {
             THROW_HR_WITH_USER_ERROR(
@@ -1279,8 +1248,12 @@ int UpdatePackage(std::wstring_view commandLine)
     ExecutionContext context(wsl::windows::common::UpdatePackage);
 
     bool preRelease{};
+    bool windowsUpdate{};
     ArgumentParser parser(std::wstring{commandLine}, WSL_BINARY_NAME);
     parser.AddArgument(preRelease, WSL_UPDATE_ARG_PRE_RELEASE_OPTION_LONG);
+
+    // Hidden option used by the elevated Windows Update fallback.
+    parser.AddArgument(windowsUpdate, WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG);
 
     // Options kept for compatibility with inbox WSL.
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_WEB_DOWNLOAD_OPTION_LONG);
@@ -1288,7 +1261,16 @@ int UpdatePackage(std::wstring_view commandLine)
     parser.AddArgument(NoOp(), WSL_UPDATE_ARG_PROMPT_OPTION_LONG);
     parser.Parse();
 
-    return wsl::windows::common::install::UpdatePackage(preRelease, false);
+    if (!windowsUpdate)
+    {
+        return wsl::windows::common::install::UpdatePackage(preRelease, false);
+    }
+
+    THROW_HR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        !wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token().get()));
+
+    return wsl::windows::common::install::UpdateViaWindowsUpdate();
 }
 
 int Uninstall()

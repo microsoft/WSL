@@ -23,11 +23,13 @@ Abstract:
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
 #include "MsiQuery.h"
+#include "WindowsUpdateIntegration.h"
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
 using wsl::shared::Localization;
 using wsl::windows::common::Context;
+using wsl::windows::common::WindowsUpdateContext;
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::common::install;
@@ -77,6 +79,32 @@ bool PromptForKeyPressWithTimeout()
     return waitResult == std::future_status::ready && future.get();
 }
 
+int UpdateViaWindowsUpdateFallback()
+{
+    PrintMessage(Localization::MessageGitHubRateLimitedFallback());
+
+    int exitCode = -1;
+    try
+    {
+        if (wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token().get()))
+        {
+            exitCode = UpdateViaWindowsUpdate();
+        }
+        else
+        {
+            exitCode = LaunchElevated(WSL_UPDATE_ARG L" " WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG);
+        }
+    }
+    CATCH_LOG()
+
+    if (exitCode == 0)
+    {
+        return 0;
+    }
+
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited());
+}
+
 int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
 {
     if (!repair && callerOwnsProcess)
@@ -84,7 +112,30 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
 
-    auto [version, release] = GetLatestGitHubRelease(preRelease);
+    // Windows Update doesn't offer pre-release versions or repairs and requires elevation, so only fall back for
+    // interactive updates.
+    bool rateLimited = false;
+    std::pair<std::wstring, GitHubReleaseAsset> latestRelease;
+    try
+    {
+        latestRelease = GetLatestGitHubRelease(preRelease);
+    }
+    catch (...)
+    {
+        if (wil::ResultFromCaughtException() != WSL_E_GITHUB_RATE_LIMITED || preRelease || repair || !callerOwnsProcess)
+        {
+            throw;
+        }
+
+        rateLimited = true;
+    }
+
+    if (rateLimited)
+    {
+        return UpdateViaWindowsUpdateFallback();
+    }
+
+    const auto& [version, release] = latestRelease;
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
@@ -380,6 +431,26 @@ int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair, b
         // Rethrowing via WIL is required for the error context to be properly set in case a winrt exception was thrown.
         THROW_HR(wil::ResultFromCaughtException());
     }
+}
+
+int wsl::windows::common::install::UpdateViaWindowsUpdate()
+{
+    wsl::windows::common::ConsoleProgressBar progressBar;
+    auto clearProgress = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&progressBar]() { progressBar.Clear(); });
+
+    WindowsUpdateContext context;
+    context.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::EnsureProductRegistration, [&progressBar](uint32_t percent) {
+        progressBar.Print(percent, 100);
+    });
+
+    clearProgress.reset();
+
+    if (context.GetUpdateCount() == 0)
+    {
+        PrintMessage(Localization::MessageUpdateNotNeeded());
+    }
+
+    return 0;
 }
 
 UINT wsl::windows::common::install::UpgradeViaMsi(

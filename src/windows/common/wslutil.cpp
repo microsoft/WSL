@@ -107,6 +107,7 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_DISTRIBUTION_NAME_NEEDED),
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
+    X(WSL_E_GITHUB_RATE_LIMITED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
     X(WSLC_E_CONTAINER_DISABLED),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
@@ -376,6 +377,19 @@ std::regex BuildImageReferenceRegex()
     auto namePat = optional(domain + "\\/") + nameComponent + optional(repeated("\\/" + nameComponent));
 
     return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
+}
+
+void ThrowIfGitHubRateLimited(const winrt::Windows::Web::Http::HttpResponseMessage& response)
+{
+    const auto statusCode = response.StatusCode();
+    if (statusCode != winrt::Windows::Web::Http::HttpStatusCode::Forbidden && statusCode != winrt::Windows::Web::Http::HttpStatusCode::TooManyRequests)
+    {
+        return;
+    }
+
+    WSL_LOG("GitHubRateLimited", TraceLoggingValue(static_cast<uint32_t>(statusCode), "statusCode"));
+
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited());
 }
 
 } // namespace
@@ -1007,6 +1021,7 @@ std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLa
     winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
+    ThrowIfGitHubRateLimited(response);
     response.EnsureSuccessStatusCode();
 
     return GetLatestGitHubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
@@ -1051,6 +1066,7 @@ GitHubRelease wsl::windows::common::wslutil::GetGitHubReleaseByTag(_In_ const st
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto url = c_specificReleaseListUrl + inTag;
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
+    ThrowIfGitHubRateLimited(response);
     response.EnsureSuccessStatusCode();
 
     const auto content = response.Content().ReadAsStringAsync().get();
@@ -1254,6 +1270,36 @@ bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& 
 {
     return wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdFileExtension) ||
            wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
+}
+
+int wsl::windows::common::wslutil::LaunchElevated(_In_ LPCWSTR CommandLine)
+{
+    PrintMessage(GetSystemErrorString(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED)));
+
+    // Add the attach parent process argument to the command line and shell execute an elevated version of wsl.exe.
+    std::wstring arguments;
+    arguments += WSL_PARENT_CONSOLE_ARG L" ";
+    arguments += std::to_wstring(GetCurrentProcessId());
+    arguments += L" ";
+    arguments += CommandLine;
+
+    const auto path = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
+    SHELLEXECUTEINFOW execInfo{};
+    execInfo.cbSize = sizeof(execInfo);
+    execInfo.fMask = (SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE | SEE_MASK_FLAG_NO_UI);
+    execInfo.lpFile = path.c_str();
+    execInfo.lpVerb = L"runas";
+    execInfo.nShow = SW_HIDE;
+    execInfo.lpParameters = arguments.c_str();
+    THROW_IF_WIN32_BOOL_FALSE(ShellExecuteExW(&execInfo));
+    const wil::unique_handle process{execInfo.hProcess};
+
+    // Get the process exit code.
+    WI_VERIFY(WaitForSingleObject(process.get(), INFINITE) == WAIT_OBJECT_0);
+
+    DWORD exitCode;
+    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(process.get(), &exitCode));
+    return static_cast<int>(exitCode);
 }
 
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
