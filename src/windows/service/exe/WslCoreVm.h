@@ -79,7 +79,8 @@ public:
         _In_ ULONG ExportFlags = 0,
         _Out_opt_ ULONG* ConnectPort = nullptr);
 
-    wil::unique_socket CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments, uint64_t PluginId = 0);
+    wil::unique_socket CreateRootNamespaceProcess(
+        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, uint64_t PluginId = 0, _In_opt_ LPCSTR PluginRelativeCgroupPath = nullptr);
 
     std::pair<int, LX_MINI_MOUNT_STEP> DetachDisk(_In_opt_ PCWSTR Disk);
 
