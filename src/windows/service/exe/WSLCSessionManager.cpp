@@ -40,6 +40,8 @@ Abstract:
 #include "APICompat.h"
 #include "Localization.h"
 
+#include <nlohmann/json.hpp>
+
 extern wsl::windows::service::PluginManager g_pluginManager;
 
 using wsl::windows::common::COMServiceExecutionContext;
@@ -55,12 +57,40 @@ namespace settings = wsl::windows::wslc::settings;
 
 namespace {
 
+// Builds the daemon.json that the session writes into the VM before starting dockerd.
+// Returns an empty string when no registry setting is configured, in which case the session keeps the
+// default configuration that /init generates.
+std::string BuildDockerDaemonConfig(const std::vector<std::string>& InsecureRegistries, const std::vector<std::string>& RegistryMirrors)
+{
+    if (InsecureRegistries.empty() && RegistryMirrors.empty())
+    {
+        return {};
+    }
+
+    nlohmann::json config;
+    // Keep the CDI feature that /init enables by default; dockerd needs it for GPU support.
+    config["features"]["cdi"] = true;
+
+    if (!InsecureRegistries.empty())
+    {
+        config["insecure-registries"] = InsecureRegistries;
+    }
+
+    if (!RegistryMirrors.empty())
+    {
+        config["registry-mirrors"] = RegistryMirrors;
+    }
+
+    return config.dump();
+}
+
 // Session settings built server-side from the caller's settings.yaml.
 struct SessionSettings
 {
     std::wstring DisplayName;
     std::wstring StoragePath;
     std::string HostLoopback;
+    std::string DockerDaemonConfig;
     WSLCSessionSettings Settings{};
 
     NON_COPYABLE(SessionSettings);
@@ -124,6 +154,10 @@ private:
         Settings.BootTimeoutMs = wsl::windows::wslc::DefaultBootTimeoutMs;
         Settings.IdleTimeoutSec = userSettings.Get<settings::Setting::SessionIdleTimeout>();
         Settings.NetworkingMode = userSettings.Get<settings::Setting::SessionNetworkingMode>();
+
+        DockerDaemonConfig = BuildDockerDaemonConfig(
+            userSettings.Get<settings::Setting::SessionRegistryInsecure>(), userSettings.Get<settings::Setting::SessionRegistryMirrors>());
+        Settings.DockerDaemonConfig = DockerDaemonConfig.empty() ? nullptr : DockerDaemonConfig.c_str();
 
         // TODO: Add a config setting to opt-out of GPU support.
         Settings.FeatureFlags = WslcFeatureFlagsGPU;
@@ -544,6 +578,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
+    sessionSettings.DockerDaemonConfig = Settings->DockerDaemonConfig;
     return sessionSettings;
 }
 
