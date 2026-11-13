@@ -822,3 +822,8 @@ UINT64 wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(_In_ UINT64 me
 
     return c_swiotlbSize;
 }
+
+std::filesystem::path wsl::windows::common::helpers::GetDefaultSwapFilePath(_In_ HANDLE userToken)
+{
+    return wsl::windows::common::filesystem::GetTempFolderPath(userToken) / L"wsl-swap" / L"swap.vhdx";
+}

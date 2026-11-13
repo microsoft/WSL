@@ -538,11 +538,13 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         {
             {
                 // If no user-specified swap vhd file path was specified, use a
-                // path in the temp directory.
+                // fixed path in the user's temp directory.
                 auto runAsUser = wil::impersonate_token(m_userToken.get());
                 if (m_vmConfig.SwapFilePath.empty())
                 {
-                    m_vmConfig.SwapFilePath = m_tempPath / L"swap";
+                    m_vmConfig.SwapFilePath = helpers::GetDefaultSwapFilePath(m_userToken.get());
+                    m_deleteSwapFile = true;
+                    wil::CreateDirectoryDeep(m_vmConfig.SwapFilePath.parent_path().c_str());
                 }
 
                 // Ensure the swap vhd ends with the vhdx file extension.
@@ -556,7 +558,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 m_vmConfig.SwapSizeBytes += PAGE_SIZE;
                 auto result = wil::ResultFromException([&]() {
                     wsl::core::filesystem::CreateVhd(m_vmConfig.SwapFilePath.c_str(), m_vmConfig.SwapSizeBytes, &m_userSid.Sid, false, false);
-                    m_swapFileCreated = true;
+                    m_deleteSwapFile = true;
                 });
 
                 if (result == HRESULT_FROM_WIN32(ERROR_FILE_EXISTS))
@@ -863,13 +865,17 @@ WslCoreVm::~WslCoreVm() noexcept
     // compute system, guest device manager, disks, and host-side disk state.
     m_backend.reset();
 
-    // Delete the swap vhd if one was created.
-    if (m_swapFileCreated)
+    // Delete the default swap vhd, or a custom one created by this VM.
+    if (m_deleteSwapFile)
     {
         try
         {
             const auto runAsUser = wil::impersonate_token(m_userToken.get());
-            LOG_IF_WIN32_BOOL_FALSE(DeleteFileW(m_vmConfig.SwapFilePath.c_str()));
+            if (!DeleteFileW(m_vmConfig.SwapFilePath.c_str()))
+            {
+                const auto error = GetLastError();
+                THROW_WIN32_IF(error, error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND);
+            }
         }
         CATCH_LOG()
     }

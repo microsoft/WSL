@@ -211,4 +211,6 @@ void AppendCommonKernelCommandLine(_Inout_ std::wstring& kernelCmdLine, _In_ int
 
 UINT64 ComputeDefaultSwiotlbConfig(_In_ UINT64 memoryBytes);
 
+std::filesystem::path GetDefaultSwapFilePath(_In_ HANDLE userToken);
+
 } // namespace wsl::windows::common::helpers
