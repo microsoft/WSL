@@ -490,6 +490,12 @@ void AcceptThread(std::vector<std::shared_ptr<PortRelay>>& ports, const GUID& Vm
                 while (e->ScheduleAccept())
                 {
                     e->LaunchRelay(VmId); // Start the relay if accept completes immediately.
+
+                    // A steady stream of connections keeps accepts completing immediately, so check for exit between them.
+                    if (WaitForSingleObject(ExitEvent, 0) == WAIT_OBJECT_0)
+                    {
+                        return;
+                    }
                 }
             }
 
