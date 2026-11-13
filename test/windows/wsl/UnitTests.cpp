@@ -1504,6 +1504,11 @@ class UnitTests
 
         validateEnv({{L"a", L"C:\\Users;C:\\Windows\\System32"}, {L"WSLENV", L"a/w"}}, {{L"a", L""}});
 
+        validateEnv(
+            {{L"a", std::format(L"\\\\wsl.localhost\\{}\\tmp\\escaped\uf05cpath;C:\\Windows", LXSS_DISTRO_NAME_TEST_L)},
+             {L"WSLENV", L"a/lp"}},
+            {{L"a", L"/tmp/escaped\\path:/mnt/c/Windows"}});
+
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"Empty", nullptr));
             THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"WSLENV", nullptr));
