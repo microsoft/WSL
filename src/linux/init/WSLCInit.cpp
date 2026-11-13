@@ -1091,6 +1091,56 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
     Transaction.SendResultMessage<int32_t>(result);
 }
 
+int WriteFileAtomic(const std::filesystem::path& Path, const gsl::span<gsl::byte>& Content, int Permissions)
+{
+    // Every step goes through the same directory fd so the staging file and the rename target can't diverge.
+    wil::unique_fd directory{open(Path.parent_path().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
+    if (!directory)
+    {
+        return errno;
+    }
+
+    const auto name = Path.filename();
+    auto tmpName = name;
+    tmpName += ".tmp";
+
+    // Always stage into a freshly created regular file. Opening a leftover FIFO or device would block or have side effects.
+    if (unlinkat(directory.get(), tmpName.c_str(), 0) < 0 && errno != ENOENT)
+    {
+        return errno;
+    }
+
+    wil::unique_fd fd{openat(directory.get(), tmpName.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, Permissions)};
+    if (!fd)
+    {
+        return errno;
+    }
+
+    auto removeTmp = wil::scope_exit([&]() { unlinkat(directory.get(), tmpName.c_str(), 0); });
+
+    if (UtilWriteBuffer(fd.get(), Content) != static_cast<ssize_t>(Content.size()) || fsync(fd.get()) < 0)
+    {
+        return errno;
+    }
+
+    fd.reset();
+
+    if (renameat(directory.get(), tmpName.c_str(), directory.get(), name.c_str()) < 0)
+    {
+        return errno;
+    }
+
+    removeTmp.release();
+
+    // The rename is only durable once the directory entry is flushed.
+    if (fsync(directory.get()) < 0)
+    {
+        return errno;
+    }
+
+    return 0;
+}
+
 void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_WRITE_FILE& Message, const gsl::span<gsl::byte>& Buffer)
 {
@@ -1104,25 +1154,109 @@ void HandleMessageImpl(
     const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
     const auto content = Buffer.subspan(Message.ContentIndex, Message.ContentLength);
 
+    if (WI_IsFlagClear(Message.Flags, WSLCWriteFileFlagsNoCreateParents) && UtilMkdirPath(path, 0755, true) < 0)
+    {
+        Transaction.SendResultMessage<int32_t>(errno);
+        return;
+    }
+
+    // Atomic writes always create or replace the target, so OpenFlags does not apply.
+    if (WI_IsFlagSet(Message.Flags, WSLCWriteFileFlagsAtomic))
+    {
+        Transaction.SendResultMessage<int32_t>(WriteFileAtomic(path, content, Message.Permissions));
+        return;
+    }
+
     int result = 0;
-    if (UtilMkdirPath(path, 0755, true) < 0)
+    wil::unique_fd fd{open(path, Message.OpenFlags, Message.Permissions)};
+    if (!fd)
     {
         result = errno;
     }
-    else
+    else if (UtilWriteBuffer(fd.get(), content) != static_cast<ssize_t>(content.size()))
     {
-        wil::unique_fd fd{open(path, Message.OpenFlags, Message.Permissions)};
-        if (!fd)
-        {
-            result = errno;
-        }
-        else if (UtilWriteBuffer(fd.get(), content) != static_cast<ssize_t>(content.size()))
-        {
-            result = errno;
-        }
+        result = errno;
     }
 
     Transaction.SendResultMessage<int32_t>(result);
+}
+
+int ReadFileWithLimit(const char* Path, size_t MaxSize, std::string& Content)
+{
+    // O_NONBLOCK keeps a FIFO from blocking the open so the regular-file check below can reject it.
+    wil::unique_fd fd{open(Path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)};
+    if (!fd)
+    {
+        return errno;
+    }
+
+    struct stat status{};
+    if (fstat(fd.get(), &status) < 0)
+    {
+        return errno;
+    }
+
+    if (!S_ISREG(status.st_mode))
+    {
+        return EINVAL;
+    }
+
+    if (static_cast<size_t>(status.st_size) > MaxSize)
+    {
+        return EFBIG;
+    }
+
+    // Read one byte past MaxSize so a file that grew after fstat is still rejected.
+    Content.resize(MaxSize + 1);
+    size_t offset = 0;
+    while (offset < Content.size())
+    {
+        const auto bytesRead = TEMP_FAILURE_RETRY(read(fd.get(), Content.data() + offset, Content.size() - offset));
+        if (bytesRead < 0)
+        {
+            return errno;
+        }
+
+        if (bytesRead == 0)
+        {
+            break;
+        }
+
+        offset += bytesRead;
+    }
+
+    if (offset > MaxSize)
+    {
+        return EFBIG;
+    }
+
+    Content.resize(offset);
+    return 0;
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_READ_FILE& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    wsl::shared::MessageWriter<WSLC_READ_FILE_RESULT> writer;
+
+    try
+    {
+        const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
+
+        std::string content;
+        writer->Result = ReadFileWithLimit(path, Message.MaxSize, content);
+        if (writer->Result == 0)
+        {
+            auto output = writer.InsertBuffer(writer->ContentIndex, content.size());
+            gsl::copy(gsl::as_bytes(gsl::make_span(content)), output);
+        }
+    }
+    catch (...)
+    {
+        writer->Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_READ_FILE::TResponse>(writer.Span());
 }
 
 void HandleMessageImpl(
@@ -1274,7 +1408,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE, WSLC_READ_FILE>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

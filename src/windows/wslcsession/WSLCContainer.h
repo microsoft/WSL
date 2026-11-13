@@ -26,6 +26,7 @@ Abstract:
 #include "wslc_schema.h"
 #include "WSLCCompat.h"
 #include "WSLCContainerMetadata.h"
+#include "WSLCContainerStateStore.h"
 #include "WSLCExitRequestState.h"
 #include "WSLCRestartBackoff.h"
 #include "WSLCRestartTransaction.h"
@@ -96,7 +97,9 @@ public:
         std::int64_t CreatedAt,
         WSLCProcessFlags InitProcessFlags,
         WSLCContainerFlags ContainerFlags,
-        WSLCContainerRestartPolicy RestartPolicy);
+        WSLCContainerRestartPolicy RestartPolicy,
+        const WSLCPersistedContainerState& PersistentState,
+        HRESULT PersistentStateLoadError);
 
     ~WSLCContainerImpl();
 
@@ -232,6 +235,9 @@ private:
     void RunPolicyRestart(std::uint64_t Token) noexcept;
     void OnPolicyRestartFailed(std::uint64_t Token) noexcept;
 
+    // Logs a failure to save the persisted state and warns the caller.
+    void ReportStateSaveFailure(HRESULT Result) noexcept;
+
     // Undoes what the phases left half-done: releases the resources the stop phase held back and
     // requests the auto-delete OnStopped() deferred, returning that delete's transition.
     __requires_exclusive_lock_held(m_lock) std::shared_ptr<StateTransition> OnFailedRestartExclusiveLockHeld();
@@ -354,6 +360,9 @@ private:
 
     // Delay before the next policy restart; reset when a run lasts long enough or by an explicit start.
     _Guarded_by_(m_lock) WSLCRestartBackoff m_restartBackoff;
+
+    // State persisted across VM shutdown for the lifetime of the container. Internally synchronized.
+    WSLCContainerStateStore m_persistentState;
 };
 
 class DECLSPEC_UUID("B1F1C4E3-C225-4CAE-AD8A-34C004DE1AE4") WSLCContainer

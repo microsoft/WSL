@@ -73,6 +73,11 @@ size_t ShareList::MaximumConnectionCount()
 
 Expected<std::shared_ptr<const IRoot>> ShareList::MakeRoot(std::string_view aname, LX_UID_T uid)
 {
+    if (uid == util::c_InvalidUid)
+    {
+        return LxError{LX_EINVAL};
+    }
+
     auto share = Get(aname);
     if (!share)
     {

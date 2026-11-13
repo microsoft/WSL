@@ -2978,4 +2978,76 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(stdoutAccum, "EVENT_OUT\n");
         VERIFY_ARE_EQUAL(stderrAccum, "EVENT_ERR\n");
     }
+
+    WSLC_TEST_METHOD(OpenContainerEventModeCloseDuringOutputCallback)
+    {
+        // Verify that closing a running Event-mode container does not destroy its init process
+        // while an output callback is still executing on the IO thread.
+        constexpr auto c_containerName = L"wslc-winrt-open-event-close-test";
+
+        auto procSettings = WSLCSDK::ProcessSettings();
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo OUT && sleep 99"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(procSettings);
+        containerSettings.Name(c_containerName);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto opened = m_defaultSession.OpenContainer(c_containerName, WSLCSDK::ProcessOutputMode::Event);
+
+        struct DestructionSignal
+        {
+            HANDLE Event;
+            ~DestructionSignal()
+            {
+                SetEvent(Event);
+            }
+        };
+
+        wil::unique_event outputReceived{wil::EventOptions::ManualReset};
+        wil::unique_event resumeCallback{wil::EventOptions::ManualReset};
+        wil::unique_event processDestroyed{wil::EventOptions::ManualReset};
+
+        // Release the container while the events are still alive.
+        auto releaseOpened = wil::scope_exit([&]() {
+            resumeCallback.SetEvent();
+            opened = nullptr;
+        });
+
+        {
+            auto initProcess = opened.InitProcess();
+
+            initProcess.OutputReceived([&](winrt::array_view<const uint8_t>) {
+                outputReceived.SetEvent();
+                resumeCallback.wait(60 * 1000);
+            });
+
+            // The handler is only destroyed when the init process is destroyed.
+            auto signal = std::make_shared<DestructionSignal>(processDestroyed.get());
+            initProcess.Exited([signal](int32_t) {});
+        }
+
+        opened.Start();
+        VERIFY_IS_TRUE(outputReceived.wait(30 * 1000));
+
+        std::thread closeThread([&opened]() {
+            auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+            opened.Close();
+        });
+
+        auto joinCloseThread = wil::scope_exit([&]() {
+            resumeCallback.SetEvent();
+            closeThread.join();
+        });
+
+        // The output callback is blocked, so the init process must remain alive.
+        VERIFY_IS_FALSE(processDestroyed.wait(2 * 1000));
+
+        joinCloseThread.reset();
+
+        opened = nullptr;
+        VERIFY_IS_TRUE(processDestroyed.wait(30 * 1000));
+    }
 };

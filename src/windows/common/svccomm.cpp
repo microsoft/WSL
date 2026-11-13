@@ -476,6 +476,10 @@ wsl::windows::common::SvcComm::LaunchProcess(
                 wsl::windows::common::relay::StandardInputRelay(StdIn, StdInSocket.get(), updateTerminal, ExitEvent.get());
             }).detach();
         }
+        else
+        {
+            StdInSocket.reset();
+        }
 
         auto StdOut = GetStdHandle(STD_OUTPUT_HANDLE);
         StdOutWorker = relay::CreateThread(std::move(StdOutSocket), IS_VALID_HANDLE(StdOut) ? StdOut : nullptr);
