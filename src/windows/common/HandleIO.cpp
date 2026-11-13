@@ -299,8 +299,8 @@ HANDLE EventHandle::GetHandle() const
 
 // ReadHandle
 
-ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead) :
-    Handle(std::move(MovedHandle)), OnRead(OnRead), Offset(InitializeFileOffset(Handle.Get()))
+ReadHandle::ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead, size_t BufferSize) :
+    Handle(std::move(MovedHandle)), OnRead(std::move(OnRead)), Buffer(BufferSize), Offset(InitializeFileOffset(Handle.Get()))
 {
     Overlapped.hEvent = Event.get();
 }
