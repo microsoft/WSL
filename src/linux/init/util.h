@@ -260,7 +260,7 @@ size_t UtilIsPathPrefix(const char* Path, const char* Prefix, bool WinPath);
 
 bool UtilIsUtilityVm(void);
 
-int UtilListenVsockAnyPort(struct sockaddr_vm* Address, int Backlog, bool CloseOnExec = true);
+int UtilListenVsockAnyPort(struct sockaddr_vm* Address, int Backlog, bool CloseOnExec = true, std::optional<int> SocketBuffer = {});
 
 int UtilMkdir(const char* Path, mode_t Mode);
 
