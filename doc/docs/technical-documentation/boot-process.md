@@ -56,11 +56,39 @@ When [wslservice.exe](wslservice.exe.md) receives the CreateInstance() call via 
 
 To start a WSL2 distribution, [wslservice.exe](wslservice.exe.md) needs a virtual machine. If the virtual machine isn't already running, it will be created as part of the `CreateInstance()` call. 
 
-The WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). `src/windows/service/exe/WslCoreVm.cpp` owns WSL-specific policy and guest startup. It passes a `VmCreateRequest` to `HcsVirtualMachineBackend` (`src/windows/common/HcsVirtualMachineBackend.cpp`), which owns the HCS configuration and compute-system lifetime.
+By default, the WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). `src/windows/service/exe/WslCoreVm.cpp` owns WSL-specific policy and guest startup. It passes a `VmCreateRequest` to the selected backend, which owns the virtual machine configuration and lifetime.
 
-To create a new virtual machine, the HCS backend generates a JSON string, which describes the virtual machine configuration. This JSON is then passed to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem) to create a new virtual machine.
+The experimental OpenVMM configuration requires the following `.wslconfig` profile. Backend selection is not yet wired up on this branch:
 
-See `src/windows/common/hcs_schema.h` for more details on the HCS JSON schema.
+```ini
+[wsl2]
+gpuSupport=false
+guiApplications=false
+networkingMode=nat
+virtioFs=true
+nestedVirtualization=false
+hardwarePerformanceCounters=false
+firewall=false
+dnsTunneling=false
+ipv6=false
+
+[experimental]
+openVmm=true
+virtioFsAggregateShares=false
+```
+
+`networkingMode=none` is also supported. Incompatible settings are rejected with an error.
+
+OpenVMM currently does not support:
+
+- ARM64 or UEFI boot
+- GPU assignment
+- Physical-disk devices
+- Mirrored or bridged networking, custom NAT addressing, Hyper-V firewall, DNS tunneling, or IPv6
+- Nested virtualization, performance counters, or advanced memory controls
+- Plan 9 file sharing, aggregate virtio-fs devices, or switching user/elevation context after VM creation
+
+The HCS backend generates a JSON virtual machine configuration and passes it to [HcsCreateComputeSystem()](https://learn.microsoft.com/virtualization/api/hcs/reference/hcscreatecomputesystem). See `src/windows/common/hcs_schema.h` for details on the HCS JSON schema.
 
 Part of the JSON configuration includes:
 

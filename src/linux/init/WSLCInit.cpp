@@ -49,7 +49,7 @@ extern std::vector<unsigned int> ListScsiDisks();
 
 extern int DetachScsiDisk(unsigned int Lun);
 
-extern std::string GetLunDeviceName(unsigned int Lun);
+extern std::string GetScsiDeviceName(unsigned int Lun);
 
 void ProcessMessages(wsl::shared::SocketChannel& Channel);
 int MountInit(const char* Target);
@@ -364,7 +364,7 @@ void HandleMessageImpl(
 
     try
     {
-        auto deviceName = GetLunDeviceName(Message.ScsiLun);
+        auto deviceName = GetScsiDeviceName(Message.ScsiLun);
 
         writer->Result = 0;
         writer.WriteString("/dev/" + deviceName);

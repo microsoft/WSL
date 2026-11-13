@@ -58,6 +58,19 @@ using wsl::windows::common::Context;
 using wsl::windows::common::ExecutionContext;
 
 namespace {
+LX_MINI_INIT_MOUNT_DEVICE_TYPE ToMiniInitDeviceType(VmDiskTransport Transport)
+{
+    switch (Transport)
+    {
+    case VmDiskTransport::Scsi:
+        return LxMiniInitMountDeviceTypeScsi;
+    case VmDiskTransport::VirtioBlk:
+        return LxMiniInitMountDeviceTypeVirtioBlk;
+    default:
+        FAIL_FAST();
+    }
+}
+
 INT64
 RequiredExtraMmioSpaceForPmemFileInMb(_In_ PCWSTR FilePath)
 {
@@ -362,6 +375,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     const auto systemDistro = description.BootDisks.find(L"system-distro");
     if (systemDistro != description.BootDisks.end())
     {
+        m_systemDistroDeviceType = ToMiniInitDeviceType(systemDistro->second.Transport);
         m_systemDistroDeviceId = systemDistro->second.GuestAddress.Lun;
     }
     const auto kernelModules = description.BootDisks.find(L"kernel-modules");
@@ -536,6 +550,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // N.B. This can fail if the target directory is compressed, encrypted, or if
     //      the user does not have write access.
     ULONG swapLun = ULONG_MAX;
+    auto swapDeviceType = LxMiniInitMountDeviceTypeInvalid;
     if ((m_systemDistroDeviceId != ULONG_MAX) && (m_vmConfig.SwapSizeBytes > 0))
     {
         try
@@ -578,7 +593,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 }
             }
 
-            swapLun = AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+            const auto swapDisk =
+                AttachDiskLockHeld(m_vmConfig.SwapFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+            swapLun = swapDisk.GuestAddress.Lun;
+            swapDeviceType = ToMiniInitDeviceType(swapDisk.Transport);
         }
         CATCH_LOG()
     }
@@ -592,6 +610,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // Send the early configuration message.
     wsl::shared::MessageWriter<LX_MINI_INIT_EARLY_CONFIG_MESSAGE> message(LxMiniInitMessageEarlyConfig);
     message->SwapLun = swapLun;
+    message->SwapDeviceType = swapDeviceType;
     message->SystemDistroDeviceType = m_systemDistroDeviceType;
     message->SystemDistroDeviceId = m_systemDistroDeviceId;
     message->MemoryReclaimMode = static_cast<LX_MINI_INIT_MEMORY_RECLAIM_MODE>(m_vmConfig.MemoryReclaim);
@@ -602,6 +621,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->DefaultKernel = m_defaultKernel;
     message->IsolateDistroCgroup = m_vmConfig.IsolateDistroCgroup;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
+    if (m_kernelModulesDeviceId != ULONG_MAX)
+    {
+        message->KernelModulesDeviceType = ToMiniInitDeviceType(m_backend->GetDescription().BootDisks.at(L"kernel-modules").Transport);
+    }
     message.WriteString(message->HostnameOffset, wsl::windows::common::filesystem::GetLinuxHostName());
     message.WriteString(message->KernelModulesListOffset, m_vmConfig.KernelModulesList);
     message->DnsTunnelingIpAddress = m_vmConfig.DnsTunnelingIpAddress.value_or(0);
@@ -1023,13 +1046,13 @@ void WslCoreVm::AddPlan9Share(
     m_backend->AddFileSystemShare(device.Id, request);
 }
 
-ULONG WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken)
+VmDiskAttachment WslCoreVm::AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken)
 {
     auto lock = m_lock.lock_exclusive();
     return AttachDiskLockHeld(Disk, Type, MountFlags::None, Lun, IsUserDisk, UserToken);
 }
 
-ULONG WslCoreVm::AttachDiskLockHeld(
+VmDiskAttachment WslCoreVm::AttachDiskLockHeld(
     _In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_opt_ HANDLE UserToken)
 {
     ExecutionContext context(Context::MountDisk);
@@ -1069,7 +1092,7 @@ ULONG WslCoreVm::AttachDiskLockHeld(
             return std::ranges::none_of(attachedDisks, [&](const VmDiskAttachment& disk) { return disk.Id.Value == entry.first; });
         });
         m_diskMounts.try_emplace(attachment.Id.Value);
-        return attachment.GuestAddress.Lun;
+        return attachment;
     }
     catch (...)
     {
@@ -1178,7 +1201,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     // Add the VHD to the machine.
     auto lock = m_lock.lock_exclusive();
     SlowOperationWatcher slowOperation{"AttachDistroVhd"};
-    const auto lun = AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
+    const auto attachment =
+        AttachDiskLockHeld(Configuration.VhdFilePath.c_str(), DiskType::VHD, MountFlags::None, {}, false, m_userToken.get());
     slowOperation.Reset();
 
     // Launch the init daemon and create the instance.
@@ -1209,8 +1233,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstance(
     WI_SetFlagIf(flags, LxMiniInitMessageFlagVerbose, WI_IsFlagSet(ExportFlags, LXSS_EXPORT_DISTRO_FLAGS_VERBOSE));
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MESSAGE> message(MessageType);
-    message->MountDeviceType = LxMiniInitMountDeviceTypeLun;
-    message->DeviceId = lun;
+    message->MountDeviceType = ToMiniInitDeviceType(attachment.Transport);
+    message->DeviceId = attachment.GuestAddress.Lun;
     message->Flags = flags;
     message->InstanceId = InstanceId;
     message.WriteString(message->FsTypeOffset, "ext4");
@@ -1357,7 +1381,8 @@ void WslCoreVm::EjectVhdLockHeld(_In_ PCWSTR VhdPath)
         EJECT_VHD_MESSAGE message;
         message.Header.MessageSize = sizeof(message);
         message.Header.MessageType = LxMiniInitMessageEjectVhd;
-        message.Lun = disk->GuestAddress.Lun;
+        message.DeviceType = ToMiniInitDeviceType(disk->Transport);
+        message.DeviceId = disk->GuestAddress.Lun;
         const auto& result = m_miniInitChannel.Transaction(message);
         LOG_HR_IF_MSG(E_UNEXPECTED, result.Result != 0, "VHD eject failed: %u", result.Result);
 
@@ -1422,7 +1447,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
         m_vmConfig.SystemDistroPath = TEXT(WSL_SYSTEM_DISTRO_PATH);
         privateSystemDistro = true;
 #else
-        m_systemDistroDeviceType = LxMiniInitMountDeviceTypeLun;
+        m_systemDistroDeviceType = LxMiniInitMountDeviceTypeScsi;
         m_vmConfig.SystemDistroPath = m_installPath / L"system.vhd";
         WI_ASSERT(wsl::windows::common::filesystem::FileExists(m_vmConfig.SystemDistroPath.c_str()));
 #endif
@@ -1437,7 +1462,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
         }
         else if (wsl::windows::common::string::IsPathComponentEqual(m_vmConfig.SystemDistroPath.extension().native(), L".vhd"))
         {
-            m_systemDistroDeviceType = LxMiniInitMountDeviceTypeLun;
+            m_systemDistroDeviceType = LxMiniInitMountDeviceTypeScsi;
         }
 
         THROW_HR_IF(
@@ -1546,7 +1571,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
         disk.GrantHostAccess = grantHostAccess;
         request.BootDisks.emplace_back(std::move(disk));
     };
-    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeLun)
+    if (m_systemDistroDeviceType == LxMiniInitMountDeviceTypeScsi)
     {
         addBootDisk(L"system-distro", m_vmConfig.SystemDistroPath, privateSystemDistro);
     }
@@ -1770,7 +1795,8 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_MESSAGE> message(LxMiniInitMessageMount);
     message->PartitionIndex = PartitionIndex;
-    message->ScsiLun = disk->GuestAddress.Lun;
+    message->DeviceType = ToMiniInitDeviceType(disk->Transport);
+    message->DeviceId = disk->GuestAddress.Lun;
     message.WriteString(message->TypeOffset, Type);
     message.WriteString(message->TargetNameOffset, targetName);
     message.WriteString(message->OptionsOffset, Options);
@@ -2153,14 +2179,15 @@ void WslCoreVm::RegisterCallbacks(
     }
 }
 
-void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize)
+void WslCoreVm::ResizeDistribution(_In_ const VmDiskAttachment& Disk, _In_ HANDLE OutputHandle, _In_ ULONG64 NewSize)
 {
     auto lock = m_lock.lock_exclusive();
 
     LX_MINI_INIT_RESIZE_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageResizeDistribution;
-    message.ScsiLun = Lun;
+    message.DeviceType = ToMiniInitDeviceType(Disk.Transport);
+    message.DeviceId = Disk.GuestAddress.Lun;
     message.NewSize = NewSize;
 
     auto transaction = m_miniInitChannel.StartTransaction();
@@ -2178,14 +2205,15 @@ void WslCoreVm::ResizeDistribution(_In_ ULONG Lun, _In_ HANDLE OutputHandle, _In
     }
 }
 
-void WslCoreVm::TrimDistribution(_In_ ULONG Lun)
+void WslCoreVm::TrimDistribution(_In_ const VmDiskAttachment& Disk)
 {
     auto lock = m_lock.lock_exclusive();
 
     LX_MINI_INIT_TRIM_DISTRIBUTION_MESSAGE message{};
     message.Header.MessageSize = sizeof(message);
     message.Header.MessageType = LxMiniInitMessageTrimDistribution;
-    message.ScsiLun = Lun;
+    message.DeviceType = ToMiniInitDeviceType(Disk.Transport);
+    message.DeviceId = Disk.GuestAddress.Lun;
 
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);
@@ -2261,7 +2289,8 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::UnmountDisk(_In_ const VmDiskAttac
     LX_MINI_INIT_DETACH_MESSAGE message{};
     message.Header.MessageType = LxMiniInitMessageDetach;
     message.Header.MessageSize = sizeof(message);
-    message.ScsiLun = Disk.GuestAddress.Lun;
+    message.DeviceType = ToMiniInitDeviceType(Disk.Transport);
+    message.DeviceId = Disk.GuestAddress.Lun;
 
     auto transaction = m_miniInitChannel.StartTransaction();
     transaction.Send(message);
