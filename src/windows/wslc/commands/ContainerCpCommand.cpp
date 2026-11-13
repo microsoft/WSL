@@ -30,7 +30,7 @@ std::wstring ContainerCpCommand::ShortDescription() const
 
 std::wstring ContainerCpCommand::LongDescription() const
 {
-    return Localization::WSLCCLI_ContainerCpLongDesc();
+    return Localization::WSLCCLI_ContainerCpDesc();
 }
 
 void ContainerCpCommand::ExecuteInternal(CLIExecutionContext& context) const

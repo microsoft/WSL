@@ -390,7 +390,7 @@ std::string BuildRegistryAuthHeader(const std::string& username, const std::stri
 // returned by Authenticate().
 std::string BuildRegistryAuthHeader(const std::string& identityToken);
 
-void ValidateName(LPCSTR Name, size_t maxLength);
+void ValidateName(LPCSTR Name, size_t maxLength, bool allowLeadingSlash = false);
 
 std::map<std::string, std::string> ParseKeyValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count, _In_opt_ LPCSTR reservedKey = nullptr);
 std::map<std::string, std::vector<std::string>> ParseKeyMultiValuePairs(_In_reads_opt_(count) const KeyValuePair* pairs, ULONG count);

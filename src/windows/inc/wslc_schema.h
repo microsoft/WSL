@@ -79,14 +79,25 @@ struct Ulimit
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Ulimit, Name, Soft, Hard);
 };
 
+struct RestartPolicyConfig
+{
+    std::string Name{"no"};
+    std::int64_t MaximumRetryCount{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RestartPolicyConfig, Name, MaximumRetryCount);
+};
+
 struct InspectHostConfig
 {
     std::string NetworkMode;
     std::int64_t Memory{};
     std::int64_t NanoCpus{};
     std::vector<Ulimit> Ulimits;
+    RestartPolicyConfig RestartPolicy;
+    std::vector<std::string> CapAdd;
+    std::vector<std::string> CapDrop;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectHostConfig, NetworkMode, Memory, NanoCpus, Ulimits, RestartPolicy, CapAdd, CapDrop);
 };
 
 struct HealthConfig
@@ -118,9 +129,10 @@ struct ContainerConfig
 struct InspectEndpointIPAMConfig
 {
     std::string IPv4Address;
+    std::string IPv6Address;
     std::vector<std::string> LinkLocalIPs;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, LinkLocalIPs);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(InspectEndpointIPAMConfig, IPv4Address, IPv6Address, LinkLocalIPs);
 };
 
 struct InspectEndpointSettings
@@ -151,6 +163,7 @@ struct InspectContainer
     std::string Created;
     std::string Image;
     ContainerInspectState State;
+    std::uint32_t RestartCount{};
     InspectHostConfig HostConfig;
     ContainerConfig Config;
     std::map<std::string, std::vector<InspectPortBinding>> Ports;
@@ -161,7 +174,7 @@ struct InspectContainer
     std::optional<std::int64_t> SizeRootFs;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
+        InspectContainer, Id, Name, Created, Image, State, RestartCount, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 // Serializes a container inspect document. SizeRw and SizeRootFs are only populated when the
@@ -353,8 +366,21 @@ struct NetworkListEntry
     bool EnableIPv6{};
     bool Internal{};
     std::map<std::string, std::string> Labels;
+    wslc_schema::IPAM IPAM;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkListEntry, Id, Name, Driver, Scope, Created, EnableIPv4, EnableIPv6, Internal, Labels, IPAM);
+};
+
+// The network creation options carried from the SDK to the session. Subnet uses CIDR notation.
+struct CreateNetworkOptions
+{
+    std::string Name;
+    bool Internal{};
+    bool EnableIPv6{};
+    std::optional<std::string> Subnet;
+    std::optional<std::string> Gateway;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CreateNetworkOptions, Name, Internal, EnableIPv6, Subnet, Gateway);
 };
 
 // The volume properties carried from the session to the CLI for "volume list". Values keep their

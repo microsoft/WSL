@@ -19,6 +19,7 @@ Abstract:
 #include "WSLCExecutor.h"
 #include "WSLCE2EHelpers.h"
 #include "TestImageRegistry.h"
+#include "hcs.hpp"
 #include <JsonUtils.h>
 #include <wslutil.h>
 
@@ -31,6 +32,56 @@ using namespace WEX::Logging;
 namespace wslc_schema = wsl::windows::common::wslc_schema;
 using wsl::windows::common::RunningWSLCContainer;
 using wsl::windows::common::WSLCContainerLauncher;
+
+// Returns VM info (Id + Owner) for all compute systems via the HCS API.
+std::vector<VmInfo> ListVms()
+{
+    const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::HCS);
+
+    auto operation = wsl::windows::common::hcs::CreateOperation();
+    THROW_IF_FAILED(::HcsEnumerateComputeSystems(L"{}", operation.get()));
+
+    wil::unique_cotaskmem_string resultDocument;
+    const auto result = ::HcsWaitForOperationResult(operation.get(), 10000, &resultDocument);
+    THROW_IF_FAILED_MSG(result, "HcsEnumerateComputeSystems failed (error: %ls)", resultDocument.get());
+
+    LogInfo("HcsEnumerateComputeSystems result='%ws'", resultDocument.get());
+
+    std::vector<VmInfo> vms;
+    const auto json = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(resultDocument.get()));
+    if (!json.is_array())
+    {
+        return vms;
+    }
+
+    for (const auto& entry : json)
+    {
+        if (entry.contains("Owner") && entry["Owner"].is_string() && entry.contains("Id") && entry["Id"].is_string())
+        {
+            vms.push_back(
+                {wsl::shared::string::MultiByteToWide(entry["Id"].get<std::string>()),
+                 wsl::shared::string::MultiByteToWide(entry["Owner"].get<std::string>())});
+        }
+    }
+
+    return vms;
+}
+
+// Kills all VMs matching the given owner name via hcsdiag.
+void KillVmByOwner(const std::wstring& owner)
+{
+    bool found = false;
+    for (const auto& vm : ListVms())
+    {
+        if (vm.Owner == owner)
+        {
+            found = true;
+            VERIFY_ARE_EQUAL(wsl::windows::common::SubProcess(nullptr, std::format(L"hcsdiag.exe kill {}", vm.Id).c_str()).Run(10000), 0u);
+        }
+    }
+
+    VERIFY_IS_TRUE(found, std::format(L"VM with owner '{}' not found", owner).c_str());
+}
 
 namespace {
     // Lazily compute the session storage base path.

@@ -700,16 +700,18 @@ std::optional<std::reference_wrapper<const Command>> Command::FindSubCommand(Inv
 // Convert the invocation vector into a map of argument types and their associated values.
 // Argument map is based on the arguments that the command defines and are stored as
 // an enum -> variant multimap. This is parsing and value storage only, not validation of
-// the argument data.
-void Command::ParseArguments(
-    InvocationCursor& invocation, ArgMap& target, std::vector<Argument> definedArgs, bool optionsOnly, bool stopOnUnknown, std::vector<Argument> inheritedGlobalArgs) const
+// the argument data. Returns whether a '--' has ended option parsing.
+bool Command::ParseArguments(
+    InvocationCursor& invocation,
+    ArgMap& target,
+    std::vector<Argument> definedArgs,
+    bool optionsOnly,
+    bool stopOnUnknown,
+    std::vector<Argument> inheritedGlobalArgs,
+    bool endOfOptions) const
 {
-    if (definedArgs.empty())
-    {
-        return;
-    }
-
-    ParseArgumentsStateMachine stateMachine{invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown, std::move(inheritedGlobalArgs)};
+    ParseArgumentsStateMachine stateMachine{
+        invocation, target, std::move(definedArgs), optionsOnly, stopOnUnknown, std::move(inheritedGlobalArgs), endOfOptions};
 
     while (stateMachine.Step())
     {
@@ -718,6 +720,7 @@ void Command::ParseArguments(
     stateMachine.ThrowIfError();
 
     invocation.SetPosition(stateMachine.Position());
+    return stateMachine.EndOfOptions();
 }
 
 // Validates the ArgMap produced by ParseArguments. ArgMap is assumed to have

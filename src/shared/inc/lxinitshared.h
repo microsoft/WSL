@@ -251,6 +251,12 @@ Abstract:
 
 #define LX_INIT_WSLC_GPU_HOOK "wsl-gpu-hook"
 
+#define LX_INIT_WSLC_GPU_START_HOOK "wsl-gpu-start-hook"
+
+// Where init is copied inside GPU containers, so that the startContainer hook can run it.
+#define LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY "/.wslc-gpu-hook"
+#define LX_INIT_WSLC_GPU_START_HOOK_PATH LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY "/init"
+
 #define LX_WSLC_CDI_KIND "microsoft.com/wslc"
 #define LX_WSLC_GPU_CDI_DEVICE LX_WSLC_CDI_KIND "=gpu"
 
@@ -265,8 +271,6 @@ Abstract:
 #define LX_WSL2_KERNEL_MODULES_PATH_ENV "WSL2_KERNEL_MODULES_PATH"
 #define LX_WSL2_KERNEL_HEADERS_MOUNT_ENV "WSL2_KERNEL_HEADERS_MOUNT"
 #define LX_WSL2_KERNEL_HEADERS_PATH_ENV "WSL2_KERNEL_HEADERS_PATH"
-#define LX_WSL2_KERNEL_PERF_MOUNT_ENV "WSL2_KERNEL_PERF_MOUNT"
-#define LX_WSL2_KERNEL_PERF_PATH_ENV "WSL2_KERNEL_PERF_PATH"
 #define LX_WSL2_SYSTEM_DISTRO_SHARE_ENV "WSL2_SYSTEM_DISTRO_SHARE"
 #define LX_WSL2_GPU_SHARE_ENV "WSL2_GPU_SHARE_ENV_"
 #define LX_WSL2_SHARED_MEMORY_OB_DIRECTORY "WSL2_SHARED_MEMORY_OB_DIRECTORY"
@@ -424,6 +428,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
     LxMessageWSLCMountModules,
+    LxMessageWSLCReadFile,
+    LxMessageWSLCReadFileResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -543,6 +549,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
         X(LxMessageWSLCMountModules)
+        X(LxMessageWSLCReadFile)
+        X(LxMessageWSLCReadFileResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1288,6 +1296,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    GUID InstanceId;
     char Buffer[];
 
     PRETTY_PRINT(
@@ -1301,7 +1310,8 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(InstallPathOffset),
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
-        FIELD(ConnectPort));
+        FIELD(ConnectPort),
+        FIELD(InstanceId));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
 
@@ -1501,11 +1511,12 @@ typedef struct _LX_INIT_GUEST_CAPABILITIES
 
     MESSAGE_HEADER Header;
     bool SeccompAvailable;
+    bool Ipv6Available;
     uint64_t HvPciSwiotlbBase;
     uint64_t HvPciSwiotlbSize;
     char Buffer[]; // Contains the kernel version string
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(Ipv6Available), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
 } LX_INIT_GUEST_CAPABILITIES, *PLX_INIT_GUEST_CAPABILITIES;
 
 typedef struct _LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE
@@ -1525,8 +1536,9 @@ typedef struct _LX_MINI_INIT_CHILD_EXIT_MESSAGE
 
     MESSAGE_HEADER Header;
     unsigned int ChildPid;
+    GUID InstanceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid));
+    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid), FIELD(InstanceId));
 } LX_MINI_INIT_CHILD_EXIT_MESSAGE, *PLX_MINI_INIT_CHILD_EXIT_MESSAGE;
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
@@ -1589,11 +1601,12 @@ struct CREATE_PROCESS_MESSAGE
     static inline auto Type = LxInitCreateProcess;
 
     MESSAGE_HEADER Header;
+    uint64_t PluginId;
     unsigned int PathIndex;
     unsigned int CommandLineIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
+    PRETTY_PRINT(FIELD(Header), FIELD(PluginId), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 
 struct EJECT_VHD_MESSAGE
@@ -2011,6 +2024,18 @@ struct WSLC_GET_GUEST_CAPABILITIES
     PRETTY_PRINT(FIELD(Header));
 };
 
+typedef enum _WSLC_WRITE_FILE_FLAGS
+{
+    WSLCWriteFileFlagsNone = 0,
+
+    // Write to <path>.tmp, then rename it over <path> so readers see either the old or the new content.
+    // The file and its directory are flushed to disk before the write completes.
+    WSLCWriteFileFlagsAtomic = 0x1,
+
+    // Fail with ENOENT instead of creating missing parent directories.
+    WSLCWriteFileFlagsNoCreateParents = 0x2,
+} WSLC_WRITE_FILE_FLAGS;
+
 struct WSLC_WRITE_FILE
 {
     static inline auto Type = LxMessageWSLCWriteFile;
@@ -2023,10 +2048,40 @@ struct WSLC_WRITE_FILE
     unsigned int ContentLength;
     int OpenFlags;
     int Permissions;
+    unsigned int Flags;
     char Buffer[];
 
     // Buffer content excluded from PRETTY_PRINT so callers can pass sensitive payloads.
-    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions));
+    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions), FIELD(Flags));
+};
+
+struct WSLC_READ_FILE_RESULT
+{
+    static inline auto Type = LxMessageWSLCReadFileResult;
+
+    DECLARE_MESSAGE_CTOR(WSLC_READ_FILE_RESULT);
+    MESSAGE_HEADER Header;
+    int Result{};
+    unsigned int ContentIndex{};
+    char Buffer[];
+
+    // Buffer content excluded from PRETTY_PRINT so files can hold sensitive payloads.
+    PRETTY_PRINT(FIELD(Header), FIELD(Result));
+};
+
+// Reads a regular file. Fails with EFBIG if the file is larger than MaxSize.
+struct WSLC_READ_FILE
+{
+    static inline auto Type = LxMessageWSLCReadFile;
+    using TResponse = WSLC_READ_FILE_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_READ_FILE);
+    MESSAGE_HEADER Header;
+    unsigned int PathIndex;
+    unsigned int MaxSize;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), FIELD(MaxSize));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

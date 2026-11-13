@@ -80,8 +80,7 @@ public:
         // (e.g. to create a process) fails cleanly instead of restarting the VM.
         std::function<void()> OnVmStopping;
 
-        // Fired for every Docker volume event, after WSLCVolumes applied it, so a consumer of the event never
-        // observes volume state that lags behind it.
+        // Fired for every Docker volume event, after WSLCVolumes has updated the volumes it tracks.
         DockerEventTracker::VolumeEventCallback OnVolumeEvent;
     };
 
@@ -105,7 +104,7 @@ public:
     // running VM, including one committed to stopping, and fails with WSLC_E_VM_NOT_RUNNING when there
     // is none. Waiting is not an option for the calls that matter -- a plugin reentering from its
     // OnWslcVmStopping handler is the reason the teardown is blocked, so it would deadlock against
-    // itself.
+    // itself. Once the session is terminating it fails with ERROR_INVALID_STATE instead of waiting.
     enum class VmLeasePolicy
     {
         Acquire,

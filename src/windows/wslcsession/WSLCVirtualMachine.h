@@ -50,6 +50,14 @@ struct WSLCProcessFd
 
 class WSLCVirtualMachine;
 
+// This structure is used to keep track of tracked processes.
+// It cannot be stored inside WSLCVirtualMachine because process references can outlive the VM.
+struct VMProcessRegistry
+{
+    std::mutex Mutex;
+    std::vector<std::weak_ptr<VMProcessControl>> Processes;
+};
+
 // Owns the set of in-use VM-side port numbers for a single VM instance. Held by shared_ptr from the
 // VM (sole owner) and referenced weakly by each VmPortAllocation, so a VM teardown drops every
 // reservation and any surviving allocation self-neuters instead of dangling into a freed VM.
@@ -170,7 +178,6 @@ public:
 
     void Signal(_In_ LONG Pid, _In_ int Signal);
 
-    void OnProcessReleased(int Pid);
     void OnSessionTerminated();
 
     std::shared_ptr<VmPortAllocation> TryAllocatePort(uint16_t Port, int Family, int Protocol);
@@ -190,6 +197,12 @@ public:
     void Mount(_In_ LPCSTR Source, _In_ LPCSTR Target, _In_ LPCSTR Type, _In_ LPCSTR Options, _In_ ULONG Flags);
     void RemoveDirectory(_In_ const std::string& Path);
     std::vector<std::string> ListDirectory(_In_ const std::string& Path);
+
+    void WriteGuestFile(_In_ const std::string& Path, _In_ std::string_view Content, _In_ unsigned int Flags = WSLCWriteFileFlagsNone);
+
+    // Throws HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) if the file doesn't exist, and
+    // HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE) if it is larger than MaxSize.
+    std::string ReadGuestFile(_In_ const std::string& Path, _In_ size_t MaxSize);
 
     wil::unique_socket ConnectUnixSocket(_In_ const char* Path);
     std::tuple<int32_t, int32_t, wsl::shared::SocketChannel> Fork(enum WSLC_FORK::ForkType Type);
@@ -222,6 +235,8 @@ public:
 
 private:
     void MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove);
+
+    void ConfigureLocalhost();
 
     // Initial setup during Connect()
     void ConfigureNetworking();
@@ -291,8 +306,7 @@ private:
 
     GUID m_vmId{};
 
-    std::mutex m_trackedProcessesLock;
-    std::vector<std::weak_ptr<VMProcessControl>> m_trackedProcesses;
+    std::shared_ptr<VMProcessRegistry> m_processRegistry = std::make_shared<VMProcessRegistry>();
 
     wil::unique_event m_vmTerminatingEvent{wil::EventOptions::ManualReset};
     HANDLE m_sessionTerminatingEvent{};

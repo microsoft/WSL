@@ -1,0 +1,6 @@
+title: Network APIs
+nav:
+  - index.md
+  - wslclistsessionnetworks.md
+  - wslccreatesessionnetwork.md
+  - wslcdeletesessionnetwork.md
