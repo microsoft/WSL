@@ -32,6 +32,9 @@ Notable ETL providers:
     - `GuestLog`: Logs from the vm's dmesg
     - `Error`: Unexpected errors
     - `CreateVmBegin`, `CreateVmEnd`: Virtual machine lifetime
+    - `CreateInstanceBegin`, `CreateInstanceEnd`: Distro startup and outcome, including the distro VHD's sparse state (`1` sparse, `0` non-sparse, `-1` unavailable or WSL1).
+    - `AttachVhd`: VHD sparse state before each attach call (`1` sparse, `0` non-sparse, `-1` unreadable). Retries can emit more than one event; this event does not identify a distro.
+    - `DiskSpaceInfo`: Sparse state and host/guest disk usage after a distro initializes successfully. Unavailable measurements are `-1`.
     - `CreateNetworkBegin`, `CreateNetworkEnd`: Networking configuration
     - `SentMessage`, `ReceivedMessage`: Communication on the hvsocket channels with Linux.
     
@@ -40,6 +43,12 @@ Notable ETL providers:
     - `UserVisibleError`: An error was displayed to the user 
 
 - `Microsoft.Windows.Plan9.Server`: Logs from the Windows plan9 server (used when accessing /mnt/ shares and running Windows)
+
+The [log collection script](https://github.com/microsoft/WSL/blob/master/diagnostics/collect-wsl-logs.ps1)
+also records each registered WSL2 distro's VHD sparse-file state in
+`distro-info.json`, along with the VHD's logical length and allocated host bytes.
+`Unknown` means the sparse state could not be read; unavailable sizes are `null`
+with an error. Collecting this snapshot does not start the distros.
 
 
 On the Linux side, the easiest way to access logs is to look at `dmesg` or use the debug console, which can be enabled by writing:
@@ -74,7 +83,6 @@ The [collect-wsl-logs.ps1](https://github.com/microsoft/WSL/blob/master/diagnost
 script gathers the logs above automatically into a `wslg/` folder (crash dumps are included when run
 with `-Dump`). Note that `weston.log` is truncated on every system-distro boot, so it only contains
 the most recent boot.
-
 
 ## Attaching debuggers
 
