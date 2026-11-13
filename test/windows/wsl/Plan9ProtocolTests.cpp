@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "hvsocket.hpp"
 #include "p9defs.h"
 
 namespace Plan9ProtocolTests {
@@ -101,6 +102,14 @@ namespace {
             }
         }
     };
+
+    wil::unique_socket ConnectToDistroServer(ULONG port)
+    {
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
+        const auto vmId = wsl::shared::string::ToGuid(output);
+        VERIFY_IS_TRUE(vmId.has_value());
+        return wsl::windows::common::hvsocket::Connect(vmId.value(), port, nullptr, 5000);
+    }
 
     Plan9Server ConnectToServer()
     {
@@ -253,6 +262,47 @@ class Plan9ProtocolTests
         auto server = ConnectToServer();
 
         const auto response = SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+    }
+
+    WSL2_TEST_METHOD(VsockRejectsGuestConnections)
+    {
+        WslKeepAlive keepAlive;
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system -u root --exec modprobe vsock_loopback"), 0u);
+
+        // Extract the hvsocket port used by the plan9 server.
+        auto [portOutput, warnings] = LxsstuLaunchWslAndCaptureOutput(
+            L"--exec sh -c \"pid=$(pgrep -f '^plan9 --control-socket ') && "
+            L"ss -H -l -n -p --vsock | awk -v owner=pid=$pid, 'index($0, owner) { split($5, address, /:/); print address[2] "
+            L"}'\"");
+
+        Trim(portOutput);
+        VERIFY_IS_FALSE(portOutput.empty());
+
+        size_t parsedLength{};
+        const auto port = std::stoul(portOutput, &parsedLength);
+        VERIFY_ARE_EQUAL(parsedLength, portOutput.size());
+
+        // Validate that connecting to the server from the host using that port works.
+        auto client = ConnectToDistroServer(port);
+        auto response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+
+        for (int attempt = 0; attempt < 2; ++attempt)
+        {
+            auto commandLine = LxssGenerateWslCommandLine(
+                std::format(L"-u root --exec timeout 10 socat -d -d -u VSOCK-CONNECT:1:{} STDOUT", port).c_str());
+
+            const auto [output, error, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data());
+            VERIFY_IS_TRUE(error.find(L"successfully connected") != std::wstring::npos);
+            VERIFY_IS_TRUE(exitCode == 0 || (exitCode == 1 && error.find(L"Connection reset by peer") != std::wstring::npos));
+            VERIFY_IS_TRUE(output.empty());
+        }
+
+        // Validate that the server still accepts clients after a rejected connection.
+        client.reset();
+        client = ConnectToDistroServer(port);
+        response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
