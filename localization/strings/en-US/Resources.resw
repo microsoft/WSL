@@ -4122,7 +4122,7 @@ On first run, creates the file with all settings commented out at their defaults
   </data>
   <data name="WSLCProxyLoopbackNotReachable" xml:space="preserve">
     <value>This localhost proxy is not supported in WSLc.</value>
-    <comment>{Locked="WSLc"}Shown when a WSLc session cannot use a localhost or other loopback proxy address.</comment>
+    <comment>{Locked="WSLc"}{Locked="localhost"}</comment>
   </data>
   <data name="WSLCUserSettings_Warning_InvalidType" xml:space="preserve">
     <value>Warning: Invalid type for setting '{}' in {}:{}.</value>
