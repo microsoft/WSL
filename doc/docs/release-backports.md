@@ -143,12 +143,16 @@ The relabeler checks original merge commits and exact
 `(cherry picked from commit <sha>)` trailers in release history. It does not infer
 completion from similar titles or PR-number mentions. Changes already inherited
 when the release branch was created also count as present.
-Standard `This reverts commit <sha>.` messages undo completion; reverting that
-revert or cherry-picking the change again restores completion. Reverted merged
-backport PRs do not suppress a new attempt. Arbitrary inverse patches or edited
-revert messages cannot be recognized automatically and need manual review.
+Standard Git revert messages containing `This reverts commit <sha>.` undo
+completion; quoted revert bodies inside other commit messages do not.
+Reverting that revert or cherry-picking the change again restores completion.
+Reverted merged backport PRs do not suppress a new attempt. Arbitrary inverse
+patches or edited revert messages cannot be recognized automatically and need
+manual review.
 If a merged backport remains in history without recognizable source provenance,
 the generator stops for manual review rather than assuming it is still active.
+Histories that revert the same commit more than once also stop both scripts for
+manual review, even if a later revert restores the fix.
 An active revert of a merge commit stops both scripts for manual review rather
 than counting the merged-side changes as present. Reverting that revert restores
 normal detection. This conservative check does not attempt to infer which

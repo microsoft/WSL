@@ -103,17 +103,25 @@ def backported_commits(ref):
     fields = output("git", "log", "--topo-order", "--format=%H %P%x00%B%x00", ref).split("\0")
     records = [(fields[index].split(), fields[index + 1]) for index in range(0, len(fields) - 1, 2)]
     parents = {identity[0]: identity[1:] for identity, _ in records}
-    present, reverted = set(), set()
+    present, reverted, seen_targets = set(), set(), set()
     # Walk newest first: an active revert disables its target; reverting that
     # revert disables the reversal instead, restoring the original commit.
     for identity, message in records:
         sha = identity[0]
+        # Squash messages can quote old revert bodies without reverting anything.
+        reversal = re.match(r'(?:(?:Revert|Reapply) "[^\n]*"\n\n)?This reverts commit ([0-9a-f]{40})[.,]', message)
+        targets = [reversal.group(1)] if reversal else []
+        if any(target in seen_targets for target in targets):
+            raise ValueError(
+                "Release history reverts the same commit more than once; "
+                "manual review is required before generating backports or updating labels."
+            )
+        seen_targets.update(targets)
         sources = re.findall(r"^\(cherry picked from commit ([0-9a-f]{40})\)$", message, re.MULTILINE)
         if sha in reverted or any(source in reverted for source in sources):
             continue
         present.add(sha)
         present.update(sources)
-        targets = re.findall(r"^This reverts commit ([0-9a-f]{40})[.,]", message, re.MULTILINE)
         merge_targets = set(re.findall(r"^This reverts commit ([0-9a-f]{40}), reversing\b", message, re.MULTILINE))
         for target in targets:
             if len(parents.get(target, [])) > 1 or target in merge_targets:

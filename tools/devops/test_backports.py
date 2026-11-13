@@ -254,6 +254,32 @@ class BackportTests(unittest.TestCase):
                 edits = [args for args, _ in self.calls if args[:3] == ("gh", "pr", "edit")]
                 self.assertEqual([args[3] for args in edits], ["1"])
 
+    def test_repeated_revert_targets_require_manual_review_for_removed_and_restored_fixes(self):
+        for restored in (False, True):
+            with self.subTest(restored=restored):
+                self.git("switch", "--detach", self.base)
+                self.git("cherry-pick", "-x", self.first)
+                backport = self.git("rev-parse", "HEAD")
+                self.git("revert", "--no-edit", backport)
+                reversal = self.git("rev-parse", "HEAD")
+                if restored:
+                    self.git("revert", "--no-edit", reversal)
+                else:
+                    self.git("cherry-pick", "-x", self.first)
+                self.git("revert", "--no-edit", backport)
+                if restored:
+                    self.git("revert", "--no-edit", reversal)
+                self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+                self.assertEqual(Path("first.txt").exists(), restored)
+                self.calls.clear()
+                for function, args in (
+                    (generate.main, ["3.0", "1", "--apply"]),
+                    (relabel.main, ["3.0", "--apply"]),
+                ):
+                    with self.subTest(script=function.__module__), self.assertRaisesRegex(ValueError, "manual review"):
+                        self.invoke(function, args)
+                self.assertEqual(self.mutations(), [])
+
     def test_reverted_inherited_commit_does_not_count_as_complete(self):
         self.git("switch", "--detach", self.first)
         self.git("revert", "--no-edit", self.first)
@@ -300,6 +326,12 @@ class BackportTests(unittest.TestCase):
 
     def test_revert_message_can_reference_an_object_absent_from_history(self):
         self.git("commit", "--allow-empty", "--no-verify", "-m", f"This reverts commit {'a' * 40}.")
+        self.assertIn(self.first, utils.backported_commits("HEAD"))
+
+    def test_quoted_revert_bodies_do_not_disable_sources_or_trigger_repeated_target_guard(self):
+        for number in (1, 2):
+            self.git("commit", "--allow-empty", "--no-verify", "-m", f"Describe prior fixes {number}",
+                     "-m", f"Quoted history:\n\nThis reverts commit {self.first}.")
         self.assertIn(self.first, utils.backported_commits("HEAD"))
 
     def test_merge_revert_annotation_requires_review_even_if_target_object_is_absent(self):
