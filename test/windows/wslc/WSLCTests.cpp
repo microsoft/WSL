@@ -4058,7 +4058,7 @@ sys.exit(1 if queries else 0)
     // Returns the IDs of the wslrelay.exe processes launched by WSLC sessions.
     static std::set<DWORD> ListSessionRelays()
     {
-        const wil::unique_handle snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)};
+        const wil::unique_hfile snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)};
         THROW_LAST_ERROR_IF(!snapshot);
 
         std::vector<PROCESSENTRY32W> processes;
@@ -4092,9 +4092,18 @@ sys.exit(1 if queries else 0)
         return relays;
     }
 
+    static DWORD GetNewSessionRelay(const std::set<DWORD>& ExistingRelays)
+    {
+        auto relays = ListSessionRelays();
+        std::erase_if(relays, [&](DWORD pid) { return ExistingRelays.contains(pid); });
+        VERIFY_ARE_EQUAL(relays.size(), 1u);
+
+        return *relays.begin();
+    }
+
     static void SuspendProcessThreads(DWORD Pid)
     {
-        const wil::unique_handle snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)};
+        const wil::unique_hfile snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)};
         THROW_LAST_ERROR_IF(!snapshot);
 
         THREADENTRY32 entry{};
@@ -4125,12 +4134,8 @@ sys.exit(1 if queries else 0)
         // Map a port to confirm the relay is running and responsive.
         VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
-        auto relays = ListSessionRelays();
-        std::erase_if(relays, [&](DWORD pid) { return existingRelays.contains(pid); });
-        VERIFY_ARE_EQUAL(relays.size(), 1u);
-
         // Suspend wslrelay so it never answers the next request.
-        SuspendProcessThreads(*relays.begin());
+        SuspendProcessThreads(GetNewSessionRelay(existingRelays));
 
         std::future<HRESULT> mapResult;
         std::future<HRESULT> terminateResult;
@@ -4150,6 +4155,40 @@ sys.exit(1 if queries else 0)
         VERIFY_SUCCEEDED(terminateResult.get());
 
         killSession.release();
+    }
+
+    WSLC_TEST_METHOD(PortRelayExitFailsPortMapping)
+    {
+        const auto existingRelays = ListSessionRelays();
+
+        // NAT mode always forwards ports through wslrelay.
+        auto session = CreateSession(GetDefaultSessionSettings(L"port-relay-exit", false, WSLCNetworkingModeNAT));
+
+        wil::unique_handle sessionProcess;
+        VERIFY_SUCCEEDED(session->GetProcessHandle(&sessionProcess));
+
+        // Map a port to confirm the relay is running and responsive.
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
+
+        const wil::unique_handle relay{OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, GetNewSessionRelay(existingRelays))};
+        VERIFY_IS_TRUE(!!relay);
+        VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(relay.get(), 1));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(relay.get(), 60 * 1000), WAIT_OBJECT_0);
+
+        std::future<HRESULT> mapResult;
+
+        // If the call stays stuck, kill the session process to disconnect it so the future can be destroyed.
+        auto killSession = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(sessionProcess.get(), 1)); });
+
+        // With the relay gone, the request must fail on the broken pipe instead of waiting for a response.
+        mapResult = std::async(std::launch::async, [&]() { return session->MapVmPort(AF_INET, 1235, 81); });
+        VERIFY_ARE_EQUAL(mapResult.wait_for(60s), std::future_status::ready);
+        VERIFY_ARE_EQUAL(mapResult.get(), E_ABORT);
+
+        killSession.release();
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(sessionProcess.get(), 0), WAIT_TIMEOUT);
+        VERIFY_SUCCEEDED(session->Terminate());
     }
 
     WSLC_TEST_METHOD(StuckVmTermination)
