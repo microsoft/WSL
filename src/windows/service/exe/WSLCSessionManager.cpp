@@ -352,24 +352,24 @@ void WSLCSessionManagerImpl::CreateSession(
         THROW_IF_FAILED(factory->GetProcessHandle(hostProcess.put()));
         wil::unique_handle sessionJob = CreateSessionProcessJob(hostProcess.get());
 
-        std::vector<std::string> proxyEnvironment;
+        std::vector<std::string> proxyOverrides;
         if (ProxyEnvironment != nullptr)
         {
             THROW_HR_IF(E_INVALIDARG, ProxyEnvironment->Count != 0 && ProxyEnvironment->Values == nullptr);
             for (const auto* entry : wil::make_range(ProxyEnvironment->Values, ProxyEnvironment->Count))
             {
                 THROW_HR_IF(E_INVALIDARG, entry == nullptr || !wsl::windows::wslc::IsProxyEnvironmentVariable(entry));
-                proxyEnvironment.emplace_back(wsl::windows::wslc::CanonicalizeProxyEnvironmentVariable(entry));
+                proxyOverrides.emplace_back(wsl::windows::wslc::CanonicalizeProxyEnvironmentVariable(entry));
             }
         }
 
         if (Settings->NetworkingMode == WSLCNetworkingModeConsomme && Settings->HostLoopback != nullptr)
         {
-            wsl::windows::wslc::ResolveProxyEnvironmentLoopback(proxyEnvironment, Settings->HostLoopback);
+            wsl::windows::wslc::ResolveProxyEnvironmentLoopback(proxyOverrides, Settings->HostLoopback);
         }
 
         std::vector<LPCSTR> proxyValues;
-        std::ranges::transform(proxyEnvironment, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
+        std::ranges::transform(proxyOverrides, std::back_inserter(proxyValues), [](const auto& entry) { return entry.c_str(); });
         auto sessionSettings = CreateSessionSettings(sessionId, callerFileName.c_str(), Settings, resolvedDisplayName.c_str());
         sessionSettings.ProxyEnvironmentOverrides = {proxyValues.data(), static_cast<ULONG>(proxyValues.size())};
         wil::com_ptr<IWSLCSession> session;
