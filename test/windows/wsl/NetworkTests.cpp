@@ -4195,6 +4195,44 @@ class NetworkTests
         RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
+    TEST_METHOD(HttpProxyTracksChangesWithoutNetworkingMode)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        VERIFY_SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+
+        auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(true); });
+        SetHttpProxySettings(c_httpProxyLocalhostv4, L"", L"", true);
+
+        wil::unique_handle userToken;
+        VERIFY_WIN32_BOOL_SUCCEEDED(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        HttpProxyStateTracker tracker(10000, userToken.get());
+
+        const auto verifyProxy = [&](const std::string& expectedProxy) {
+            std::optional<HttpProxySettings> settings;
+            Stopwatch<std::chrono::seconds> watchdog(std::chrono::seconds(30));
+            do
+            {
+                settings = tracker.WaitForInitialProxySettings();
+                if (settings && settings->Proxy == expectedProxy && settings->SecureProxy == expectedProxy)
+                {
+                    break;
+                }
+            } while (Sleep(100), !watchdog.IsExpired());
+
+            VERIFY_IS_TRUE(settings.has_value());
+            VERIFY_ARE_EQUAL(expectedProxy, settings->Proxy);
+            VERIFY_ARE_EQUAL(expectedProxy, settings->SecureProxy);
+        };
+
+        verifyProxy(wsl::shared::string::WideToMultiByte(c_httpProxyLocalhostv4));
+
+        SetHttpProxySettings(c_httpProxyString2, L"", L"", true);
+        verifyProxy(wsl::shared::string::WideToMultiByte(c_httpProxyString2));
+
+        ClearHttpProxySettings(true);
+        verifyProxy("");
+    }
+
     TEST_METHOD(HttpProxyRestoredAfterNatFallback)
     {
         WINHTTP_PROXY_TEST_ONLY();

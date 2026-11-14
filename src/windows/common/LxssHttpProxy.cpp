@@ -550,11 +550,7 @@ HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken,
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(UserToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &m_userToken));
-    if (mode)
-    {
-        THROW_IF_WIN32_ERROR(s_WinHttpRegisterProxyChangeNotification.value()(
-            WINHTTP_PROXY_NOTIFY_CHANGE, s_OnProxyChange, this, &m_proxyRegistrationHandle));
-    }
+    THROW_IF_WIN32_ERROR(s_WinHttpRegisterProxyChangeNotification.value()(WINHTTP_PROXY_NOTIFY_CHANGE, s_OnProxyChange, this, &m_proxyRegistrationHandle));
     m_callbackQueue.submit([this] { QueryProxySettingsAsync(); });
 }
 
