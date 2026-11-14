@@ -1111,10 +1111,11 @@ void WSLCVirtualMachine::LaunchPortRelay()
     std::lock_guard lock(m_portRelaylock);
     auto relayPort = channel.Transaction<WSLC_PORT_RELAY>();
 
-    wil::unique_handle readPipe;
-    wil::unique_handle writePipe;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&readPipe, &m_portRelayChannelWrite, nullptr, 0));
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&m_portRelayChannelRead, &writePipe, nullptr, 0));
+    // wslrelay uses synchronous I/O on its ends. This process uses overlapped I/O so requests can be interrupted.
+    wil::unique_hfile readPipe;
+    wil::unique_hfile writePipe;
+    std::tie(readPipe, m_portRelayChannelWrite) = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, true);
+    std::tie(m_portRelayChannelRead, writePipe) = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
 
     // TODO: move the port relay infra into this process. Create a thread, pass handle ownership to thread, refactor and remove
     // wslrelaymode. wsl::windows::wslrelay::localhost::RunWSLCPortRelay(
@@ -1145,9 +1146,6 @@ void WSLCVirtualMachine::LaunchPortRelay()
     process.InheritHandle(m_vmTerminatingEvent.get());
     process.SetJobObject(m_processJobObject.get());
     process.Start();
-
-    readPipe.release();
-    writePipe.release();
 }
 
 void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
@@ -1162,14 +1160,29 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
     message.AddressFamily = Family;
     message.Stop = Remove;
 
-    DWORD bytesTransfered{};
-    THROW_IF_WIN32_BOOL_FALSE(WriteFile(m_portRelayChannelWrite.get(), &message, sizeof(message), &bytesTransfered, nullptr));
-    THROW_HR_IF_MSG(E_UNEXPECTED, bytesTransfered != sizeof(message), "%u bytes transferred", bytesTransfered);
+    // An interrupted or failed exchange leaves the channel out of sync, so close it. wslrelay exits once its input closes.
+    auto closeChannel = wil::scope_exit([&]() {
+        m_portRelayChannelWrite.reset();
+        m_portRelayChannelRead.reset();
+    });
+
+    const std::vector<HANDLE> exitEvents{m_vmTerminatingEvent.get(), m_sessionTerminatingEvent};
+
+    const wil::unique_event writeEvent{wil::EventOptions::ManualReset};
+    OVERLAPPED writeOverlapped{};
+    writeOverlapped.hEvent = writeEvent.get();
+    auto bytesTransferred =
+        relay::InterruptableWrite(m_portRelayChannelWrite.get(), gslhelpers::struct_as_bytes(message), exitEvents, &writeOverlapped);
+
+    THROW_HR_IF_MSG(E_ABORT, bytesTransferred != sizeof(message), "Port relay request interrupted, %u bytes written", bytesTransferred);
 
     HRESULT result = E_UNEXPECTED;
-    THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
+    bytesTransferred = relay::InterruptableRead(m_portRelayChannelRead.get(), gslhelpers::struct_as_writeable_bytes(result), exitEvents);
 
-    THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
+    THROW_HR_IF_MSG(E_ABORT, bytesTransferred != sizeof(result), "Port relay response interrupted, %u bytes read", bytesTransferred);
+
+    closeChannel.release();
+
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
