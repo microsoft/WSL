@@ -306,6 +306,7 @@ jobs:
             mkdir $(ob_outputDirectory)\testbin\x64\release
 
             Copy-Item -Path "bin\x64\release\wsltests.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wsltests.dll"
+            Copy-Item -Path "bin\x64\release\netlink_dump_tests" -Destination "$(ob_outputDirectory)\testbin\x64\release\netlink_dump_tests"
             Copy-Item -Path "bin\x64\release\testplugin.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\testplugin.dll"
             Copy-Item -Path "bin\x64\release\wslcsdk.dll" -Destination "$(ob_outputDirectory)\testbin\x64\release\wslcsdk.dll"
             Copy-Item -Path "bin\x64\release\installer.msix" -Destination "$(ob_outputDirectory)\testbin\x64\release\installer.msix"
