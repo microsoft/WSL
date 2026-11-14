@@ -9200,7 +9200,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         VERIFY_ARE_EQUAL(baselineCodePage, GetConsoleOutputCP(), L"Destruction restores the code page saved on the first call");
     }
 
-    TEST_METHOD(PrettyPrintWslcExecRedactsProxyValues)
+    TEST_METHOD(PrettyPrintWslcExecOmitsEnvironment)
     {
         wsl::shared::MessageWriter<WSLC_EXEC> message;
         message.WriteString(message->ExecutableIndex, "/usr/bin/dockerd");
@@ -9225,11 +9225,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto output = message->PrettyPrint();
         VERIFY_ARE_NOT_EQUAL(std::string::npos, output.find("ExecutableIndex = /usr/bin/dockerd\n"));
         VERIFY_ARE_NOT_EQUAL(std::string::npos, output.find("CommandLineIndex = /usr/bin/dockerd,--debug,HTTP_PROXY=argument-value\n"));
-        VERIFY_ARE_NOT_EQUAL(
-            std::string::npos,
-            output.find("EnvironmentIndex = PATH=/usr/bin:/bin,HTTP_PROXY=<redacted>,HTTPS_PROXY=<redacted>,NO_PROXY=<redacted>,"
-                        "http_proxy=<redacted>,https_proxy=<redacted>,no_proxy=<redacted>,HtTp_PrOxY=<redacted>,"
-                        "WSL_PAC_URL=<redacted>,HTTP_PROXY_EXTRA=visible,HTTPS_PROXY=,HTTP_PROXY\n"));
+        VERIFY_ARE_EQUAL(std::string::npos, output.find("EnvironmentIndex"));
+        VERIFY_ARE_EQUAL(std::string::npos, output.find("PATH=/usr/bin:/bin"));
+        VERIFY_ARE_EQUAL(std::string::npos, output.find("HTTP_PROXY_EXTRA=visible"));
         VERIFY_ARE_EQUAL(std::string::npos, output.find("synthetic-"));
         VERIFY_ARE_EQUAL(std::string::npos, output.find("private.example"));
         VERIFY_IS_TRUE(std::ranges::equal(originalMessage, message.Span()));
@@ -9239,11 +9237,17 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
     {
         {
             wsl::shared::MessageWriter<WSLC_EXEC> message;
+            message->CommandLineIndex = message->Header.MessageSize;
             message->EnvironmentIndex = message->Header.MessageSize;
-            VERIFY_ARE_NOT_EQUAL(std::string::npos, message->PrettyPrint().find("EnvironmentIndex = <out-of-bounds>\n"));
+            const auto outOfBoundsOutput = message->PrettyPrint();
+            VERIFY_ARE_NOT_EQUAL(std::string::npos, outOfBoundsOutput.find("CommandLineIndex = <out-of-bounds>\n"));
+            VERIFY_ARE_EQUAL(std::string::npos, outOfBoundsOutput.find("EnvironmentIndex"));
 
+            message->CommandLineIndex = 0;
             message->EnvironmentIndex = 0;
-            VERIFY_ARE_NOT_EQUAL(std::string::npos, message->PrettyPrint().find("EnvironmentIndex = <empty>\n"));
+            const auto emptyOutput = message->PrettyPrint();
+            VERIFY_ARE_NOT_EQUAL(std::string::npos, emptyOutput.find("CommandLineIndex = <empty>\n"));
+            VERIFY_ARE_EQUAL(std::string::npos, emptyOutput.find("EnvironmentIndex"));
         }
 
         {
