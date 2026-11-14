@@ -383,14 +383,18 @@ try
     WSLCExecutionContext warningContext(this, WarningCallback);
 
     RETURN_HR_IF(E_INVALIDARG, Settings->ProxyEnvironmentOverrides.Count != 0 && Settings->ProxyEnvironmentOverrides.Values == nullptr);
+
     const auto isLoopbackProxy = [](LPCSTR entry) {
         THROW_HR_IF_NULL(E_INVALIDARG, entry);
+
         const std::string_view value{entry};
         const auto equals = value.find('=');
         const auto name = value.substr(0, equals);
+
         return (wsl::shared::string::IsEqual(name, "http_proxy", true) || wsl::shared::string::IsEqual(name, "https_proxy", true)) &&
                wsl::windows::wslc::IsLoopbackProxyUrl(std::string{value.substr(equals + 1)});
     };
+
     if (Settings->NetworkingMode == WSLCNetworkingModeConsomme &&
         std::ranges::any_of(wil::make_range(Settings->ProxyEnvironmentOverrides.Values, Settings->ProxyEnvironmentOverrides.Count), isLoopbackProxy))
     {
