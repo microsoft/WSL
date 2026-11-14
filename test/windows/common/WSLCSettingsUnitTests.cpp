@@ -752,6 +752,7 @@ class WSLCCLISettingsUnitTests
              {"",
               "://localhost:3128",
               "localhost:",
+              "localhost:/path",
               "localhost:0",
               "localhost:65536",
               "localhost:abc",
@@ -761,6 +762,23 @@ class WSLCCLISettingsUnitTests
             VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
             VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
         }
+    }
+
+    TEST_METHOD(ProxyEnvironment_UrlComponents)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+        const std::vector<std::pair<std::string, std::string>> cases{
+            {"socks5h://user:p%40ss@localhost:1080/path?next=localhost#fragment",
+             "socks5h://user:p%40ss@host.wslc.internal:1080/path?next=localhost#fragment"},
+            {"http://user:p\xc3\xa4ss@127.0.0.1:3128/", "http://user:p\xc3\xa4ss@host.wslc.internal:3128/"}};
+        for (const auto& [url, expected] : cases)
+        {
+            VERIFY_ARE_EQUAL(expected, ResolveProxyUrl(url, loopback));
+        }
+
+        const std::string invalidAuthority = "http://user:pass@proxy.example.com@localhost:3128";
+        VERIFY_ARE_EQUAL(invalidAuthority, ResolveProxyUrl(invalidAuthority, loopback));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(invalidAuthority));
     }
 
     TEST_METHOD(ProxyEnvironment_MappedLoopbackClassification)

@@ -5,8 +5,8 @@
 #include "WslCoreNetworkingSupport.h"
 #include "stringshared.h"
 #include <array>
-#include <charconv>
 #include <cstring>
+#include <winhttp.h>
 
 namespace wsl::windows::wslc {
 
@@ -28,58 +28,29 @@ namespace {
             return std::nullopt;
         }
 
-        auto begin = schemeEnd == std::string_view::npos ? 0 : schemeEnd + 3;
-        auto authorityEnd = url.find_first_of("/?#", begin);
-        if (authorityEnd == std::string_view::npos)
-        {
-            authorityEnd = url.size();
-        }
-
-        const auto at = url.substr(begin, authorityEnd - begin).rfind('@');
-        if (at != std::string_view::npos)
-        {
-            begin += at + 1;
-        }
-
-        size_t end{};
-        if (begin < authorityEnd && url[begin] == '[')
-        {
-            end = url.find(']', begin);
-            if (end == std::string_view::npos || end >= authorityEnd)
-            {
-                return std::nullopt;
-            }
-
-            end++;
-        }
-        else
-        {
-            end = std::min(url.find(':', begin), authorityEnd);
-        }
-
-        if (end <= begin)
+        const auto authorityOffset = schemeEnd == std::string_view::npos ? 0 : schemeEnd + 3;
+        // Use HTTP only for parsing so schemeless and SOCKS proxy URLs keep their original form.
+        constexpr std::wstring_view c_scheme = L"http://";
+        const auto normalizedUrl = std::wstring{c_scheme} + wsl::shared::string::MultiByteToWide(std::string{url.substr(authorityOffset)});
+        URL_COMPONENTS components{};
+        components.dwStructSize = sizeof(components);
+        components.dwHostNameLength = -1;
+        if (!WinHttpCrackUrl(normalizedUrl.c_str(), 0, 0, &components) || components.dwHostNameLength == 0 || components.nPort == 0)
         {
             return std::nullopt;
         }
 
-        if (end < authorityEnd)
+        const auto* hostBegin = components.lpszHostName;
+        const auto* hostEnd = hostBegin + components.dwHostNameLength;
+        // WinHTTP treats an empty port as the default port.
+        if (*hostEnd == L':' && (hostEnd[1] < L'0' || hostEnd[1] > L'9'))
         {
-            if (url[end] != ':')
-            {
-                return std::nullopt;
-            }
-
-            uint16_t port{};
-            const auto portBegin = url.data() + end + 1;
-            const auto portEnd = url.data() + authorityEnd;
-            const auto result = std::from_chars(portBegin, portEnd, port);
-            if (result.ec != std::errc{} || result.ptr != portEnd || port == 0)
-            {
-                return std::nullopt;
-            }
+            return std::nullopt;
         }
 
-        return std::make_pair(begin, end - begin);
+        const auto prefix = wsl::shared::string::WideToMultiByte(std::wstring{normalizedUrl.c_str() + c_scheme.size(), hostBegin});
+        const auto host = wsl::shared::string::WideToMultiByte(std::wstring{hostBegin, hostEnd});
+        return std::make_pair(authorityOffset + prefix.size(), host.size());
     }
 
 } // namespace
