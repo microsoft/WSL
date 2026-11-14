@@ -2841,6 +2841,34 @@ class NetworkTests
         ValidateLocalhostRelayTraffic(AF_INET6);
     }
 
+    WSL2_TEST_METHOD(NatLocalhostRelayPortConflictRecovery)
+    {
+        WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
+        WslKeepAlive keepAlive;
+
+        for (const auto family : std::array<ADDRESS_FAMILY, 2>{AF_INET, AF_INET6})
+        {
+            wil::unique_socket blocker(socket(family, SOCK_STREAM, IPPROTO_TCP));
+            VERIFY_IS_TRUE(!!blocker);
+            const BOOL exclusive = TRUE;
+            VERIFY_ARE_EQUAL(
+                setsockopt(blocker.get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)), 0);
+            SOCKADDR_INET address{};
+            address.si_family = family;
+            INETADDR_SETLOOPBACK(reinterpret_cast<SOCKADDR*>(&address));
+            SS_PORT(&address) = htons(1234);
+            VERIFY_ARE_EQUAL(bind(blocker.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)), 0);
+            VERIFY_ARE_EQUAL(listen(blocker.get(), SOMAXCONN), 0);
+
+            auto [guestProcess, read] =
+                BindGuestPort(family == AF_INET6 ? L"TCP6-LISTEN:1234,bind=::1" : L"TCP4-LISTEN:1234,bind=127.0.0.1", true);
+            // Give the one-second scanner multiple chances to observe the conflict.
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            blocker.reset();
+            ValidateLocalhostRelayTraffic(family, read.get());
+        }
+    }
+
     WSL2_TEST_METHOD(NatLocalhostRelayDualStack)
     {
         WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
