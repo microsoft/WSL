@@ -114,7 +114,6 @@ struct HttpProxySettings
     std::string ProxyBypassesComma{};
     UnsupportedProxyReason UnsupportedProxyDropReason = UnsupportedProxyReason::Supported;
 
-    std::string ToString() const;
     bool HasSettingsConfigured() const;
     void AddToEnvironment(std::vector<std::string>& Environment) const;
 };
@@ -206,8 +205,6 @@ private:
     /// Current network mode. Used to determine some cases when we should send toast notification.
     /// </summary>
     _Guarded_by_(m_proxySettingsLock) std::optional<wsl::core::NetworkingMode> m_networkMode;
-
-    const bool m_logProxySettings;
 
     /// <summary>
     /// Whether localhost relay is enabled in the current network configuration.
