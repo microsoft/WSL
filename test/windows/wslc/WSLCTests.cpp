@@ -18302,7 +18302,11 @@ sys.exit(1 if queries else 0)
         verifyWarning(L"warning-https-loopback-http-proxy", "https://localhost:3128", nullptr, WSLCNetworkingModeConsomme, true);
         verifyWarning(L"warning-https-loopback-https-proxy", nullptr, "https://127.0.0.1:3128", WSLCNetworkingModeConsomme, true);
         verifyWarning(L"warning-ipv6-loopback-proxy", "http://[::1]:3128", nullptr, WSLCNetworkingModeConsomme, true);
-        verifyWarning(L"warning-https-loopback-nat", "https://localhost:3128", nullptr, WSLCNetworkingModeNAT, false);
+        verifyWarning(L"warning-https-loopback-nat", "https://localhost:3128", nullptr, WSLCNetworkingModeNAT, true);
+        verifyWarning(L"warning-http-loopback-nat", "http://127.0.0.1:3128", nullptr, WSLCNetworkingModeNAT, true);
+        verifyWarning(L"warning-ipv6-loopback-nat", nullptr, "http://[::1]:3128", WSLCNetworkingModeNAT, true);
+        verifyWarning(L"warning-non-loopback-nat", "http://proxy.example.com:3128", nullptr, WSLCNetworkingModeNAT, false);
+        verifyWarning(L"warning-loopback-networking-none", "https://localhost:3128", nullptr, WSLCNetworkingModeNone, false);
     }
 
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)

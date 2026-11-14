@@ -395,7 +395,7 @@ try
                wsl::windows::wslc::IsLoopbackProxyUrl(std::string{value.substr(equals + 1)});
     };
 
-    if (Settings->NetworkingMode == WSLCNetworkingModeConsomme &&
+    if ((Settings->NetworkingMode == WSLCNetworkingModeConsomme || Settings->NetworkingMode == WSLCNetworkingModeNAT) &&
         std::ranges::any_of(wil::make_range(Settings->ProxyEnvironmentOverrides.Values, Settings->ProxyEnvironmentOverrides.Count), isLoopbackProxy))
     {
         EMIT_USER_WARNING(Localization::WSLCProxyLoopbackNotReachable());
