@@ -30,7 +30,7 @@
 
 namespace {
 
-std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
+std::optional<std::vector<sockaddr_storage>> QueryListeningSockets(NetlinkChannel& channel)
 {
     std::vector<sockaddr_storage> sockets{};
     try
@@ -95,6 +95,18 @@ std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
 
         // Query IPv6 listening sockets.
         {
+            wil::unique_fd ipv6Socket{socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0)};
+            if (!ipv6Socket)
+            {
+                if (errno == EAFNOSUPPORT)
+                {
+                    return sockets;
+                }
+
+                LOG_ERROR("Failed to check IPv6 availability: {}", errno);
+                return std::nullopt;
+            }
+
             message.sdiag_family = AF_INET6;
             auto transaction = channel.CreateTransaction(message, SOCK_DIAG_BY_FAMILY, NLM_F_DUMP);
             transaction.Execute(onMessage);
@@ -102,8 +114,9 @@ std::vector<sockaddr_storage> QueryListeningSockets(NetlinkChannel& channel)
     }
     catch (const NetlinkTransactionError& e)
     {
-        // Log but don't fail - network state might be temporarily unavailable
+        // A partial dump is not an authoritative snapshot.
         LOG_ERROR("Failed to query listening sockets via sock_diag: {}", e.what());
+        return std::nullopt;
     }
 
     return sockets;
@@ -201,13 +214,18 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
     for (;;)
     {
         auto sockets = QueryListeningSockets(netlinkChannel);
+        if (!sockets)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            continue;
+        }
 
         // Stop any relays that no longer match listening ports.
         std::erase_if(relays, [&](const auto& entry) {
             auto found =
-                std::find_if(sockets.begin(), sockets.end(), [&](const auto& socket) { return IsSameSockAddr(entry, socket); });
+                std::find_if(sockets->begin(), sockets->end(), [&](const auto& socket) { return IsSameSockAddr(entry, socket); });
 
-            bool remove = (found == sockets.end());
+            bool remove = (found == sockets->end());
             if (remove)
             {
                 if (StopHostListener(channel, entry) < 0)
@@ -220,7 +238,7 @@ int MonitorListeningSockets(wsl::shared::SocketChannel& channel)
         });
 
         // Create relays for any new ports.
-        std::for_each(sockets.begin(), sockets.end(), [&](const auto& socket) {
+        std::for_each(sockets->begin(), sockets->end(), [&](const auto& socket) {
             auto found =
                 std::find_if(relays.begin(), relays.end(), [&](const auto& entry) { return IsSameSockAddr(entry, socket); });
 
