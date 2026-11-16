@@ -4222,7 +4222,7 @@ Při prvním spuštění vytvoří soubor se všemi nastaveními okomentovanými
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' in the guest (guest error {}).</value>
+    <value>WSLC nemohl zapsat '{}' do hostovaného systému (chyba hostovaného systému {})</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

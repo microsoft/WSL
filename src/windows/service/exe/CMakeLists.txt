@@ -20,7 +20,7 @@ set(SOURCES
     WslMirroredNetworking.cpp
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
-    HcsVirtualMachine.cpp
+    WSLCVirtualMachineHost.cpp
     WSLCSessionManager.cpp
     WSLCSessionManagerFactory.cpp
     WSLCPluginNotifier.cpp
@@ -52,7 +52,7 @@ set(HEADERS
     WslCoreNetworkEndpoint.h
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h
-    HcsVirtualMachine.h
+    WSLCVirtualMachineHost.h
     WSLCSessionManager.h
     WSLCSessionManagerFactory.h
     WSLCPluginNotifier.h)

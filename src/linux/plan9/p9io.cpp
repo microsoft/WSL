@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "precomp.h"
+#include <linux/vm_sockets.h>
 #include "p9io.h"
 
 #ifndef TEMP_FAILURE_RETRY
@@ -263,16 +264,35 @@ Task<size_t> SendAsync(CoroutineEpollIssuer& socket, gsl::span<const gsl::byte> 
 
 Task<int> AcceptAsync(CoroutineEpollIssuer& listen, CancelToken& token)
 {
-    CoroutineEpollOperation operation;
-    auto result = co_await listen.Issue<int>(
-        operation, token, EPOLLIN, [&](int fd) { return accept4(fd, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC); });
-
-    if (result < 0)
+    for (;;)
     {
-        THROW_ERRNO(-result);
-    }
+        THROW_ERRNO_IF(ECANCELED, token.Cancelled());
 
-    co_return result;
+        sockaddr_storage address{};
+        socklen_t addressSize = sizeof(address);
+        CoroutineEpollOperation operation;
+
+        auto result = co_await listen.Issue<int>(operation, token, EPOLLIN, [&](int fd) {
+            return accept4(fd, reinterpret_cast<sockaddr*>(&address), &addressSize, SOCK_NONBLOCK | SOCK_CLOEXEC);
+        });
+
+        if (result < 0)
+        {
+            THROW_ERRNO(-result);
+        }
+
+        wil::unique_fd client{result};
+
+        if (address.ss_family == AF_VSOCK &&
+            (addressSize < sizeof(sockaddr_vm) || reinterpret_cast<const sockaddr_vm*>(&address)->svm_cid != VMADDR_CID_HOST))
+        {
+            Plan9TraceLoggingProvider::LogMessage("Rejected unexpected hvsocket connection.", TRACE_LEVEL_WARNING);
+
+            continue;
+        }
+
+        co_return client.release();
+    }
 }
 
 Task<IoResult> ReadAsync(CoroutineIoIssuer& file, std::uint64_t offset, gsl::span<gsl::byte> buffer, CancelToken& token)
