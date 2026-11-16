@@ -575,7 +575,7 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
     THROW_IF_WIN32_BOOL_FALSE(::CopySid(sizeof(m_userSid), &m_userSid.Sid, userSid));
 
     wil::unique_hkey lxssKey;
-    wil::unique_handle userToken;
+    wil::shared_handle userToken;
     {
         userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         lxssKey = s_OpenLxssUserKey(userToken.get());
@@ -586,15 +586,20 @@ LxssUserSessionImpl::LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId
     m_session = {sessionCookie++, nullptr, &m_userSid.Sid};
 
     // Detect existing legacy installs and convert them to the new format.
-    const DWORD state =
-        wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
+    DWORD state{};
+    {
+        const auto runAsUser = wil::impersonate_token(userToken.get());
+        state = wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_LEGACY_INSTALL_VALUE, LxssDistributionStateInvalid);
+    }
 
     if (state == LxssDistributionStateInstalled)
     {
         // Create a registration for legacy installs and delete legacy
         // installed state.
         std::lock_guard lock(m_instanceLock);
-        _CreateLegacyRegistration(lxssKey.get(), userToken.get());
+        _CreateLegacyRegistration(lxssKey.get(), userToken);
+
+        const auto runAsUser = wil::impersonate_token(userToken.get());
         wsl::windows::common::registry::DeleteKeyValue(lxssKey.get(), LXSS_LEGACY_INSTALL_VALUE);
     }
 
@@ -755,12 +760,12 @@ try
 
     WSL_LOG("ConfigureDistribution", TraceLoggingValue(DefaultUid, "DefaultUid"), TraceLoggingValue(Flags, "Flags"));
 
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     std::lock_guard lock(m_instanceLock);
 
     // Ensure the distribution exists.
-    auto distribution = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+    auto distribution = DistributionRegistration::OpenOrDefault(userToken, lxssKey.get(), DistroGuid);
 
     auto configuration = s_GetDistributionConfiguration(distribution);
 
@@ -969,11 +974,11 @@ HRESULT LxssUserSessionImpl::MoveDistribution(_In_ LPCGUID DistroGuid, _In_ LPCW
     _EnsureNotLocked(DistroGuid);
 
     // Lookup the distribution configuration
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const auto lxssKey = s_OpenLxssUserKey(userToken.get());
     _ValidateDistributionNameAndPathNotInUse(lxssKey.get(), Location, nullptr);
 
-    auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    auto registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
     auto distro = s_GetDistributionConfiguration(registration);
 
     RETURN_HR_IF(E_NOTIMPL, WI_IsFlagClear(distro.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
@@ -1121,11 +1126,11 @@ HRESULT LxssUserSessionImpl::ExportDistribution(_In_opt_ LPCGUID DistroGuid, _In
     wil::unique_hkey distroKey;
     try
     {
-        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
         std::lock_guard lock(m_instanceLock);
 
-        const auto registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+        const auto registration = DistributionRegistration::OpenOrDefault(userToken, lxssKey.get(), DistroGuid);
 
         // Ensure the distribution is installed.
         configuration = s_GetDistributionConfiguration(registration);
@@ -1286,11 +1291,11 @@ HRESULT LxssUserSessionImpl::GetDistributionConfiguration(
     _Out_ ULONG* Flags)
 try
 {
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     std::lock_guard lock(m_instanceLock);
 
-    const auto registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+    const auto registration = DistributionRegistration::OpenOrDefault(userToken, lxssKey.get(), DistroGuid);
     const auto configuration = s_GetDistributionConfiguration(registration);
 
     // Write configuration information back to the calling process.
@@ -1375,7 +1380,7 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
     const std::filesystem::path path{VhdPath};
     RETURN_HR_IF(E_INVALIDARG, !path.is_absolute() || !wsl::windows::common::wslutil::IsVhdFile(path));
 
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     std::lock_guard lock(m_instanceLock);
 
@@ -1386,6 +1391,7 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
 
     constexpr ULONG flags = LXSS_DISTRO_FLAGS_DEFAULT | LXSS_DISTRO_FLAGS_VM_MODE;
     auto registration = DistributionRegistration::Create(
+        userToken,
         lxssKey.get(),
         {},
         DistributionName,
@@ -1421,7 +1427,7 @@ LxssUserSessionImpl::ImportDistributionInplace(_In_ LPCWSTR DistributionName, _I
     _ProcessImportResultMessage(message, span, lxssKey.get(), configuration, registration);
 
     // Set the distribution as installed.
-    _SetDistributionInstalled(lxssKey.get(), registration.Id());
+    _SetDistributionInstalled(userToken, lxssKey.get(), registration.Id());
     cleanup.release();
 
     _SendDistributionRegisteredEvent(configuration);
@@ -1484,26 +1490,29 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
         }
 
         // Impersonate the user and open their lxss registry key.
-        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
 
         // Determine the filesystem version. If WslFs is not enabled, downgrade
         // the version.
         ULONG FilesystemVersion = LXSS_DISTRO_VERSION_CURRENT;
-        if (wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, WSL_NEW_DISTRO_LXFS, 0) != 0)
         {
-            if (LXSS_DISTRO_USES_WSL_FS(FilesystemVersion) != FALSE)
+            const auto runAsUser = wil::impersonate_token(userToken.get());
+            if (wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, WSL_NEW_DISTRO_LXFS, 0) != 0)
             {
-                FilesystemVersion = LXSS_DISTRO_VERSION_1;
+                if (LXSS_DISTRO_USES_WSL_FS(FilesystemVersion) != FALSE)
+                {
+                    FilesystemVersion = LXSS_DISTRO_VERSION_1;
+                }
+            }
+
+            if (Version == LXSS_WSL_VERSION_DEFAULT)
+            {
+                Version = wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_WSL_DEFAULT_VERSION, LXSS_WSL_VERSION_2);
             }
         }
 
         // Validate the version number.
-        if (Version == LXSS_WSL_VERSION_DEFAULT)
-        {
-            Version = wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_WSL_DEFAULT_VERSION, LXSS_WSL_VERSION_2);
-        }
-
         RETURN_HR_IF(E_INVALIDARG, ((Version != LXSS_WSL_VERSION_1) && (Version != LXSS_WSL_VERSION_2)));
 
         // Registering a WSL1 distro is not possible if any VHD flags are specified.
@@ -1579,6 +1588,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
             }
 
             registration = DistributionRegistration::Create(
+                userToken,
                 lxssKey.get(),
                 DistributionId,
                 DistributionName,
@@ -1771,7 +1781,7 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
         // so the registration is persisted.
         {
             std::lock_guard lock(m_instanceLock);
-            _SetDistributionInstalled(lxssKey.get(), registration.Id());
+            _SetDistributionInstalled(userToken, lxssKey.get(), registration.Id());
             cleanup.release();
         }
 
@@ -1798,13 +1808,13 @@ HRESULT LxssUserSessionImpl::RegisterDistribution(
 HRESULT LxssUserSessionImpl::SetDefaultDistribution(_In_ LPCGUID DistroGuid)
 try
 {
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
 
     // Ensure the distribution is in the installed state.
     std::lock_guard lock(m_instanceLock);
 
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    const auto registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
     const DWORD state = registration.Read(Property::State);
 
     RETURN_HR_IF(WSL_E_DISTRO_NOT_FOUND, (state != LxssDistributionStateInstalled));
@@ -1821,12 +1831,12 @@ try
 {
     UNREFERENCED_PARAMETER(AllowUnsafe);
 
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     auto runAsUser = wil::impersonate_token(userToken.get());
     std::lock_guard lock(m_instanceLock);
 
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    const auto registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
     LXSS_DISTRO_CONFIGURATION configuration = s_GetDistributionConfiguration(registration);
 
     // Don't attempt on V1
@@ -1871,9 +1881,9 @@ HRESULT LxssUserSessionImpl::ResizeDistribution(_In_ LPCGUID DistroGuid, _In_ HA
 try
 {
     std::lock_guard lock(m_instanceLock);
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
-    const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+    const auto registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
     const auto configuration = s_GetDistributionConfiguration(registration);
     RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
@@ -1933,12 +1943,12 @@ try
     std::filesystem::path vhdPath;
     LXSS_DISTRO_CONFIGURATION configuration{};
     std::vector<PidTermination> pidTerminations;
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
     {
         std::lock_guard lock(m_instanceLock);
         const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
-        const auto registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        const auto registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
         configuration = s_GetDistributionConfiguration(registration);
         RETURN_HR_IF(WSL_E_WSL2_NEEDED, WI_IsFlagClear(configuration.Flags, LXSS_DISTRO_FLAGS_VM_MODE));
 
@@ -1991,13 +2001,13 @@ HRESULT LxssUserSessionImpl::SetVersion(_In_ LPCGUID DistroGuid, _In_ ULONG Vers
     DistributionRegistration registration;
     LXSS_DISTRO_CONFIGURATION configuration;
     std::vector<PidTermination> pidTerminations;
-    const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     try
     {
         // Ensure the distribution exists.
         std::lock_guard lock(m_instanceLock);
-        registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+        registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
         configuration = s_GetDistributionConfiguration(registration);
 
         // The distro must be in the installed state.
@@ -2515,7 +2525,7 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
 
     try
     {
-        const auto userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
         wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
 
         // Set up a scope exit lambda to delete the distribution registry key
@@ -2528,9 +2538,10 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
                 _ConversionComplete(*DistroGuid);
             }
         });
-        auto deleteDistroKey = wil::scope_exit([&] {
+        auto deleteDistroKey = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
             if (removeDistro)
             {
+                const auto runAsUser = wil::impersonate_token(userToken.get());
                 wsl::windows::common::registry::DeleteKey(lxssKey.get(), removedDistroString.c_str());
             }
         });
@@ -2540,7 +2551,7 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             std::lock_guard lock(m_instanceLock);
 
             // Get the configuration information about the distribution.
-            registration = DistributionRegistration::Open(lxssKey.get(), *DistroGuid);
+            registration = DistributionRegistration::Open(userToken, lxssKey.get(), *DistroGuid);
             configuration = s_GetDistributionConfiguration(registration);
 
             // Log telemetry about the distribution being removed.
@@ -2559,11 +2570,11 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
             // If the default distribution has been unregistered, search for another
             // distribution to set as the new default.
 
-            auto defaultDistribution = DistributionRegistration::OpenDefault(lxssKey.get());
+            auto defaultDistribution = DistributionRegistration::OpenDefault(userToken, lxssKey.get());
             if (defaultDistribution.has_value() && IsEqualGUID(defaultDistribution->Id(), registration.Id()))
             {
                 // Remove the old default.
-                DistributionRegistration::DeleteDefault(lxssKey.get());
+                DistributionRegistration::DeleteDefault(userToken.get(), lxssKey.get());
 
                 // If there are any other registered distributions, set the first
                 // one found to the new default.
@@ -2692,8 +2703,10 @@ try
 CATCH_RETURN()
 
 _Requires_exclusive_lock_held_(m_instanceLock)
-void LxssUserSessionImpl::_CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ HANDLE UserToken)
+void LxssUserSessionImpl::_CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ const wil::shared_handle& UserToken)
 {
+    const auto runAsUser = wil::impersonate_token(UserToken.get());
+
     // Delete any existing legacy registration.
     const auto distroGuidString = wsl::shared::string::GuidToString<wchar_t>(LXSS_LEGACY_DISTRO_GUID);
     wsl::windows::common::registry::DeleteKey(LxssKey, distroGuidString.c_str());
@@ -2707,12 +2720,12 @@ void LxssUserSessionImpl::_CreateLegacyRegistration(_In_ HKEY LxssKey, _In_ HAND
     WI_ClearFlagIf(configFlags, LXSS_DISTRO_FLAGS_ENABLE_INTEROP, (enabled == 0));
 
     // Create a new registration for the legacy distro.
-    const auto basePath = wsl::windows::common::filesystem::GetLegacyBasePath(UserToken);
+    const auto basePath = wsl::windows::common::filesystem::GetLegacyBasePath(UserToken.get());
 
     DistributionRegistration::Create(
-        LxssKey, LXSS_LEGACY_DISTRO_GUID, LXSS_LEGACY_INSTALL_NAME, LXSS_DISTRO_VERSION_LEGACY, basePath.c_str(), configFlags, defaultUid, nullptr, LXSS_VM_MODE_VHD_NAME, false);
+        UserToken, LxssKey, LXSS_LEGACY_DISTRO_GUID, LXSS_LEGACY_INSTALL_NAME, LXSS_DISTRO_VERSION_LEGACY, basePath.c_str(), configFlags, defaultUid, nullptr, LXSS_VM_MODE_VHD_NAME, false);
 
-    _SetDistributionInstalled(LxssKey, LXSS_LEGACY_DISTRO_GUID);
+    _SetDistributionInstalled(UserToken, LxssKey, LXSS_LEGACY_DISTRO_GUID);
 }
 
 std::vector<wsl::windows::common::filesystem::unique_lxss_addmount> LxssUserSessionImpl::_CreateSetupMounts(_In_ const LXSS_DISTRO_CONFIGURATION& Configuration)
@@ -2746,7 +2759,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
     _ClearTerminatedInstances();
 
-    wil::unique_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
     DistributionRegistration registration;
 
@@ -2758,7 +2771,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
         // In that code path, don't create a new session.
         THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
 
-        registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+        registration = DistributionRegistration::OpenOrDefault(userToken, lxssKey.get(), DistroGuid);
 
         // Retain event ownership so neither PID nor event-handle reuse can match a previous wait.
         std::vector<PidTermination> waitedTerminations;
@@ -2791,7 +2804,7 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
             lock.lock();
 
             THROW_HR_IF(RPC_E_DISCONNECTED, m_disableNewInstanceCreation);
-            registration = DistributionRegistration::OpenOrDefault(lxssKey.get(), DistroGuid);
+            registration = DistributionRegistration::OpenOrDefault(userToken, lxssKey.get(), DistroGuid);
         }
 
         // Check if an instance is already running for this distribution, if
@@ -3345,8 +3358,11 @@ void LxssUserSessionImpl::_DeleteDistributionLockHeld(_In_ const LXSS_DISTRO_CON
         // Remove the terminal profile, if any.
         try
         {
+            wil::shared_handle userToken;
+            THROW_IF_WIN32_BOOL_FALSE(OpenThreadToken(GetCurrentThread(), TOKEN_QUERY | TOKEN_IMPERSONATE, TRUE, &userToken));
             const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
-            const auto profile = DistributionRegistration::Open(lxssKey.get(), Configuration.DistroId).Read(Property::TerminalProfilePath);
+            const auto profile =
+                DistributionRegistration::Open(userToken, lxssKey.get(), Configuration.DistroId).Read(Property::TerminalProfilePath);
 
             if (profile.has_value())
             {
@@ -3384,10 +3400,16 @@ _Requires_exclusive_lock_held_(m_instanceLock)
 std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributions(
     _In_ HKEY LxssKey, _In_ bool ListAll, _In_ const std::optional<GUID>& Exclude)
 {
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto distroKeys = [&] {
+        const auto runAsUser = wil::impersonate_token(userToken.get());
+        return wsl::windows::common::registry::EnumGuidKeys(LxssKey);
+    }();
+
     // Iterate through all subkeys looking for distributions.
     std::vector<DistributionRegistration> distributions;
     std::vector<GUID> orphanedDistributions;
-    for (const auto& distro : wsl::windows::common::registry::EnumGuidKeys(LxssKey))
+    for (const auto& distro : distroKeys)
     {
         if (Exclude.has_value() && IsEqualGUID(Exclude.value(), distro.first))
         {
@@ -3401,7 +3423,7 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
             continue;
         }
 
-        auto registration = DistributionRegistration::Open(LxssKey, distro.first);
+        auto registration = DistributionRegistration::Open(userToken, LxssKey, distro.first);
 
         // Add the distribution to the list if the caller requested all, or if
         // it is installed or upgrading.
@@ -3416,7 +3438,7 @@ std::vector<DistributionRegistration> LxssUserSessionImpl::_EnumerateDistributio
     for (GUID Distro : orphanedDistributions)
     {
         // TODO: This can fail if the registration is broken.
-        auto configuration = s_GetDistributionConfiguration(DistributionRegistration::Open(LxssKey, Distro));
+        auto configuration = s_GetDistributionConfiguration(DistributionRegistration::Open(userToken, LxssKey, Distro));
         _UnregisterDistributionLockHeld(LxssKey, configuration);
     }
 
@@ -3453,12 +3475,13 @@ _Requires_exclusive_lock_held_(m_instanceLock)
 GUID LxssUserSessionImpl::_GetDefaultDistro(_In_ HKEY LxssKey)
 {
     ExecutionContext context(Context::GetDefaultDistro);
+    const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
 
     GUID defaultDistroId = {};
     HRESULT result;
     try
     {
-        const auto defaultDistro = DistributionRegistration::OpenDefault(LxssKey);
+        const auto defaultDistro = DistributionRegistration::OpenDefault(userToken, LxssKey);
 
         THROW_HR_IF(WSL_E_DEFAULT_DISTRO_NOT_FOUND, !defaultDistro.has_value());
 
@@ -3466,7 +3489,7 @@ GUID LxssUserSessionImpl::_GetDefaultDistro(_In_ HKEY LxssKey)
         if (!_ValidateDistro(LxssKey, &defaultDistro->Id()))
         {
             // Delete the old default distribution.
-            DistributionRegistration::DeleteDefault(LxssKey);
+            DistributionRegistration::DeleteDefault(userToken.get(), LxssKey);
 
             const auto configuration = s_GetDistributionConfiguration(defaultDistro.value());
             _UnregisterDistributionLockHeld(LxssKey, configuration);
@@ -3892,15 +3915,15 @@ void LxssUserSessionImpl::_SendDistributionRegisteredEvent(_In_ const LXSS_DISTR
 }
 
 _Requires_lock_held_(m_instanceLock)
-void LxssUserSessionImpl::_SetDistributionInstalled(_In_ HKEY LxssKey, _In_ const GUID& DistroGuid)
+void LxssUserSessionImpl::_SetDistributionInstalled(_In_ const wil::shared_handle& UserToken, _In_ HKEY LxssKey, _In_ const GUID& DistroGuid)
 {
     // Mark the distribution as installed.
-    auto registration = DistributionRegistration::Open(LxssKey, DistroGuid);
+    auto registration = DistributionRegistration::Open(UserToken, LxssKey, DistroGuid);
     registration.Write(Property::State, LxssDistributionStateInstalled);
 
     // Set this distribution as the default if there is not already a default
     // distribution.
-    const auto defaultDistro = DistributionRegistration::OpenDefault(LxssKey);
+    const auto defaultDistro = DistributionRegistration::OpenDefault(UserToken, LxssKey);
     if (!defaultDistro.has_value())
     {
         DistributionRegistration::SetDefault(LxssKey, registration);
@@ -4049,6 +4072,7 @@ void LxssUserSessionImpl::_UnregisterDistributionLockHeld(_In_ HKEY LxssKey, _In
         }
 
         // Delete the distro registry key.
+        const auto runAsUser = wil::CoImpersonateClient();
         wsl::windows::common::registry::DeleteKey(LxssKey, removedDistroString.c_str());
     }
     CATCH_LOG()
@@ -4075,7 +4099,8 @@ bool LxssUserSessionImpl::_ValidateDistro(_In_ HKEY LxssKey, _In_ LPCGUID Distro
     try
     {
         // Ensure a subkey exists for the distribution.
-        auto configuration = s_GetDistributionConfiguration(DistributionRegistration::Open(LxssKey, *DistroGuid));
+        const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+        auto configuration = s_GetDistributionConfiguration(DistributionRegistration::Open(userToken, LxssKey, *DistroGuid));
         packageFamilyName = configuration.PackageFamilyName;
 
         // If there is no package family name associated with the distribution,
@@ -4355,9 +4380,12 @@ try
     const wil::unique_hkey lxssKey = s_OpenLxssUserKey(userToken.get());
 
     // OOBE hasn't run if the value is not present or set to 0.
-    if (wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_OOBE_COMPLETE_NAME, false) != false)
     {
-        return;
+        const auto runAsUser = wil::impersonate_token(userToken.get());
+        if (wsl::windows::common::registry::ReadDword(lxssKey.get(), nullptr, LXSS_OOBE_COMPLETE_NAME, false) != false)
+        {
+            return;
+        }
     }
 
     // Don't run OOBE for existing users who already have a distro.
@@ -4365,6 +4393,7 @@ try
     THROW_IF_FAILED(EnumerateDistributions(distributions.size_address<ULONG>(), &distributions));
     if (distributions.size() > 1)
     {
+        const auto runAsUser = wil::impersonate_token(userToken.get());
         wsl::windows::common::registry::WriteDword(lxssKey.get(), nullptr, LXSS_OOBE_COMPLETE_NAME, true);
         return;
     }
@@ -4373,7 +4402,10 @@ try
     wil::unique_handle userTokenCreateProcess;
     THROW_IF_WIN32_BOOL_FALSE(::DuplicateTokenEx(
         userToken.get(), MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenImpersonation, &userTokenCreateProcess));
+
     wsl::windows::common::helpers::LaunchWslSettingsOOBE(userTokenCreateProcess.get());
+
+    const auto runAsUser = wil::impersonate_token(userToken.get());
     wsl::windows::common::registry::WriteDword(lxssKey.get(), nullptr, LXSS_OOBE_COMPLETE_NAME, true);
 }
 CATCH_LOG()
@@ -4411,13 +4443,13 @@ LxssUserSessionImpl::s_GetDistributionConfiguration(const DistributionRegistrati
 CreateLxProcessContext LxssUserSessionImpl::s_GetCreateProcessContext(_In_ const GUID& DistroGuid, _In_ bool SystemDistro)
 {
     CreateLxProcessContext context{};
+    context.UserToken.reset(wsl::windows::common::security::GetUserToken(TokenImpersonation).release());
     std::vector<std::wstring> environment{};
     if (!SystemDistro)
     {
-        auto runAsUser = wil::CoImpersonateClient();
-        const auto lxssKey = wsl::windows::common::registry::OpenLxssUserKey();
+        const auto lxssKey = s_OpenLxssUserKey(context.UserToken.get());
 
-        const auto registration = DistributionRegistration::Open(lxssKey.get(), DistroGuid);
+        const auto registration = DistributionRegistration::Open(context.UserToken, lxssKey.get(), DistroGuid);
 
         context.Flags = registration.Read(Property::Flags);
         context.DefaultEnvironment = registration.Read(Property::DefaultEnvironment);
@@ -4428,7 +4460,6 @@ CreateLxProcessContext LxssUserSessionImpl::s_GetCreateProcessContext(_In_ const
         context.DefaultEnvironment = Property::DefaultEnvironment.DefaultValue;
     }
 
-    context.UserToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
     context.Elevated = wsl::windows::common::security::IsTokenElevated(context.UserToken.get());
     return context;
 }
