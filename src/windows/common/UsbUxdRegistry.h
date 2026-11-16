@@ -10,7 +10,7 @@
 
 namespace wsl::windows::common::usb {
 
-inline constexpr wchar_t c_winusbHardwareId[] = L"USB\\MS_COMP_WINUSB";
+inline constexpr wchar_t c_winusbHardwareId[] = L"USB\\MS_COMP_VMREDIR";
 
 #pragma pack(push, 4)
 struct Reservation

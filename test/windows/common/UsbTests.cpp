@@ -191,23 +191,23 @@ class UsbTests
         registry::WriteString(key.get(), nullptr, name.c_str(), usb::c_winusbHardwareId);
         auto cleanup = wil::scope_exit([&]() { LOG_IF_WIN32_ERROR(RegDeleteValueW(key.get(), name.c_str())); });
         VERIFY_IS_TRUE(uxdRegistry.MappingMatches(identity));
-        registry::WriteString(key.get(), nullptr, name.c_str(), L"usb\\ms_comp_winusb");
+        registry::WriteString(key.get(), nullptr, name.c_str(), L"usb\\ms_comp_vmredir");
         VERIFY_IS_TRUE(uxdRegistry.MappingMatches(identity));
 
-        for (const auto* nonmatching : {L"USB\\MS_COMP_WINUSX", L"USB\\OTHER", L"USB\\MS_COMP_WINUSB_EXTRA"})
+        for (const auto* nonmatching : {L"USB\\MS_COMP_WINUSB", L"USB\\MS_COMP_VMREDIX", L"USB\\OTHER", L"USB\\MS_COMP_VMREDIR_EXTRA"})
         {
             registry::WriteString(key.get(), nullptr, name.c_str(), nonmatching);
             VERIFY_IS_FALSE(uxdRegistry.MappingMatches(identity));
         }
         uxdRegistry.RemoveMapping(identity);
-        VERIFY_ARE_EQUAL(std::wstring(L"USB\\MS_COMP_WINUSB_EXTRA"), registry::ReadString(key.get(), nullptr, name.c_str()));
+        VERIFY_ARE_EQUAL(std::wstring(L"USB\\MS_COMP_VMREDIR_EXTRA"), registry::ReadString(key.get(), nullptr, name.c_str()));
 
         VERIFY_ARE_EQUAL(
             ERROR_SUCCESS,
             RegSetValueExW(key.get(), name.c_str(), 0, REG_BINARY, reinterpret_cast<const BYTE*>(usb::c_winusbHardwareId), sizeof(usb::c_winusbHardwareId)));
         VERIFY_IS_FALSE(uxdRegistry.MappingMatches(identity));
 
-        wchar_t unterminated[] = L"USB\\MS_COMP_WINUSB";
+        wchar_t unterminated[] = L"USB\\MS_COMP_VMREDIR";
         unterminated[ARRAYSIZE(unterminated) - 1] = L'X';
         VERIFY_ARE_EQUAL(
             ERROR_SUCCESS,
@@ -274,10 +274,15 @@ class UsbTests
     TEST_METHOD(WinUsbReadiness)
     {
         usb::Device device;
-        device.HardwareIds = {L"USB\\MS_COMP_WINUSB"};
+        device.HardwareIds = {L"USB\\MS_COMP_VMREDIR"};
         device.Service = L"WINUSB";
         device.Status = DN_STARTED;
         device.InterfacePaths = {L"opaque-device-interface"};
+        VERIFY_IS_TRUE(device.IsReady());
+        device.HardwareIds = {L"USB\\MS_COMP_WINUSB"};
+        VERIFY_IS_FALSE(device.IsRedirected());
+        VERIFY_IS_FALSE(device.IsReady());
+        device.HardwareIds = {L"usb\\ms_comp_vmredir"};
         VERIFY_IS_TRUE(device.IsReady());
         device.Status |= DN_HAS_PROBLEM;
         VERIFY_IS_FALSE(device.IsReady());
@@ -295,7 +300,7 @@ class UsbTests
         VERIFY_SUCCEEDED(CoCreateGuid(&id));
         const auto path = std::filesystem::temp_directory_path() / (L"wsl-usb-probe-" + wsl::shared::string::GuidToString<wchar_t>(id));
         usb::Device device;
-        device.HardwareIds = {L"USB\\MS_COMP_WINUSB"};
+        device.HardwareIds = {L"USB\\MS_COMP_VMREDIR"};
         device.Service = L"WINUSB";
         device.Status = DN_STARTED;
         device.InterfacePaths = {path.wstring()};
