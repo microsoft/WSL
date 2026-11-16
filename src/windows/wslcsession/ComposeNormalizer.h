@@ -22,6 +22,9 @@ struct ComposeDocuments
     std::optional<std::string> ExplicitProjectName;
     // The collection retains input order and per-document source context.
     std::vector<ComposeDocument> Documents;
+    // KEY=VALUE entries that override values from EnvironmentFiles.
+    std::vector<std::string> Environment;
+    std::vector<ComposeEnvironmentFile> EnvironmentFiles;
 };
 
 struct ComposeProjectSelection

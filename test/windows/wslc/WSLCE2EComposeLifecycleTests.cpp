@@ -152,6 +152,44 @@ services:
         VERIFY_IS_TRUE(std::ranges::find(env, std::string{"SOURCE=base"}) == env.end());
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Compose_InterpolatesDotEnvAndProcessVariables)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { Cleanup(); });
+
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetEnvironmentVariableW(L"WSLC_E2E_COMPOSE_OVERRIDE", L"process"));
+        auto environmentCleanup =
+            wil::scope_exit([]() { LOG_IF_WIN32_BOOL_FALSE(SetEnvironmentVariableW(L"WSLC_E2E_COMPOSE_OVERRIDE", nullptr)); });
+
+        WriteTestFileContent(
+            projectDirectory / L"compose.yaml",
+            "services:\n"
+            "  owned:\n"
+            "    name: ${CONTAINER_NAME}\n"
+            "    image: ${IMAGE}\n"
+            "    environment:\n"
+            "      FROM_DOTENV: ${DOTENV_VALUE}\n"
+            "      OVERRIDE: ${WSLC_E2E_COMPOSE_OVERRIDE}\n"
+            "      WSLC_E2E_COMPOSE_OVERRIDE:\n");
+        WriteTestFileContent(
+            projectDirectory / L".env",
+            std::format(
+                "CONTAINER_NAME={}\nIMAGE={}\nDOTENV_VALUE=\"dotenv value\"\nWSLC_E2E_COMPOSE_OVERRIDE=file\n",
+                WideToMultiByte(ContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag())));
+
+        const auto result = RunWslc(std::format(L"compose --project-directory \"{}\" create", projectDirectory.wstring()));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+
+        const auto inspect = InspectContainer(ContainerName);
+        VERIFY_IS_TRUE(inspect.Config.Env.has_value());
+        const auto& env = *inspect.Config.Env;
+        VERIFY_IS_TRUE(std::ranges::find(env, std::string{"FROM_DOTENV=dotenv value"}) != env.end());
+        VERIFY_IS_TRUE(std::ranges::find(env, std::string{"OVERRIDE=process"}) != env.end());
+        VERIFY_IS_TRUE(std::ranges::find(env, std::string{"WSLC_E2E_COMPOSE_OVERRIDE=process"}) != env.end());
+    }
+
 private:
     static void Cleanup()
     {

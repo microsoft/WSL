@@ -54,7 +54,7 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
         });
     }
 
-    auto spec = ComposeSpec::Parse(specDocuments);
+    auto spec = ComposeSpec::Parse(specDocuments, ComposeVariables{documents.Environment, documents.EnvironmentFiles});
 
     std::string projectName;
     if (documents.ExplicitProjectName.has_value())
