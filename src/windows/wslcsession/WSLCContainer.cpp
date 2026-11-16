@@ -3822,6 +3822,15 @@ Microsoft::WRL::ComPtr<IWSLCSession> WSLCContainer::ResolveSession(bool Required
 HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
 try
 {
+    auto sessionLifetime = ResolveSession();
+    WSLCExecutionContext context(&m_session);
+    return AttachImpl(DetachKeys, Stdin, Stdout, Stderr);
+}
+CATCH_RETURN();
+
+HRESULT WSLCContainer::AttachImpl(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
+try
+{
     RETURN_HR_IF_NULL(E_POINTER, Stdin);
     RETURN_HR_IF_NULL(E_POINTER, Stdout);
     RETURN_HR_IF_NULL(E_POINTER, Stderr);
@@ -3830,8 +3839,6 @@ try
     *Stdout = {};
     *Stderr = {};
 
-    auto sessionLifetime = ResolveSession();
-    WSLCExecutionContext context(&m_session);
     auto vmLease = m_session.Runtime().AcquireVmLease();
     return CallImpl(&WSLCContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
 }

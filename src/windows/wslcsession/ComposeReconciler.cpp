@@ -72,6 +72,7 @@ ComposeExecutionResult ComposeReconciler::Execute(
 
     return {
         .AffectedContainers = ObserveContainers(containers),
+        .Containers = std::move(containers),
     };
 }
 

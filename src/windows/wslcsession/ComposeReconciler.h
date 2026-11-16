@@ -19,6 +19,7 @@ class WSLCContainer;
 struct ComposeExecutionResult
 {
     std::vector<WSLCContainerEntry> AffectedContainers;
+    std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> Containers;
 };
 
 // Invoked before resource work; Current identifies the resource's ordinal within its operation group.

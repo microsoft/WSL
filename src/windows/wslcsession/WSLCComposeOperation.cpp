@@ -263,20 +263,20 @@ void WSLCComposeOperation::ReportStreams(const ComposeExecutionResult& result)
     // Attachment covers running project containers and succeeds when none are running.
     // TODO: Align standalone attach with Docker Compose service selection and its error when no target is running.
     // TODO: Align attached up with Docker Compose attachment timing and log fallback for exited containers.
-    for (const auto& entry : result.AffectedContainers)
+    for (size_t index = 0; index < result.AffectedContainers.size(); ++index)
     {
         m_cancellation.Check();
+        const auto& entry = result.AffectedContainers[index];
         if (entry.State != WslcContainerStateRunning)
         {
             continue;
         }
 
-        Microsoft::WRL::ComPtr<IWSLCContainer> container;
-        THROW_IF_FAILED(m_session.OpenContainer(entry.Id, &container));
+        const auto& container = result.Containers[index];
         wsl::windows::common::wslutil::COMOutputHandle stdinHandle;
         wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
         wsl::windows::common::wslutil::COMOutputHandle stderrHandle;
-        const HRESULT attachResult = container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle);
+        const HRESULT attachResult = container->AttachImpl(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle);
         if (attachResult == WSLC_E_CONTAINER_NOT_RUNNING)
         {
             continue;

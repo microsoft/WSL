@@ -421,6 +421,7 @@ public:
     IFACEMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
     // Internal entry points share the caller's execution context.
+    HRESULT AttachImpl(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr);
     HRESULT StartImpl(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions, IWSLCProcess** Process = nullptr);
     HRESULT StopImpl(WSLCSignal Signal, LONG TimeoutSeconds);
     HRESULT DeleteImpl(WSLCDeleteFlags Flags);
