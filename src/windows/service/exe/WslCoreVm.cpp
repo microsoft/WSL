@@ -1803,12 +1803,12 @@ WslCoreVm::DiskMountResult WslCoreVm::MountDiskLockHeld(
     return {std::move(targetName), mountResult, step};
 }
 
-wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments, uint64_t PluginId)
+wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ LPCSTR* Arguments, uint64_t PluginId, _In_opt_ LPCSTR PluginRelativeCgroupPath)
 {
     auto lock = m_lock.lock_exclusive();
 
     return LxssCreateProcess::CreateLinuxProcess(
-        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout, PluginId);
+        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout, PluginId, PluginRelativeCgroupPath);
 }
 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)

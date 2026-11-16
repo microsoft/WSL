@@ -4008,14 +4008,17 @@ HRESULT LxssUserSessionImpl::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In
     return S_OK;
 }
 
-HRESULT LxssUserSessionImpl::CreateLinuxProcess(_In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket, uint64_t PluginId)
+HRESULT LxssUserSessionImpl::CreateLinuxProcess(
+    _In_opt_ const GUID* Distro, _In_ LPCSTR Path, _In_ LPCSTR* Arguments, _Out_ SOCKET* Socket, uint64_t PluginId, _In_opt_ LPCSTR PluginRelativeCgroupPath)
 {
+    RETURN_HR_IF(E_INVALIDARG, PluginRelativeCgroupPath != nullptr && (Distro != nullptr || PluginId == 0));
+
     std::lock_guard lock(m_instanceLock);
     RETURN_HR_IF(E_NOT_VALID_STATE, !m_utilityVm);
 
     if (Distro == nullptr)
     {
-        *Socket = m_utilityVm->CreateRootNamespaceProcess(Path, Arguments, PluginId).release();
+        *Socket = m_utilityVm->CreateRootNamespaceProcess(Path, Arguments, PluginId, PluginRelativeCgroupPath).release();
     }
     else
     {
