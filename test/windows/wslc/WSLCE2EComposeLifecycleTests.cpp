@@ -126,6 +126,32 @@ services:
         VERIFY_IS_FALSE(InspectContainer(ContainerName).State.Running);
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Compose_MergesDiscoveredOverrideFile)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { Cleanup(); });
+
+        WriteTestFileContent(
+            projectDirectory / L"compose.yaml",
+            std::format(
+                "services:\n  owned:\n    name: {}\n    image: {}\n    environment:\n      SOURCE: base\n      KEEP: base\n",
+                WideToMultiByte(ContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag())));
+        WriteTestFileContent(
+            projectDirectory / L"compose.override.yaml", "services:\n  owned:\n    environment:\n      SOURCE: override\n");
+
+        const auto result = RunWslc(std::format(L"compose --project-directory \"{}\" create", projectDirectory.wstring()));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+
+        const auto inspect = InspectContainer(ContainerName);
+        VERIFY_IS_TRUE(inspect.Config.Env.has_value());
+        const auto& env = *inspect.Config.Env;
+        VERIFY_IS_TRUE(std::ranges::find(env, std::string{"SOURCE=override"}) != env.end());
+        VERIFY_IS_TRUE(std::ranges::find(env, std::string{"KEEP=base"}) != env.end());
+        VERIFY_IS_TRUE(std::ranges::find(env, std::string{"SOURCE=base"}) == env.end());
+    }
+
 private:
     static void Cleanup()
     {

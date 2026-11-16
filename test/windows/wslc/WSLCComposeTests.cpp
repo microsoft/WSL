@@ -56,6 +56,37 @@ struct ComposeRequestStorage
         request.ActionOptions.Type = WSLCComposeActionOptionsTypeNone;
     }
 
+    ComposeRequestStorage(const std::vector<std::filesystem::path>& paths, WSLCComposeAction action)
+    {
+        projectDirectory = std::filesystem::absolute(paths.front()).lexically_normal().parent_path();
+        sourcePaths.reserve(paths.size());
+        contents.reserve(paths.size());
+        documentList.reserve(paths.size());
+        for (const auto& path : paths)
+        {
+            const auto& source = sourcePaths.emplace_back(std::filesystem::absolute(path).lexically_normal());
+            std::ifstream stream{source, std::ios::binary};
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), !stream);
+            const auto& bytes = contents.emplace_back(std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{});
+
+            documentList.push_back({
+                .SourcePath = source.c_str(),
+                .BaseDirectory = projectDirectory.c_str(),
+                .Content = reinterpret_cast<const byte*>(bytes.data()),
+                .ContentSize = gsl::narrow<ULONG>(bytes.size()),
+            });
+        }
+
+        documents.ProjectDirectory = projectDirectory.c_str();
+        documents.Documents = documentList.data();
+        documents.DocumentCount = gsl::narrow<ULONG>(documentList.size());
+
+        request.Action = action;
+        request.Project.Type = WSLCComposeProjectTypeDocuments;
+        request.Project.Value.Documents = &documents;
+        request.ActionOptions.Type = WSLCComposeActionOptionsTypeNone;
+    }
+
     ComposeRequestStorage(std::string projectKeyValue, WSLCComposeAction action) : projectKey(std::move(projectKeyValue))
     {
         request.Action = action;
@@ -79,6 +110,9 @@ struct ComposeRequestStorage
     std::filesystem::path sourcePath;
     std::filesystem::path projectDirectory;
     std::vector<char> content;
+    std::vector<std::filesystem::path> sourcePaths;
+    std::vector<std::vector<char>> contents;
+    std::vector<WSLCComposeDocument> documentList;
     std::string projectKey;
     std::string explicitProjectName;
     WSLCComposeDocument document{};
@@ -1757,6 +1791,174 @@ secrets:
         const auto result = blocked.TakeResult();
         VERIFY_SUCCEEDED(result.value.Result);
         VERIFY_ARE_EQUAL(projectKeys[0], std::string{result.value.ProjectKey});
+    }
+
+    TEST_METHOD(ComposeMultipleDocumentsMerge)
+    {
+        const std::string projectName{"compose-multi-file"};
+        const auto projectPath = std::filesystem::current_path() / projectName;
+        const auto composePath = projectPath / "compose.yaml";
+        const auto overridePath = projectPath / "overrides" / "override.yaml";
+        const auto networkName = projectName + "_default";
+        const std::array containerNames{projectName + "-added-1", projectName + "-replaced-1", projectName + "-web-1"};
+
+        auto cleanup = wil::scope_exit([&] {
+            for (const auto& name : containerNames)
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                if (SUCCEEDED(m_defaultSession->OpenContainer(name.c_str(), &container)))
+                {
+                    LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+                }
+            }
+
+            const auto deleteNetworkResult = m_defaultSession->DeleteNetwork(networkName.c_str());
+            if (deleteNetworkResult != WSLC_E_NETWORK_NOT_FOUND)
+            {
+                LOG_IF_FAILED(deleteNetworkResult);
+            }
+
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+        });
+
+        for (const auto* directory : {"base", "keep", "override", "overrides"})
+        {
+            std::filesystem::create_directories(projectPath / directory);
+        }
+
+        WriteFileContent(
+            composePath,
+            "services:\n"
+            "  web:\n"
+            "    image: alpine:latest\n"
+            "    command: [\"sleep\", \"1\"]\n"
+            "    environment:\n"
+            "      KEEP: base\n"
+            "      REPLACE: base\n"
+            "    volumes:\n"
+            "      - ./base:/data\n"
+            "      - ./keep:/keep:ro\n"
+            "    ports:\n"
+            "      - \"0:8080\"\n"
+            "  replaced:\n"
+            "    image: alpine:latest\n"
+            "    environment:\n"
+            "      DROPPED: base\n"
+            "  removed:\n"
+            "    image: alpine:latest\n");
+
+        WriteFileContent(
+            overridePath,
+            "services:\n"
+            "  web:\n"
+            "    command: [\"sleep\", \"infinity\"]\n"
+            "    environment:\n"
+            "      - REPLACE=override\n"
+            "      - ADDED=override\n"
+            "    volumes:\n"
+            "      - ./override:/data\n"
+            "    ports:\n"
+            "      - \"0:8080\"\n"
+            "      - \"0:9090\"\n"
+            "  replaced:\n"
+            "    environment: !override\n"
+            "      KEPT: override\n"
+            "  removed: !reset {}\n"
+            "  added:\n"
+            "    image: alpine:latest\n");
+
+        ComposeRequestStorage request{std::vector{composePath, overridePath}, WSLCComposeActionCreate};
+        const auto result = ExecuteCompose(*m_defaultSession, request);
+
+        VERIFY_ARE_EQUAL(3u, result.value.AffectedContainersCount);
+        for (ULONG i = 0; i < result.value.AffectedContainersCount; ++i)
+        {
+            VERIFY_ARE_EQUAL(containerNames[i], std::string{result.value.AffectedContainers[i].Name});
+        }
+
+        wil::com_ptr<IWSLCContainer> container;
+        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer((projectName + "-removed-1").c_str(), &container));
+
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerNames[2].c_str(), &container));
+        const auto web = InspectContainer(container.get());
+        VERIFY_IS_TRUE(web.Config.Cmd.has_value());
+        VERIFY_ARE_EQUAL(std::vector<std::string>({"sleep", "infinity"}), *web.Config.Cmd);
+
+        VERIFY_IS_TRUE(web.Config.Env.has_value());
+        const auto hasEnv = [](const auto& inspect, const char* entry) {
+            return std::ranges::find(*inspect.Config.Env, std::string{entry}) != inspect.Config.Env->end();
+        };
+
+        VERIFY_IS_TRUE(hasEnv(web, "KEEP=base"));
+        VERIFY_IS_TRUE(hasEnv(web, "REPLACE=override"));
+        VERIFY_IS_TRUE(hasEnv(web, "ADDED=override"));
+        VERIFY_IS_FALSE(hasEnv(web, "REPLACE=base"));
+
+        // Relative sources in every document resolve against the project directory.
+        VERIFY_ARE_EQUAL(2u, web.Mounts.size());
+        for (const auto& mount : web.Mounts)
+        {
+            if (mount.Destination == "/data")
+            {
+                VERIFY_ARE_EQUAL(std::filesystem::canonical(projectPath / "override").string(), mount.Source);
+                VERIFY_IS_TRUE(mount.ReadWrite);
+                continue;
+            }
+
+            VERIFY_ARE_EQUAL(std::string{"/keep"}, mount.Destination);
+            VERIFY_ARE_EQUAL(std::filesystem::canonical(projectPath / "keep").string(), mount.Source);
+            VERIFY_IS_FALSE(mount.ReadWrite);
+        }
+
+        VERIFY_IS_TRUE(web.Ports.contains("8080/tcp"));
+        VERIFY_ARE_EQUAL(1u, web.Ports.at("8080/tcp").size());
+        VERIFY_IS_TRUE(web.Ports.contains("9090/tcp"));
+
+        container.reset();
+        VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(containerNames[1].c_str(), &container));
+        const auto replaced = InspectContainer(container.get());
+        VERIFY_IS_TRUE(replaced.Config.Env.has_value());
+        VERIFY_IS_TRUE(hasEnv(replaced, "KEPT=override"));
+        VERIFY_IS_FALSE(hasEnv(replaced, "DROPPED=base"));
+    }
+
+    TEST_METHOD(ComposeMultipleDocumentsReportFailingDocument)
+    {
+        const auto projectPath = std::filesystem::current_path() / "compose-multi-file-errors";
+        const auto composePath = projectPath / "compose.yaml";
+        const auto overridePath = projectPath / "compose.override.yaml";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+        });
+
+        WriteFileContent(composePath, "services:\n  web:\n    image: alpine:latest\n");
+
+        const auto verifyRejected = [&](std::string_view overrideContent, const std::wstring& expectedMessage) {
+            WriteFileContent(overridePath, overrideContent);
+            ComposeRequestStorage request{std::vector{composePath, overridePath}, WSLCComposeActionValidate};
+            const auto result = WaitForCompose(*m_defaultSession, request);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, result.value.Result);
+            VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, result.value.Status);
+            VERIFY_IS_NOT_NULL(result.value.ErrorMessage);
+            VERIFY_ARE_EQUAL(expectedMessage, std::wstring{result.value.ErrorMessage});
+        };
+
+        verifyRejected(
+            "services:\n  web:\n    image: !reset null\n",
+            wsl::shared::Localization::MessageWslcComposeServiceImageRequired(composePath.wstring(), "web"));
+
+        verifyRejected(
+            "services:\n  web:\n    restart: always\n",
+            wsl::shared::Localization::MessageWslcComposePropertyUnsupported(overridePath.wstring(), "restart"));
+
+        // A service may be completed by a later document.
+        WriteFileContent(composePath, "services:\n  web:\n    environment:\n      A: b\n");
+        WriteFileContent(overridePath, "services:\n  web:\n    image: alpine:latest\n");
+        ComposeRequestStorage request{std::vector{composePath, overridePath}, WSLCComposeActionValidate};
+        ExecuteCompose(*m_defaultSession, request);
     }
 
     TEST_METHOD(ComposeInvalidDocumentEnvelopeRejectedBeforeExecution)

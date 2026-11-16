@@ -54,11 +54,10 @@ Document content is the original byte sequence, including any byte-order mark
 used by yaml-cpp for encoding detection. The service parses those captured bytes;
 it does not reopen the Compose source file.
 
-`SourcePath` supplies diagnostic context, and its parent directory resolves
-relative bind mounts. Callers should supply absolute source paths so resolution
-is independent of the session process's working directory.
-
-Each document must also supply a nonempty `BaseDirectory`.
+`SourcePath` supplies diagnostic context. Each document must also supply a
+nonempty `BaseDirectory`, which resolves relative bind mounts. Callers should
+supply absolute paths so resolution is independent of the session process's
+working directory.
 
 `ProjectDirectory` supplies the default project name. `ExplicitProjectName`
 overrides that default. Interpretation normalizes the chosen name and validates
@@ -68,7 +67,13 @@ A project key is the exact normalized project name within the owning WSLC
 session. Key-backed requests validate that name without normalizing it again.
 Different session processes have independent project namespaces.
 
-The supported document input contains exactly one document.
+The collection contains one or more documents, merged in order. Each document is
+validated on its own so errors name the document that contains them. Later
+documents override scalar settings and `command`, merge `environment` by
+variable name and `volumes` by container path, and append `ports` that are not
+already present. The `!reset` tag clears a setting or removes a service, and
+`!override` replaces a setting or service instead of merging it. Required
+settings such as `image` are checked after merging.
 
 ## Actions and execution
 
