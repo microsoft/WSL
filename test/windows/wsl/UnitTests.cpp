@@ -2173,7 +2173,7 @@ Usage:
     WSL2_TEST_METHOD(DefaultSwapFile)
     {
         WslConfigChange configChange(LxssGenerateTestConfig({.vmIdleTimeout = 60000}) + L"\nswap=256MB\n");
-        const auto swapPath = wsl::windows::common::helpers::GetDefaultSwapFilePath(GetCurrentProcessToken());
+        const auto swapPath = wsl::windows::common::helpers::GetVmTempPath(GetCurrentProcessToken()) / L"swap.vhdx";
         const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
             WslShutdown();
@@ -2185,6 +2185,7 @@ Usage:
         {
             if (existingSwap)
             {
+                wil::CreateDirectoryDeep(swapPath.parent_path().c_str());
                 wsl::core::filesystem::CreateVhd(swapPath.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
             }
 

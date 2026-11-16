@@ -180,7 +180,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     try
     {
         const auto runAsUser = wil::impersonate_token(m_userToken.get());
-        m_tempPath = wsl::windows::common::filesystem::GetTempFolderPath(m_userToken.get()) / m_machineId;
+        m_tempPath = helpers::GetVmTempPath(m_userToken.get());
 
         wil::CreateDirectoryDeep(m_tempPath.c_str());
         m_tempDirectoryCreated = true;
@@ -231,10 +231,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             auto initRdPath = m_installPath / LXSS_TOOLS_DIRECTORY / LXSS_VM_MODE_INITRD_NAME;
 
             auto targetPath = m_rootFsPath / LXSS_VM_MODE_INITRD_NAME;
-            THROW_IF_WIN32_BOOL_FALSE(CopyFileW(initRdPath.c_str(), targetPath.c_str(), TRUE));
+            THROW_IF_WIN32_BOOL_FALSE(CopyFileW(initRdPath.c_str(), targetPath.c_str(), FALSE));
 
             targetPath = m_rootFsPath / LXSS_VM_MODE_KERNEL_NAME;
-            THROW_IF_WIN32_BOOL_FALSE(CopyFileW(m_vmConfig.KernelPath.c_str(), targetPath.c_str(), TRUE));
+            THROW_IF_WIN32_BOOL_FALSE(CopyFileW(m_vmConfig.KernelPath.c_str(), targetPath.c_str(), FALSE));
         }
     }
 
@@ -542,9 +542,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
                 auto runAsUser = wil::impersonate_token(m_userToken.get());
                 if (m_vmConfig.SwapFilePath.empty())
                 {
-                    m_vmConfig.SwapFilePath = helpers::GetDefaultSwapFilePath(m_userToken.get());
+                    m_vmConfig.SwapFilePath = m_tempPath / L"swap.vhdx";
                     m_deleteSwapFile = true;
-                    wil::CreateDirectoryDeep(m_vmConfig.SwapFilePath.parent_path().c_str());
                 }
 
                 // Ensure the swap vhd ends with the vhdx file extension.
