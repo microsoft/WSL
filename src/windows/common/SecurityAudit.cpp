@@ -2,6 +2,11 @@
 
 #include "precomp.h"
 #include "SecurityAudit.h"
+#include "securityaudit/ProcessCreationAudit.h"
+#include "securityaudit/ProcessExecutionAudit.h"
+#include "securityaudit/NetworkAudit.h"
+#include "securityaudit/SystemAudit.h"
+#include "lxinitshared.h"
 #include "WslSecurity.h"
 #include "registry.hpp"
 #include "wslutil.h"
@@ -181,6 +186,77 @@ void EventSource::Report(DWORD eventId, std::span<std::wstring> fields)
     }
     AUDIT_PARAMS parameters{sizeof(AUDIT_PARAMS), APF_AuditSuccess, static_cast<USHORT>(values.size()), values.data()};
     THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(0, m_provider.get(), eventId, nullptr, &parameters));
+}
+
+void ReportEvent(EventSource& source, gsl::span<gsl::byte> bytes, bool includeCommandLine, const ProcessExecutionDistribution* distribution)
+{
+    const auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(bytes);
+    THROW_HR_IF(E_INVALIDARG, !header);
+    if (header->MessageType == LxInitMessageProcessExecuted)
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED>(bytes);
+        THROW_HR_IF(E_INVALIDARG, !event || bytes.size() != sizeof(*event));
+        ReportProcessExecution(source, event->Pid);
+        return;
+    }
+
+    THROW_HR_IF(
+        E_INVALIDARG,
+        header->MessageType != LxInitMessageProcessCreated && header->MessageType != LxInitMessageProcessExecutedDetails &&
+            header->MessageType != LxInitMessageNetworkAudit && header->MessageType != LxInitMessageSystemAudit);
+    std::wstring details;
+    try
+    {
+        switch (header->MessageType)
+        {
+        case LxInitMessageProcessCreated:
+            details = FormatProcessCreation(bytes);
+            break;
+        case LxInitMessageNetworkAudit:
+            details = FormatNetworkAudit(bytes);
+            break;
+        case LxInitMessageSystemAudit:
+            details = FormatSystemAudit(bytes);
+            break;
+        case LxInitMessageProcessExecutedDetails:
+            details = FormatProcessExecution(bytes, includeCommandLine, distribution);
+            break;
+        }
+    }
+    catch (const wil::ResultException& error)
+    {
+        THROW_HR_IF(error.GetErrorCode(), error.GetErrorCode() != E_INVALIDARG);
+        LOG_CAUGHT_EXCEPTION();
+        return;
+    }
+
+    switch (header->MessageType)
+    {
+    case LxInitMessageProcessCreated:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_CREATED>(bytes);
+        ReportProcessCreation(source, event->ChildPid, details);
+        break;
+    }
+    case LxInitMessageNetworkAudit:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_NETWORK_AUDIT>(bytes);
+        ReportNetworkAudit(source, *event, details);
+        break;
+    }
+    case LxInitMessageSystemAudit:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_SYSTEM_AUDIT>(bytes);
+        ReportSystemAudit(source, *event, details);
+        break;
+    }
+    case LxInitMessageProcessExecutedDetails:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+        ReportProcessExecutionDetails(source, event->Pid, details);
+        break;
+    }
+    }
 }
 
 } // namespace wsl::windows::common::securityaudit

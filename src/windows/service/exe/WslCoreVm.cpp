@@ -2371,81 +2371,19 @@ try
     {
         gsl::span<gsl::byte> bytes;
         const auto& header = channel.ReceiveMessage<MESSAGE_HEADER>(&bytes);
-        if (header.MessageType == LxInitMessageProcessExecuted)
+        std::optional<securityaudit::ProcessExecutionDistribution> distribution;
+        if (header.MessageType == LxInitMessageProcessExecutedDetails)
         {
-            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED>(bytes);
-            THROW_HR_IF(E_INVALIDARG, !event || bytes.size() != sizeof(*event));
-            securityaudit::ReportProcessExecution(source, event->Pid);
-            continue;
-        }
-        THROW_HR_IF(
-            E_INVALIDARG,
-            header.MessageType != LxInitMessageProcessCreated && header.MessageType != LxInitMessageProcessExecutedDetails &&
-                header.MessageType != LxInitMessageNetworkAudit && header.MessageType != LxInitMessageSystemAudit);
-        std::wstring details;
-        try
-        {
-            switch (header.MessageType)
+            if (const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes))
             {
-            case LxInitMessageProcessCreated:
-                details = securityaudit::FormatProcessCreation(bytes);
-                break;
-            case LxInitMessageNetworkAudit:
-                details = securityaudit::FormatNetworkAudit(bytes);
-                break;
-            case LxInitMessageSystemAudit:
-                details = securityaudit::FormatSystemAudit(bytes);
-                break;
-            case LxInitMessageProcessExecutedDetails:
-            {
-                const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
-                THROW_HR_IF(E_INVALIDARG, !event);
-                std::optional<securityaudit::ProcessExecutionDistribution> distribution;
+                auto lock = m_auditDistributionLock.lock_shared();
+                if (const auto found = m_auditDistributions.find(event->PidNamespace); found != m_auditDistributions.end())
                 {
-                    auto lock = m_auditDistributionLock.lock_shared();
-                    if (const auto found = m_auditDistributions.find(event->PidNamespace); found != m_auditDistributions.end())
-                    {
-                        distribution = found->second;
-                    }
+                    distribution = found->second;
                 }
-                details = securityaudit::FormatProcessExecution(bytes, includeCommandLine, distribution ? &*distribution : nullptr);
-                break;
-            }
             }
         }
-        catch (const wil::ResultException& error)
-        {
-            THROW_HR_IF(error.GetErrorCode(), error.GetErrorCode() != E_INVALIDARG);
-            LOG_CAUGHT_EXCEPTION();
-            continue;
-        }
-        switch (header.MessageType)
-        {
-        case LxInitMessageProcessCreated:
-        {
-            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_CREATED>(bytes);
-            securityaudit::ReportProcessCreation(source, event->ChildPid, details);
-            break;
-        }
-        case LxInitMessageNetworkAudit:
-        {
-            const auto* event = gslhelpers::try_get_struct<LX_INIT_NETWORK_AUDIT>(bytes);
-            securityaudit::ReportNetworkAudit(source, *event, details);
-            break;
-        }
-        case LxInitMessageSystemAudit:
-        {
-            const auto* event = gslhelpers::try_get_struct<LX_INIT_SYSTEM_AUDIT>(bytes);
-            securityaudit::ReportSystemAudit(source, *event, details);
-            break;
-        }
-        case LxInitMessageProcessExecutedDetails:
-        {
-            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
-            securityaudit::ReportProcessExecutionDetails(source, event->Pid, details);
-            break;
-        }
-        }
+        securityaudit::ReportEvent(source, bytes, includeCommandLine, distribution ? &*distribution : nullptr);
     }
 }
 catch (...)
