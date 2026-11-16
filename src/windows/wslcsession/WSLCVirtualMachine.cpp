@@ -1166,22 +1166,48 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
         m_portRelayChannelRead.reset();
     });
 
-    const std::vector<HANDLE> exitEvents{m_vmTerminatingEvent.get(), m_sessionTerminatingEvent};
+    using io::MultiHandleWait;
 
-    const wil::unique_event writeEvent{wil::EventOptions::ManualReset};
-    OVERLAPPED writeOverlapped{};
-    writeOverlapped.hEvent = writeEvent.get();
-    auto bytesTransferred =
-        relay::InterruptableWrite(m_portRelayChannelWrite.get(), gslhelpers::struct_as_bytes(message), exitEvents, &writeOverlapped);
+    MultiHandleWait wait;
+    std::vector<char> response;
 
-    THROW_HR_IF_MSG(E_ABORT, bytesTransferred != sizeof(message), "Port relay request interrupted, %u bytes written", bytesTransferred);
+    // Any I/O failure ends the exchange. The incomplete response is reported below.
+    auto onError = [&]() {
+        LOG_CAUGHT_EXCEPTION();
+        wait.Cancel();
+    };
 
-    HRESULT result = E_UNEXPECTED;
-    bytesTransferred = relay::InterruptableRead(m_portRelayChannelRead.get(), gslhelpers::struct_as_writeable_bytes(result), exitEvents);
+    wait.AddHandle(
+        std::make_unique<io::WriteHandle>(HandleWrapper{m_portRelayChannelWrite.get()}, gslhelpers::struct_as_writeable_bytes(message)),
+        MultiHandleWait::None,
+        onError);
 
-    THROW_HR_IF_MSG(E_ABORT, bytesTransferred != sizeof(result), "Port relay response interrupted, %u bytes read", bytesTransferred);
+    wait.AddHandle(
+        std::make_unique<io::ReadHandle>(
+            HandleWrapper{m_portRelayChannelRead.get()},
+            [&](const gsl::span<char>& buffer) {
+                response.insert(response.end(), buffer.begin(), buffer.end());
+                if (response.size() >= sizeof(HRESULT))
+                {
+                    wait.Cancel();
+                }
+            }),
+        MultiHandleWait::None,
+        onError);
+
+    for (const auto event : {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent})
+    {
+        wait.AddHandle(std::make_unique<io::EventHandle>(event), MultiHandleWait::CancelOnCompleted | MultiHandleWait::NeedNotComplete);
+    }
+
+    wait.Run({});
+
+    THROW_HR_IF_MSG(E_ABORT, response.size() != sizeof(HRESULT), "Port relay exchange interrupted, %zu response bytes", response.size());
 
     closeChannel.release();
+
+    HRESULT result = E_UNEXPECTED;
+    std::memcpy(&result, response.data(), sizeof(result));
 
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }

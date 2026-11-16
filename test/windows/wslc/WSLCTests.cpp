@@ -4128,33 +4128,19 @@ sys.exit(1 if queries else 0)
         // NAT mode always forwards ports through wslrelay.
         auto session = CreateSession(GetDefaultSessionSettings(L"port-relay-hang", false, WSLCNetworkingModeNAT));
 
-        wil::unique_handle sessionProcess;
-        VERIFY_SUCCEEDED(session->GetProcessHandle(&sessionProcess));
-
         // Map a port to confirm the relay is running and responsive.
         VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
 
         // Suspend wslrelay so it never answers the next request.
         SuspendProcessThreads(GetNewSessionRelay(existingRelays));
 
-        std::future<HRESULT> mapResult;
-        std::future<HRESULT> terminateResult;
-
-        // If a call stays stuck, kill the session process to disconnect it so the futures can be destroyed.
-        auto killSession = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(sessionProcess.get(), 1)); });
-
-        mapResult = std::async(std::launch::async, [&]() { return session->MapVmPort(AF_INET, 1235, 81); });
+        auto mapResult = std::async(std::launch::async, [&]() { return session->MapVmPort(AF_INET, 1235, 81); });
         VERIFY_ARE_EQUAL(mapResult.wait_for(5s), std::future_status::timeout);
 
-        terminateResult = std::async(std::launch::async, [&]() { return session->Terminate(); });
+        auto terminateResult = std::async(std::launch::async, [&]() { return session->Terminate(); });
 
-        VERIFY_ARE_EQUAL(mapResult.wait_for(60s), std::future_status::ready);
         VERIFY_ARE_EQUAL(mapResult.get(), E_ABORT);
-
-        VERIFY_ARE_EQUAL(terminateResult.wait_for(60s), std::future_status::ready);
         VERIFY_SUCCEEDED(terminateResult.get());
-
-        killSession.release();
     }
 
     WSLC_TEST_METHOD(PortRelayExitFailsPortMapping)
@@ -4175,17 +4161,8 @@ sys.exit(1 if queries else 0)
         VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(relay.get(), 1));
         VERIFY_ARE_EQUAL(WaitForSingleObject(relay.get(), 60 * 1000), WAIT_OBJECT_0);
 
-        std::future<HRESULT> mapResult;
-
-        // If the call stays stuck, kill the session process to disconnect it so the future can be destroyed.
-        auto killSession = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(sessionProcess.get(), 1)); });
-
         // With the relay gone, the request must fail on the broken pipe instead of waiting for a response.
-        mapResult = std::async(std::launch::async, [&]() { return session->MapVmPort(AF_INET, 1235, 81); });
-        VERIFY_ARE_EQUAL(mapResult.wait_for(60s), std::future_status::ready);
-        VERIFY_ARE_EQUAL(mapResult.get(), E_ABORT);
-
-        killSession.release();
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1235, 81), E_ABORT);
 
         VERIFY_ARE_EQUAL(WaitForSingleObject(sessionProcess.get(), 0), WAIT_TIMEOUT);
         VERIFY_SUCCEEDED(session->Terminate());
