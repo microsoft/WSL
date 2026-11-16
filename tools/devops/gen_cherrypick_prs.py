@@ -11,39 +11,48 @@ Each new branch starts at the release tip; dependent picks may need manual handl
 On conflict, stop and leave the cherry-pick available for manual resolution or abort.
 """
 
-import argparse
 import sys
+
+import click
+from git import GitError, Repo
 
 from backport_utils import (
     REPO, active_backports, backported_commits, fetch_release,
-    list_prs, output, pr_body, release_branch, run, source_prs, validate_remote,
+    list_prs, pr_body, release_branch, run, source_prs, validate_remote,
 )
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("release", help="Release version or branch, e.g. 3.0 or release/3.0")
-    parser.add_argument("prs", nargs="*", help="Merged WSL PR numbers or URLs; default: backport_<version> label")
-    parser.add_argument("--remote", default="origin", help="WSL remote used for fetching and pushing (default: origin)")
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--apply", action="store_true", help="Cherry-pick, push, and create PRs instead of previewing")
-    mode.add_argument("--dry-run", action="store_true", help="Preview only (the default)")
-    parser.add_argument("--draft", action="store_true", help="Create draft PRs")
-    args = parser.parse_args(argv)
-
-    branch = release_branch(args.release)
-    prs = source_prs(branch, args.prs)
+@click.command(help=__doc__, context_settings={"help_option_names": ["-h", "--help"]})
+@click.argument("release")
+@click.argument("prs", nargs=-1)
+@click.option("--remote", default="origin", show_default=True, help="WSL remote used for fetching and pushing.")
+@click.option("--apply", "apply_changes", is_flag=True, help="Cherry-pick, push, and create PRs instead of previewing.")
+@click.option("--dry-run", is_flag=True, help="Preview only (the default).")
+@click.option("--draft", is_flag=True, help="Create draft PRs.")
+@click.pass_obj
+def main(repo, release, prs, remote, apply_changes, dry_run, draft):
+    if apply_changes and dry_run:
+        raise click.UsageError("--apply and --dry-run are mutually exclusive.")
+    branch = release_branch(release)
+    prs = source_prs(branch, prs)
     if not prs:
         print("No merged PRs selected.")
-        return 0
-    if args.apply and output("git", "status", "--porcelain"):
+        return
+    if repo is not None:
+        return generate(repo, branch, prs, remote, apply_changes, draft)
+    with Repo(".", search_parent_directories=True) as repo:
+        return generate(repo, branch, prs, remote, apply_changes, draft)
+
+
+def generate(repo, branch, prs, remote, apply_changes, draft):
+    if apply_changes and repo.is_dirty(untracked_files=True):
         raise ValueError("Working tree must be clean before applying cherry-picks.")
-    if args.apply:
-        validate_remote(args.remote, push=True)
-    ref = fetch_release(args.remote, branch)
-    if args.apply:
-        output("git", "fetch", "--no-tags", "--refmap=", args.remote, f"refs/heads/{prs[0]['baseRefName']}")
-    picked = backported_commits(ref)
+    if apply_changes:
+        validate_remote(repo, remote, push=True)
+    ref = fetch_release(repo, remote, branch)
+    if apply_changes:
+        repo.git.fetch("--no-tags", "--refmap=", remote, f"refs/heads/{prs[0]['baseRefName']}")
+    picked = backported_commits(repo, ref)
     candidates = list_prs(branch)
 
     for pr in prs:
@@ -52,48 +61,46 @@ def main(argv=None):
         if sha in picked:
             print(f"Skipping #{number}: already present in {branch}.")
             continue
-        existing = active_backports(pr, candidates, picked)
+        existing = active_backports(repo, pr, candidates, picked)
         if existing:
             print(f"Skipping #{number}: existing backport " + ", ".join(item["url"] for item in existing))
             continue
         head = f"cherrypick/{branch}/pr-{number}"
-        result = run("git", "show-ref", "--verify", "--quiet", f"refs/heads/{head}", check=False)
-        if result.returncode == 0:
+        if head in repo.heads:
             print(f"Skipping #{number}: existing local branch {head}; finish or abandon that attempt manually.")
             continue
-        if result.returncode != 1:
-            raise RuntimeError(f"Cannot check local branch {head}:\n{result.stderr}")
         title = f"[{branch}] {pr['title']} (#{number})"
-        body = pr_body(pr, branch)
+        body = pr_body(repo, pr, branch)
         print(f"\n#{number}: {sha} -> {head}\nTitle: {title}\n{body}")
-        if not args.apply:
+        if not apply_changes:
             continue
 
         # Never reset an existing branch or force-push a prior attempt.
-        output("git", "switch", "--create", head, ref)
-        result = run("git", "cherry-pick", "-x", sha, check=False)
-        if result.returncode:
-            print(result.stdout + result.stderr, file=sys.stderr)
+        repo.create_head(head, ref).checkout()
+        try:
+            repo.git.cherry_pick("-x", sha)
+        except GitError as error:
+            print(error, file=sys.stderr)
             print("Stopped before push/PR creation. Resolve the cherry-pick or run git cherry-pick --abort.",
                   file=sys.stderr)
-            return 2
-        output("git", "push", "--no-follow-tags", "--set-upstream", args.remote, f"HEAD:refs/heads/{head}")
+            raise click.exceptions.Exit(2) from error
+        repo.git.push("--no-follow-tags", "--set-upstream", remote, f"HEAD:refs/heads/{head}")
         command = [
             "gh", "pr", "create", "--repo", REPO, "--base", branch, "--head", head,
             "--title", title, "--body-file", "-",
         ]
-        if args.draft:
+        if draft:
             command.append("--draft")
         print(run(*command, input=body).stdout.strip())
 
-    if not args.apply:
+    if not apply_changes:
         print("\nPreview only. Use --apply to create the backport PRs.")
     return 0
 
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
-    except (RuntimeError, ValueError, OSError) as error:
+        main()
+    except (GitError, RuntimeError, ValueError, OSError) as error:
         print(error, file=sys.stderr)
         sys.exit(1)

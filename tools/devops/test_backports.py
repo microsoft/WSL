@@ -1,7 +1,6 @@
 # Copyright (C) Microsoft Corporation. All rights reserved.
 
 import contextlib
-import io
 import json
 import os
 import shutil
@@ -9,7 +8,10 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+from click.testing import CliRunner
+from git import GitCommandError, Repo
 
 import backport_utils as utils
 import gen_cherrypick_prs as generate
@@ -45,10 +47,33 @@ class BackportTests(unittest.TestCase):
         self.real_fetch = False
         self.real_push = False
         self.real_remote_urls = False
+        self.repo = Repo(self.directory.name)
+        self.addCleanup(self.repo.close)
+        self.mock_network(self.repo)
         self.stack = contextlib.ExitStack()
         self.addCleanup(self.stack.close)
-        self.stack.enter_context(patch.object(utils, "run", side_effect=self.fake_run))
-        self.stack.enter_context(patch.object(generate, "run", side_effect=self.fake_run))
+        self.stack.enter_context(patch.object(utils, "run", side_effect=self.github))
+        self.stack.enter_context(patch.object(generate, "run", side_effect=self.github))
+
+    def mock_network(self, repo):
+        git = repo.git
+        repo.git = Mock(wraps=git)
+
+        def fetch(*args):
+            self.calls.append((("git", "fetch", *args), None))
+            return git.fetch(*args) if self.real_fetch else ""
+
+        def push(*args):
+            self.calls.append((("git", "push", *args), None))
+            return git.push(*args) if self.real_push else ""
+
+        def remote(*args):
+            self.calls.append((("git", "remote", *args), None))
+            return git.remote(*args) if self.real_remote_urls else "https://github.com/microsoft/WSL.git"
+
+        repo.git.fetch.side_effect = fetch
+        repo.git.push.side_effect = push
+        repo.git.remote.side_effect = remote
 
     def git(self, *args):
         return self.real_run("git", *args).stdout.strip()
@@ -66,20 +91,10 @@ class BackportTests(unittest.TestCase):
             "baseRefName": "master", "labels": [{"name": "backport_3.0"}],
         }
 
-    def fake_run(self, *args, input=None, check=True):
+    def github(self, *args, input=None, check=True):
         self.calls.append((args, input))
         value = ""
-        if args[:3] == ("git", "remote", "get-url"):
-            if self.real_remote_urls:
-                return self.real_run(*args, input=input, check=check)
-            value = "https://github.com/microsoft/WSL.git"
-        elif args[:2] == ("git", "fetch"):
-            if self.real_fetch:
-                return self.real_run(*args, input=input, check=check)
-        elif args[:2] == ("git", "push"):
-            if self.real_push:
-                return self.real_run(*args, input=input, check=check)
-        elif args[:3] == ("gh", "repo", "view"):
+        if args[:3] == ("gh", "repo", "view"):
             value = json.dumps({"defaultBranchRef": {"name": "master"}})
         elif args[:3] == ("gh", "pr", "view"):
             value = json.dumps(self.prs[int(args[3])])
@@ -93,14 +108,14 @@ class BackportTests(unittest.TestCase):
         elif args[:3] in (("gh", "pr", "edit"), ("gh", "label", "create")):
             pass
         else:
-            return self.real_run(*args, input=input, check=check)
+            self.fail(f"Unexpected GitHub command: {args}")
         return subprocess.CompletedProcess(args, 0, value, "")
 
     def invoke(self, function, args):
-        stream = io.StringIO()
-        with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
-            code = function(args)
-        return code, stream.getvalue()
+        with Repo(".") as repo:
+            self.mock_network(repo)
+            result = CliRunner().invoke(function, args, obj=repo, catch_exceptions=False)
+        return result.exit_code, result.output
 
     def mutations(self):
         prefixes = {
@@ -131,10 +146,22 @@ class BackportTests(unittest.TestCase):
             self.assertIn("--draft", args)
             self.assertEqual(args[args.index("--base") + 1], "release/3.0")
             self.assertIn("Build and tests: not run by this script.", body)
+            self.assertTrue(body.endswith(template))
             for line in template.splitlines():
                 if line.startswith(("## ", "<!--", "- [ ]")):
                     self.assertIn(line, body)
         self.assertFalse(any("--force" in arg for args, _ in self.calls for arg in args))
+
+    def test_template_heading_changes_do_not_break_generation(self):
+        template = "## Release summary\n\n<!-- New instructions -->\n\n- [ ] Reviewed\n\n## Testing\n"
+        Path(".github", "pull_request_template.md").write_text(template, encoding="utf-8")
+        code, text = self.invoke(generate.main, ["3.0", "1"])
+        self.assertEqual(code, 0)
+        self.assertIn(template, text)
+        self.assertIn(f"Backport of {self.prs[1]['url']}", text)
+        self.assertIn(self.first, text)
+        self.assertIn("Build and tests: not run by this script.", text)
+        self.assertEqual(self.mutations(), [])
 
     def test_dirty_tree_stops_before_git_changes(self):
         Path("untracked.txt").write_text("keep me", encoding="utf-8")
@@ -186,7 +213,7 @@ class BackportTests(unittest.TestCase):
              "body": "Backport of https://github.com/microsoft/WSL/pull/12 to release/3.0."},
             {"number": 11, "state": "CLOSED", "url": "abandoned", "body": "Clean cherry pick of PR #1"},
         ]
-        self.assertEqual(utils.active_backports(self.prs[1], self.candidates, set()), [])
+        self.assertEqual(utils.active_backports(self.repo, self.prs[1], self.candidates, set()), [])
         self.candidates.append(
             {"number": 12, "state": "OPEN", "url": "open", "body": "Clean cherry pick of PR #1\n"}
         )
@@ -225,7 +252,7 @@ class BackportTests(unittest.TestCase):
             {"number": 10, "state": "MERGED", "url": "reverted",
              "body": "Clean cherry pick of PR #1", "mergeCommit": {"oid": merge}},
         ]
-        present = utils.backported_commits("HEAD")
+        present = utils.backported_commits(self.repo, "HEAD")
         self.assertIn(merge, present)
         self.assertNotIn(self.first, present)
         self.assertEqual(self.invoke(relabel.main, ["3.0", "--apply"])[0], 0)
@@ -243,13 +270,13 @@ class BackportTests(unittest.TestCase):
                 self.git("cherry-pick", "-x", self.first)
                 self.git("revert", "--no-edit", "HEAD")
                 ref = self.git("rev-parse", "HEAD")
-                self.assertNotIn(self.first, utils.backported_commits(ref))
+                self.assertNotIn(self.first, utils.backported_commits(self.repo, ref))
                 if reapply:
                     self.git("cherry-pick", "-x", self.first)
                 else:
                     self.git("revert", "--no-edit", "HEAD")
                 self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
-                present = utils.backported_commits("refs/remotes/origin/release/3.0")
+                present = utils.backported_commits(self.repo, "refs/remotes/origin/release/3.0")
                 self.assertIn(self.first, present)
                 self.calls.clear()
                 self.invoke(relabel.main, ["3.0", "--apply"])
@@ -286,7 +313,7 @@ class BackportTests(unittest.TestCase):
         self.git("switch", "--detach", self.first)
         self.git("revert", "--no-edit", self.first)
         self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
-        self.assertNotIn(self.first, utils.backported_commits("HEAD"))
+        self.assertNotIn(self.first, utils.backported_commits(self.repo, "HEAD"))
         self.invoke(relabel.main, ["3.0", "--apply"])
         self.assertEqual(self.mutations(), [])
 
@@ -318,7 +345,7 @@ class BackportTests(unittest.TestCase):
         self.git("revert", "--no-edit", "HEAD")
         self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
         self.assertTrue(Path("first.txt").exists())
-        present = utils.backported_commits("HEAD")
+        present = utils.backported_commits(self.repo, "HEAD")
         self.assertIn(self.first, present)
         self.assertIn(merge, present)
         self.calls.clear()
@@ -328,13 +355,13 @@ class BackportTests(unittest.TestCase):
 
     def test_revert_message_can_reference_an_object_absent_from_history(self):
         self.git("commit", "--allow-empty", "--no-verify", "-m", f"This reverts commit {'a' * 40}.")
-        self.assertIn(self.first, utils.backported_commits("HEAD"))
+        self.assertIn(self.first, utils.backported_commits(self.repo, "HEAD"))
 
     def test_quoted_revert_bodies_do_not_disable_sources_or_trigger_repeated_target_guard(self):
         for number in (1, 2):
             self.git("commit", "--allow-empty", "--no-verify", "-m", f"Describe prior fixes {number}",
                      "-m", f"Quoted history:\n\nThis reverts commit {self.first}.")
-        self.assertIn(self.first, utils.backported_commits("HEAD"))
+        self.assertIn(self.first, utils.backported_commits(self.repo, "HEAD"))
 
     def test_squash_merged_revert_and_reapply_subjects_with_pr_suffixes(self):
         for restored in (False, True):
@@ -351,7 +378,7 @@ class BackportTests(unittest.TestCase):
                     self.git("commit", "--no-verify", "-m", 'Reapply "first.txt" (#124)',
                              "-m", f"This reverts commit {reversal}.")
                 self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
-                self.assertEqual(self.first in utils.backported_commits("HEAD"), restored)
+                self.assertEqual(self.first in utils.backported_commits(self.repo, "HEAD"), restored)
                 code, text = self.invoke(generate.main, ["3.0", "1"])
                 self.assertEqual(code, 0)
                 self.assertEqual("already present" in text, restored)
@@ -364,7 +391,7 @@ class BackportTests(unittest.TestCase):
         message = f"This reverts commit {'a' * 40}, reversing\nchanges made to {'b' * 40}."
         self.git("commit", "--allow-empty", "--no-verify", "-m", message)
         with self.assertRaisesRegex(ValueError, "manual review"):
-            utils.backported_commits("HEAD")
+            utils.backported_commits(self.repo, "HEAD")
 
     def test_merged_backport_without_source_provenance_requires_manual_review(self):
         candidate = {
@@ -372,9 +399,9 @@ class BackportTests(unittest.TestCase):
             "mergeCommit": {"oid": self.base},
         }
         with self.assertRaisesRegex(ValueError, "manual review"):
-            utils.active_backports(self.prs[1], [candidate], {self.base})
-        self.assertEqual(utils.active_backports(self.prs[1], [candidate], {self.base, self.first}), [candidate])
-        self.assertEqual(utils.active_backports(self.prs[1], [candidate], set()), [])
+            utils.active_backports(self.repo, self.prs[1], [candidate], {self.base})
+        self.assertEqual(utils.active_backports(self.repo, self.prs[1], [candidate], {self.base, self.first}), [candidate])
+        self.assertEqual(utils.active_backports(self.repo, self.prs[1], [candidate], set()), [])
 
     def test_all_push_urls_are_checked_before_fetch_or_branch_creation(self):
         self.git("remote", "add", "origin", "https://github.com/microsoft/WSL.git")
@@ -401,15 +428,15 @@ class BackportTests(unittest.TestCase):
         self.git("branch", "--force", "release/3.0", self.first)
         self.git("push", "origin", "release/3.0")
         self.assertEqual(self.git("rev-parse", "refs/remotes/origin/release/3.0"), self.base)
-        ref = utils.fetch_release("origin", "release/3.0")
+        ref = utils.fetch_release(self.repo, "origin", "release/3.0")
         self.assertEqual(self.git("rev-parse", ref), self.first)
 
     def test_deleted_remote_release_cannot_fall_back_to_cached_ref(self):
         self.local_remote()
         self.git("push", "origin", "--delete", "release/3.0")
         self.git("update-ref", "refs/remotes/origin/release/3.0", self.base)
-        with self.assertRaises(RuntimeError):
-            utils.fetch_release("origin", "release/3.0")
+        with self.assertRaises(GitCommandError):
+            utils.fetch_release(self.repo, "origin", "release/3.0")
 
     def test_preview_fetch_does_not_apply_mappings_into_local_branches(self):
         self.local_remote()
@@ -446,12 +473,14 @@ class BackportTests(unittest.TestCase):
             self.git("config", "user.name", "Backport Test")
             self.git("config", "user.email", "backport-test@example.invalid")
             self.git("remote", "add", "origin", remote)
-            ref = utils.fetch_release("origin", "release/3.0")
-            self.git("switch", "--detach", ref)
-            self.assertNotEqual(self.real_run("git", "cat-file", "-e", self.first, check=False).returncode, 0)
-            code, _ = self.invoke(generate.main, ["3.0", "1", "--apply"])
-            self.assertEqual(code, 0)
-            self.assertIn(self.first, utils.backported_commits("HEAD"))
+            with Repo(".") as repo:
+                self.mock_network(repo)
+                ref = utils.fetch_release(repo, "origin", "release/3.0")
+                self.git("switch", "--detach", ref)
+                self.assertNotEqual(self.real_run("git", "cat-file", "-e", self.first, check=False).returncode, 0)
+                code, _ = self.invoke(generate.main, ["3.0", "1", "--apply"])
+                self.assertEqual(code, 0)
+                self.assertIn(self.first, utils.backported_commits(repo, "HEAD"))
 
     def test_apply_pushes_only_the_branch_when_follow_tags_is_configured(self):
         self.local_remote()
@@ -515,9 +544,67 @@ class BackportTests(unittest.TestCase):
                 utils.pr_number(value)
         self.assertEqual(utils.pr_number("https://github.com/microsoft/WSL/pull/42"), 42)
         self.assertEqual(utils.release_branch("release/3.0"), "release/3.0")
-        with patch.object(utils, "output", return_value="https://github.com/other/WSL.git"):
+        with patch.object(self.repo.git, "remote", return_value="https://github.com/other/WSL.git"):
             with self.assertRaisesRegex(ValueError, "not a fork"):
-                utils.fetch_release("origin", "release/3.0")
+                utils.fetch_release(self.repo, "origin", "release/3.0")
+
+
+class BackportCommandTests(unittest.TestCase):
+    def setUp(self):
+        self.repo = Mock(spec=Repo)
+        self.repo.git = Mock()
+        self.repo.git.remote.return_value = "https://github.com/microsoft/WSL.git"
+        self.repo.is_dirty.return_value = False
+        self.repo.iter_commits.return_value = []
+        self.repo.heads = []
+        self.repo.working_tree_dir = str(Path(__file__).resolve().parents[2])
+        self.source = {
+            "number": 1, "title": "Fix", "url": "https://github.com/microsoft/WSL/pull/1",
+            "baseRefName": "master", "mergeCommit": {"oid": "a" * 40},
+        }
+        self.stack = contextlib.ExitStack()
+        self.addCleanup(self.stack.close)
+        self.sources = self.stack.enter_context(patch.object(generate, "source_prs", return_value=[self.source]))
+        self.stack.enter_context(patch.object(generate, "list_prs", return_value=[]))
+        self.github = self.stack.enter_context(patch.object(generate, "run"))
+
+    def test_preview_uses_injected_repo_without_creating_or_pushing_branches(self):
+        result = CliRunner().invoke(generate.main, ["3.0", "--remote", "upstream", "--dry-run"], obj=self.repo,
+                                    catch_exceptions=False)
+        self.assertEqual(result.exit_code, 0)
+        self.repo.git.fetch.assert_called_once_with(
+            "--no-tags", "--refmap=", "upstream", "+refs/heads/release/3.0:refs/remotes/upstream/release/3.0",
+        )
+        self.repo.create_head.assert_not_called()
+        self.repo.git.cherry_pick.assert_not_called()
+        self.repo.git.push.assert_not_called()
+        self.github.assert_not_called()
+
+    def test_apply_uses_injected_repo_and_creates_a_draft_pr(self):
+        result = CliRunner().invoke(generate.main, ["3.0", "--apply", "--draft"], obj=self.repo,
+                                    catch_exceptions=False)
+        self.assertEqual(result.exit_code, 0)
+        head = "cherrypick/release/3.0/pr-1"
+        self.repo.is_dirty.assert_called_once_with(untracked_files=True)
+        self.repo.create_head.assert_called_once_with(head, "refs/remotes/origin/release/3.0")
+        self.repo.create_head.return_value.checkout.assert_called_once_with()
+        self.repo.git.cherry_pick.assert_called_once_with("-x", self.source["mergeCommit"]["oid"])
+        self.repo.git.push.assert_called_once_with("--no-follow-tags", "--set-upstream", "origin", f"HEAD:refs/heads/{head}")
+        args, kwargs = self.github.call_args
+        self.assertEqual(args[:3], ("gh", "pr", "create"))
+        self.assertEqual(args[args.index("--base") + 1], "release/3.0")
+        self.assertIn("--draft", args)
+        self.assertIn(self.source["url"], kwargs["input"])
+
+    def test_conflicting_apply_and_dry_run_options_do_not_access_git_or_github(self):
+        for flags in (["--apply", "--dry-run"], ["--dry-run", "--apply"]):
+            with self.subTest(flags=flags):
+                result = CliRunner().invoke(generate.main, ["3.0", *flags], obj=self.repo)
+                self.assertEqual(result.exit_code, 2)
+                self.assertIn("mutually exclusive", result.output)
+        self.assertEqual(self.repo.mock_calls, [])
+        self.sources.assert_not_called()
+        self.github.assert_not_called()
 
 
 if __name__ == "__main__":

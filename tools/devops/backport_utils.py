@@ -1,6 +1,6 @@
 # Copyright (C) Microsoft Corporation. All rights reserved.
 
-"""Shared helpers for the WSL release scripts (Python 3.9+, git, and authenticated gh)."""
+"""Shared GitPython and GitHub CLI helpers for the WSL release scripts."""
 
 import json
 import re
@@ -78,11 +78,11 @@ def source_prs(branch, numbers):
     return sorted(merged, key=lambda pr: pr["mergedAt"])
 
 
-def validate_remote(remote, push=False):
-    args = ["git", "remote", "get-url"]
+def validate_remote(repo, remote, push=False):
+    args = ["get-url"]
     if push:
         args += ["--push", "--all"]
-    urls = output(*args, remote).splitlines()
+    urls = repo.git.remote(*args, remote).splitlines()
     for url in urls:
         if not re.fullmatch(r"(?:https://github\.com/|git@github\.com:)microsoft/WSL(?:\.git)?/?", url, re.IGNORECASE):
             raise ValueError(f"Remote {remote} must point to {REPO}, not a fork: {url}")
@@ -90,24 +90,23 @@ def validate_remote(remote, push=False):
         raise ValueError(f"Remote {remote} has no {'push' if push else 'fetch'} URL.")
 
 
-def fetch_release(remote, branch):
-    validate_remote(remote)
+def fetch_release(repo, remote, branch):
+    validate_remote(repo, remote)
     print(f"Fetching {remote} (remote-tracking refs only).")
     ref = f"refs/remotes/{remote}/{branch}"
-    output("git", "fetch", "--no-tags", "--refmap=", remote, f"+refs/heads/{branch}:{ref}")
-    output("git", "rev-parse", "--verify", ref)
+    repo.git.fetch("--no-tags", "--refmap=", remote, f"+refs/heads/{branch}:{ref}")
+    repo.commit(ref)
     return ref
 
 
-def backported_commits(ref):
-    fields = output("git", "log", "--topo-order", "--format=%H %P%x00%B%x00", ref).split("\0")
-    records = [(fields[index].split(), fields[index + 1]) for index in range(0, len(fields) - 1, 2)]
-    parents = {identity[0]: identity[1:] for identity, _ in records}
+def backported_commits(repo, ref):
+    records = list(repo.iter_commits(ref, topo_order=True))
+    parents = {commit.hexsha: commit.parents for commit in records}
     present, reverted, seen_targets = set(), set(), set()
     # Walk newest first: an active revert disables its target; reverting that
     # revert disables the reversal instead, restoring the original commit.
-    for identity, message in records:
-        sha = identity[0]
+    for commit in records:
+        sha, message = commit.hexsha, commit.message
         # Squash messages can quote old revert bodies without reverting anything.
         reversal = re.match(
             r'(?:(?:Revert|Reapply) "[^\n]*"(?: \(#[1-9][0-9]*\))?\n\n)?'
@@ -136,7 +135,7 @@ def backported_commits(ref):
     return present
 
 
-def active_backports(pr, candidates, present):
+def active_backports(repo, pr, candidates, present):
     marker = re.compile(
         rf"^(?:Backport of https://github\.com/microsoft/WSL/pull/{pr['number']}(?!\d)"
         rf"|Clean cherry pick of PR #{pr['number']}(?!\d))",
@@ -155,7 +154,7 @@ def active_backports(pr, candidates, present):
                 continue
             if source in present:
                 active.append(item)
-            elif source not in backported_commits(merge):
+            elif source not in backported_commits(repo, merge):
                 raise ValueError(
                     f"Merged backport {item['url']} has no recognizable source provenance; "
                     "manual review is required before generating another backport."
@@ -170,19 +169,12 @@ def ensure_completed_label(name, branch):
                "--description", f"Change has been backported to the {branch} branch")
 
 
-def pr_body(pr, branch):
-    root = Path(output("git", "rev-parse", "--show-toplevel"))
+def pr_body(repo, pr, branch):
+    root = Path(repo.working_tree_dir)
     body = (root / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
-    sections = {
-        "## Summary of the Pull Request":
-            f"Backport of {pr['url']} to `{branch}`.\n\n{pr['title']}",
-        "## Detailed Description of the Pull Request / Additional comments":
-            f"Original merge commit: `{pr['mergeCommit']['oid']}`.",
-        "## Validation Steps Performed":
-            "Cherry-picked with `git cherry-pick -x`.\n\nBuild and tests: not run by this script.",
-    }
-    for heading, content in sections.items():
-        if heading not in body.splitlines():
-            raise ValueError(f"PR template is missing {heading!r}.")
-        body = body.replace(heading + "\n", heading + "\n\n" + content + "\n", 1)
-    return body
+    return (
+        f"Backport of {pr['url']} to `{branch}`.\n\n{pr['title']}\n\n"
+        f"Original merge commit: `{pr['mergeCommit']['oid']}`.\n\n"
+        "Cherry-picked with `git cherry-pick -x`.\n\nBuild and tests: not run by this script.\n\n"
+        + body
+    )

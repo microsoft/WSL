@@ -7,7 +7,13 @@ the **original** PRs after the changes reach the release branch.
 ## Prerequisites
 
 Run the commands below from a WSL checkout using Python 3.9+, Git, and an
-authenticated GitHub CLI (`gh`). No extra Python packages are needed.
+authenticated GitHub CLI (`gh`). Install the existing devops Python dependencies,
+including Click and GitPython:
+
+```powershell
+python -m pip install -r tools\devops\requirements.txt
+```
+
 The scripts target `microsoft/WSL` and default to the `origin` remote. If your
 `origin` points to a fork, use `--remote upstream` with a remote pointing to
 `microsoft/WSL`; pushing backport branches requires write access there.
@@ -75,8 +81,9 @@ For each selected PR, the generator creates
 `cherrypick/release/3.0/pr-<number>` from the current release tip, cherry-picks the
 original merge commit with `git cherry-pick -x`, pushes without force, and opens
 a PR targeting the release branch. Tag following is disabled even if
-`push.followTags` is configured. It uses the repository PR template and
-records the original PR URL and merge SHA. It skips changes already present in
+`push.followTags` is configured. It prepends the original PR URL, merge SHA, and
+validation note to the unchanged repository PR template; renaming its headings
+does not break generation. It skips changes already present in
 release history and open/merged backports carrying the original-PR provenance
 line, except for recognized reverted backports. Existing local branches are
 reported and skipped, never reset, so an earlier attempt does not block later
@@ -166,8 +173,9 @@ review them manually before updating their labels.
 
 ## Test the helpers
 
-The helper tests use temporary Git repositories and mocked GitHub operations,
-so they never push to WSL or edit live labels:
+The helper tests inject mock GitPython repositories for command orchestration
+and use real temporary repositories for Git history and safety checks.
+GitHub operations are mocked, so they never push to WSL or edit live labels:
 
 ```powershell
 python -m unittest discover -s tools\devops -p test_backports.py
