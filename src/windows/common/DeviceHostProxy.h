@@ -44,6 +44,12 @@ public:
 
     void Shutdown();
 
+    GUID AddUsbControllerDevice(_In_ HANDLE UserToken);
+
+    void AttachUsbDevice(const GUID& ControllerId, const std::wstring& DeviceInstanceId);
+
+    void DetachUsbDevice(const GUID& ControllerId, const std::wstring& DeviceInstanceId);
+
     //
     // IVmDeviceHostSupport
     //
@@ -143,6 +149,8 @@ private:
     HRESULT CreateSectionBackedMmioRangeImpl(
         const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages, UINT64 PageCount, UINT64 MappingFlags, HANDLE SectionHandle, UINT64 SectionOffsetInPages) noexcept;
     HRESULT DestroySectionBackedMmioRangeImpl(const GUID& InstanceId, UINT8 BarIndex, UINT64 BarOffsetInPages) noexcept;
+
+    wil::com_ptr<IWslUsbControllerDevice> GetUsbControllerDevice(const GUID& InstanceId);
 
     std::wstring m_systemId;
     GUID m_runtimeId;

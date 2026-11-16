@@ -60,6 +60,9 @@
 
         <string id="WSLContainerRegistryAllowlist"><!-- _locComment_text='{Locked="WSL"}' -->Allowlist for WSL container registries</string>
         <string id="WSLContainerRegistryAllowlistExplain"><!-- _locComment_text='{Locked="WSL"}' -->When enabled, WSL container will only be allowed to pull images from the registries listed here. This affects both the WSL container CLI and all applications using the WSL container API.</string>
+
+        <string id="AllowUsb"><!-- _locComment_text='{Locked="USB"}' -->Allow USB device support</string>
+        <string id="AllowUsbExplain"><!-- _locComment_text='{Locked="USB"}{Locked="WSL2"}{Locked="WSL"}' -->When set to disabled, this policy disables built-in USB device support in WSL2 for all users on the machine. When enabled or not configured, USB device support is allowed. Changes to this policy take effect after the WSL service is restarted.</string>
     </stringTable>
     <presentationTable>
       <presentation id="DefaultNetworkingMode">
