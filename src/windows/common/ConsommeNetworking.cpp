@@ -582,13 +582,17 @@ void ConsommeNetworking::UpdateDefaultRoute(ADDRESS_FAMILY family, const std::ws
 {
     WI_ASSERT(family == AF_INET || family == AF_INET6);
 
-    if (gateway == trackedGateway || !m_adapterId.has_value())
+    if (!m_adapterId.has_value())
     {
         return;
     }
 
-    SendDefaultRoute(family, trackedGateway, hns::ModifyRequestType::Remove);
-    trackedGateway.clear();
+    if (gateway != trackedGateway)
+    {
+        SendDefaultRoute(family, trackedGateway, hns::ModifyRequestType::Remove);
+        trackedGateway.clear();
+    }
+
     SendDefaultRoute(family, gateway, hns::ModifyRequestType::Add);
     trackedGateway = gateway;
 }
@@ -625,7 +629,6 @@ void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& 
     m_gnsChannel.SendEndpointState(endpointProperties);
 
     m_trackedIpv4Address = ipAddress;
-    m_trackedDefaultRouteIpv4.clear();
 }
 
 void ConsommeNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAddress, hns::ModifyRequestType requestType)
