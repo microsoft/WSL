@@ -729,13 +729,13 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(dns.Servers[2].ends_with("%eth0"));
         VERIFY_ARE_EQUAL(dns.Servers[0], dns.Servers[3]);
         VERIFY_ARE_EQUAL(std::string{"1.1.1.1"}, dns.Servers[4]);
-        auto [host, guest] = MakeSocketPair();
+        auto [host, guestSocket] = MakeSocketPair();
         wil::unique_event refreshed{wil::EventOptions::ManualReset};
         HRESULT receiverResult = E_FAIL;
         std::vector<LX_MESSAGE_TYPE> messages;
         std::thread receiver([&] {
             receiverResult = wil::ResultFromException([&] {
-                wsl::shared::SocketChannel channel{std::move(guest), "DnsRefreshTest"};
+                wsl::shared::SocketChannel channel{std::move(guestSocket), "DnsRefreshTest"};
                 for (int index = 0; index < 4; ++index)
                 {
                     auto transaction = channel.ReceiveTransaction(30000);
