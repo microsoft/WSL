@@ -269,6 +269,8 @@ bool IsVhdFile(_In_ const std::filesystem::path& path);
 
 bool IsVirtualMachinePlatformInstalled();
 
+int LaunchElevated(_In_ LPCWSTR CommandLine);
+
 std::vector<DWORD> ListRunningProcesses();
 
 // An immutable container repository reference. Holds the original repository token together with its normalized
