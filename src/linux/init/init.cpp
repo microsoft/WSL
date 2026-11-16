@@ -70,6 +70,7 @@ typedef struct _CREATE_PROCESS_PARSED_COMMON
     uid_t Uid;
     CREATE_PROCESS_SHELL_OPTIONS ShellOptions;
     bool AllowOOBE;
+    bool UserSpecified;
 } CREATE_PROCESS_PARSED_COMMON, *PCREATE_PROCESS_PARSED_COMMON;
 
 typedef struct _CREATE_PROCESS_PARSED
@@ -732,7 +733,7 @@ try
             _exit(1);
         }
 
-        ConfigureUid(manifest.DefaultUid.has_value() ? manifest.DefaultUid.value() : Common->Uid);
+        ConfigureUid(!Common->UserSpecified && manifest.DefaultUid.has_value() ? manifest.DefaultUid.value() : Common->Uid);
     }
     else
     {
@@ -1059,7 +1060,8 @@ try
 
     struct passwd* PasswordEntry = nullptr;
     auto Username = wsl::shared::string::FromSpan(Buffer, Message->UsernameOffset);
-    if (strlen(Username) != 0)
+    Parsed->UserSpecified = strlen(Username) != 0;
+    if (Parsed->UserSpecified)
     {
         PasswordEntry = getpwnam(Username);
         if (PasswordEntry == nullptr)
@@ -1844,13 +1846,27 @@ Return Value:
     {
         BytesWritten = 0;
 
+        auto stopStdinForwarding = [&]() {
+            CLOSE(StdIn);
+            StdIn = -1;
+
+            PendingStdin.clear();
+            PollDescriptors[0].fd = -1;
+            PollDescriptors[0].revents = 0;
+            UtilSocketShutdown(Sockets[0].get(), SHUT_RD);
+        };
+
         Result = poll(PollDescriptors, COUNT_OF(PollDescriptors), PendingStdin.empty() ? -1 : 100);
         if (!PendingStdin.empty())
         {
             BytesWritten = write(StdIn, PendingStdin.data(), PendingStdin.size());
             if (BytesWritten < 0)
             {
-                if (errno != EAGAIN && errno != EWOULDBLOCK)
+                if (errno == EPIPE)
+                {
+                    stopStdinForwarding();
+                }
+                else if (errno != EAGAIN && errno != EWOULDBLOCK)
                 {
                     LOG_ERROR("delayed stdin write failed {}, ChildPid={}", errno, ChildPid);
                 }
@@ -1875,7 +1891,7 @@ Return Value:
         // Relay input from the stdin socket to the stdin file descriptor.
         //
 
-        if (PollDescriptors[0].revents & (POLLIN | POLLHUP | POLLERR) && PendingStdin.empty())
+        if (PollDescriptors[0].fd != -1 && (PollDescriptors[0].revents & (POLLIN | POLLHUP | POLLERR)) && PendingStdin.empty())
         {
             BytesRead = UtilReadBuffer(Sockets[0].get(), Buffer);
             if (BytesRead < 0)
@@ -1918,7 +1934,11 @@ Return Value:
                     // is blocking trying to write on stderr / stdout while the relay tries to write stdin.
                     //
 
-                    if (errno == EWOULDBLOCK || errno == EAGAIN)
+                    if (errno == EPIPE)
+                    {
+                        stopStdinForwarding();
+                    }
+                    else if (errno == EWOULDBLOCK || errno == EAGAIN)
                     {
                         assert(PendingStdin.empty());
                         PendingStdin.assign(Buffer.begin(), Buffer.begin() + BytesRead);

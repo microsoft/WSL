@@ -212,7 +212,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name)
+    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name, WSLCContainerFlags flags = WSLCContainerFlagsNone)
     {
         WSLCContainerLauncher launcher(
             "debian:latest",
@@ -221,6 +221,8 @@ class WSLCTests
             {},
             "host",
             WSLCProcessFlagsStdin);
+
+        launcher.SetContainerFlags(flags);
 
         return launcher.Launch(session);
     }
@@ -11166,6 +11168,33 @@ sys.exit(1 if queries else 0)
 
         VERIFY_SUCCEEDED(stopResult);
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    // Validate that a blocked container stop request doesn't prevent session termination.
+    WSLC_TEST_METHOD(SessionTerminationCancelsContainerStop)
+    {
+        auto restoreSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { ResetTestSession(); });
+
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-terminate-pending-stop", WSLCContainerFlagsRm);
+        auto initProcess = container.GetInitProcess();
+        auto outputHandle = initProcess.GetStdHandle(1);
+
+        PartialHandleRead output{outputHandle.Get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult = E_UNEXPECTED;
+        std::thread stopThread([&]() { stopResult = container.Get().Stop(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE); });
+
+        auto cleanup = wil::scope_exit([&]() { stopThread.join(); });
+
+        output.ExpectConsume("stopping\n");
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        container.SetDeleteOnClose(false);
+
+        stopThread.join();
+        cleanup.release();
+
+        VERIFY_ARE_EQUAL(stopResult, E_ABORT);
     }
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndIgnoredSignal)

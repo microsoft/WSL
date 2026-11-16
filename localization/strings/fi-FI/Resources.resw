@@ -4179,7 +4179,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
-    <value>Failed to load the persisted state of container '{}'. Changes to its state will not be saved.</value>
+    <value>Säilön tallennetun tilan lataaminen epäonnistui {}. Säilön tilan muutoksia ei tallenneta.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
@@ -4222,7 +4222,7 @@ Ensimmäisellä käynnistyskerralla luo tiedoston, jossa kaikki asetukset on kom
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
-    <value>WSLC could not write '{}' in the guest (guest error {}).</value>
+    <value>WSLC ei voinut kirjoittaa kohteeseen "{}" vierasympäristössä (vierasvirhe {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

@@ -40,6 +40,12 @@ void InitializeWildcardSocketAddress(_Out_ PSOCKADDR_HV Address)
 wil::unique_socket wsl::windows::common::hvsocket::Connect(
     _In_ const GUID& VmId, _In_ unsigned long Port, _In_opt_ HANDLE ExitHandle, _In_opt_ ULONG Timeout, _In_ const std::source_location& Location)
 {
+    return Connect(VmId, Port, {&ExitHandle, ExitHandle != nullptr ? 1u : 0u}, Timeout, Location);
+}
+
+wil::unique_socket wsl::windows::common::hvsocket::Connect(
+    _In_ const GUID& VmId, _In_ unsigned long Port, _In_ gsl::span<const HANDLE> ExitHandles, _In_opt_ ULONG Timeout, _In_ const std::source_location& Location)
+{
     OVERLAPPED Overlapped{};
     const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
     Overlapped.hEvent = OverlappedEvent.get();
@@ -62,7 +68,7 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(
 
     if (Result != 0)
     {
-        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
+        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandles, Location);
     }
 
     THROW_LAST_ERROR_IF_MSG(
@@ -78,7 +84,7 @@ wil::unique_socket wsl::windows::common::hvsocket::Connect(
     const BOOL Success = ConnectFn(Socket.get(), reinterpret_cast<sockaddr*>(&Addr), sizeof(Addr), nullptr, 0, nullptr, &Overlapped);
     if (Success == FALSE)
     {
-        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandle, Location);
+        socket::GetResult(Socket.get(), Overlapped, INFINITE, ExitHandles, Location);
     }
 
     // Mark the socket as connected (required to call shutdown() later).
