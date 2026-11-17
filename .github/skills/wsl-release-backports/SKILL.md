@@ -42,10 +42,14 @@ helpers rather than inventing a separate cherry-pick or label-management flow.
    manually rather than treating historical merge status as sufficient.
    A merged backport without recognizable source provenance also requires manual
    review before retrying; its merge SHA alone does not establish completion.
-   Histories that revert the same commit more than once require manual review,
-   even when a later revert restores the fix.
+   Histories that revert the same change more than once require manual review,
+   including cherry-pick aliases, even when a later revert restores the fix.
+   An active revert targeting a commit outside reachable release history also
+   requires manual review; do not infer how another release's reversal applies.
    An active revert of a merge commit stops automation for manual review;
    reverting that revert restores normal detection.
+   Reverting a merged-side constituent of a selected original merge commit also
+   requires manual review, even when its merge SHA remains in history.
 
 For manual conflict resolution, keep the `git cherry-pick -x` trailer and
 `Backport of https://github.com/microsoft/WSL/pull/<number>` PR-body line.

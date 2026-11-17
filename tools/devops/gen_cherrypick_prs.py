@@ -37,7 +37,7 @@ def main(repo, release, prs, remote, apply_changes, dry_run, draft):
     prs = source_prs(branch, prs)
     if not prs:
         print("No merged PRs selected.")
-        return
+        return 0
     if repo is not None:
         return generate(repo, branch, prs, remote, apply_changes, draft)
     with Repo(".", search_parent_directories=True) as repo:
@@ -52,7 +52,7 @@ def generate(repo, branch, prs, remote, apply_changes, draft):
     ref = fetch_release(repo, remote, branch)
     if apply_changes:
         repo.git.fetch("--no-tags", "--refmap=", remote, f"refs/heads/{prs[0]['baseRefName']}")
-    picked = backported_commits(repo, ref)
+    picked = backported_commits(repo, ref, [pr["mergeCommit"]["oid"] for pr in prs])
     candidates = list_prs(branch)
 
     for pr in prs:

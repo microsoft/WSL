@@ -309,6 +309,80 @@ class BackportTests(unittest.TestCase):
                         self.invoke(function, args)
                 self.assertEqual(self.mutations(), [])
 
+    def test_reverting_source_and_cherry_pick_aliases_requires_manual_review(self):
+        for restored in (False, True):
+            with self.subTest(restored=restored):
+                self.git("switch", "--detach", self.first)
+                self.git("revert", "--no-edit", self.first)
+                self.git("cherry-pick", "-x", self.first)
+                backport = self.git("rev-parse", "HEAD")
+                self.git("revert", "--no-edit", backport)
+                if restored:
+                    self.git("revert", "--no-edit", "HEAD")
+                self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+                self.assertEqual(Path("first.txt").exists(), restored)
+                self.calls.clear()
+                for function, args in (
+                    (generate.main, ["3.0", "1", "--apply"]),
+                    (relabel.main, ["3.0", "--apply"]),
+                ):
+                    with self.subTest(script=function.name), self.assertRaisesRegex(ValueError, "manual review"):
+                        self.invoke(function, args)
+                self.assertEqual(self.mutations(), [])
+
+    def test_revert_carried_from_another_release_requires_manual_review(self):
+        self.git("switch", "--detach", self.base)
+        self.git("cherry-pick", "-x", self.first)
+        other_backport = self.git("rev-parse", "HEAD")
+        self.git("revert", "--no-edit", other_backport)
+        reversal = self.git("rev-parse", "HEAD")
+        self.git("switch", "--detach", self.base)
+        self.git("commit", "--allow-empty", "--no-verify", "-m", "Different release baseline")
+        self.git("cherry-pick", "-x", self.first)
+        self.assertNotEqual(self.git("rev-parse", "HEAD"), other_backport)
+        self.git("cherry-pick", "-x", reversal)
+        self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+        self.assertFalse(Path("first.txt").exists())
+        self.calls.clear()
+        for function, args in (
+            (generate.main, ["3.0", "1", "--apply"]),
+            (relabel.main, ["3.0", "--apply"]),
+        ):
+            with self.subTest(script=function.name), self.assertRaisesRegex(ValueError, "manual review"):
+                self.invoke(function, args)
+        self.assertEqual(self.mutations(), [])
+        self.git("revert", "--no-edit", "HEAD")
+        self.assertIn(self.first, utils.backported_commits(self.repo, "HEAD"))
+
+    def test_reverted_constituent_of_inherited_source_merge_requires_manual_review(self):
+        for multiple_commits in (False, True):
+            with self.subTest(multiple_commits=multiple_commits):
+                self.git("switch", "--detach", self.first)
+                tip = self.commit("side.txt", "another change\n") if multiple_commits else self.first
+                self.git("switch", "--detach", self.base)
+                self.git("merge", "--no-ff", "-m", "Merge source PR", tip)
+                merge = self.git("rev-parse", "HEAD")
+                self.prs[1]["mergeCommit"]["oid"] = merge
+                self.git("revert", "--no-edit", self.first)
+                self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+                self.assertFalse(Path("first.txt").exists())
+                self.calls.clear()
+                for function, args in (
+                    (generate.main, ["3.0", "1", "--apply"]),
+                    (relabel.main, ["3.0", "--apply"]),
+                ):
+                    with self.subTest(script=function.name), self.assertRaisesRegex(ValueError, "manual review"):
+                        self.invoke(function, args)
+                self.assertEqual(self.mutations(), [])
+                self.git("revert", "--no-edit", "HEAD")
+                self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
+                code, text = self.invoke(generate.main, ["3.0", "1"])
+                self.assertEqual(code, 0)
+                self.assertIn("already present", text)
+                self.invoke(relabel.main, ["3.0", "--apply"])
+                edits = [args for args, _ in self.calls if args[:3] == ("gh", "pr", "edit")]
+                self.assertEqual([args[3] for args in edits], ["1"])
+
     def test_reverted_inherited_commit_does_not_count_as_complete(self):
         self.git("switch", "--detach", self.first)
         self.git("revert", "--no-edit", self.first)
@@ -353,9 +427,10 @@ class BackportTests(unittest.TestCase):
         edits = [args for args, _ in self.calls if args[:3] == ("gh", "pr", "edit")]
         self.assertEqual([args[3] for args in edits], ["1"])
 
-    def test_revert_message_can_reference_an_object_absent_from_history(self):
+    def test_active_revert_of_target_outside_history_requires_manual_review(self):
         self.git("commit", "--allow-empty", "--no-verify", "-m", f"This reverts commit {'a' * 40}.")
-        self.assertIn(self.first, utils.backported_commits(self.repo, "HEAD"))
+        with self.assertRaisesRegex(ValueError, "manual review"):
+            utils.backported_commits(self.repo, "HEAD")
 
     def test_quoted_revert_bodies_do_not_disable_sources_or_trigger_repeated_target_guard(self):
         for number in (1, 2):
@@ -364,18 +439,19 @@ class BackportTests(unittest.TestCase):
         self.assertIn(self.first, utils.backported_commits(self.repo, "HEAD"))
 
     def test_squash_merged_revert_and_reapply_subjects_with_pr_suffixes(self):
-        for restored in (False, True):
-            with self.subTest(restored=restored):
+        for prefix, restored in (("", False), ("", True), ("[release/3.0] ", False), ("[release/3.0] ", True)):
+            with self.subTest(prefix=prefix, restored=restored):
                 self.git("switch", "--detach", self.base)
                 self.git("cherry-pick", "-x", self.first)
                 backport = self.git("rev-parse", "HEAD")
                 self.git("revert", "--no-commit", backport)
-                self.git("commit", "--no-verify", "-m", 'Revert "first.txt" (#123)',
+                suffix = " (#12)" if prefix else ""
+                self.git("commit", "--no-verify", "-m", f'{prefix}Revert "first.txt"{suffix} (#123)',
                          "-m", f"This reverts commit {backport}.")
                 if restored:
                     reversal = self.git("rev-parse", "HEAD")
                     self.git("revert", "--no-commit", reversal)
-                    self.git("commit", "--no-verify", "-m", 'Reapply "first.txt" (#124)',
+                    self.git("commit", "--no-verify", "-m", f'{prefix}Reapply "first.txt"{suffix} (#124)',
                              "-m", f"This reverts commit {reversal}.")
                 self.git("update-ref", "refs/remotes/origin/release/3.0", "HEAD")
                 self.assertEqual(self.first in utils.backported_commits(self.repo, "HEAD"), restored)

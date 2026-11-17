@@ -153,18 +153,27 @@ completion from similar titles or PR-number mentions. Changes already inherited
 when the release branch was created also count as present.
 Standard Git revert messages containing `This reverts commit <sha>.` undo
 completion; quoted revert bodies inside other commit messages do not.
+Revert/reapply subjects may include the generated `[release/<version>]` prefix
+and multiple GitHub PR-number suffixes.
 Reverting that revert or cherry-picking the change again restores completion.
 Reverted merged backport PRs do not suppress a new attempt. Arbitrary inverse
 patches or edited revert messages cannot be recognized automatically and need
 manual review.
 If a merged backport remains in history without recognizable source provenance,
 the generator stops for manual review rather than assuming it is still active.
-Histories that revert the same commit more than once also stop both scripts for
-manual review, even if a later revert restores the fix.
+Histories that revert the same change more than once also stop both scripts for
+manual review, including targets linked by cherry-pick trailers, even if a later
+revert restores the fix. An active revert targeting a commit outside the
+reachable release history also requires manual review; the scripts do not guess
+how a revert carried from another release maps to this one.
 An active revert of a merge commit stops both scripts for manual review rather
 than counting the merged-side changes as present. Reverting that revert restores
 normal detection. This conservative check does not attempt to infer which
 changes survived the merge reversal.
+When a selected original PR was merged with a merge commit, an active revert of
+one of its merged-side commits also requires manual review. The merge SHA alone
+does not prove its constituent changes remain applied; reverting that reversal
+restores normal detection.
 
 For confirmed changes, it adds `backported_3.0` and removes `backport_3.0`.
 It creates the completed label if missing, preserves existing label metadata,

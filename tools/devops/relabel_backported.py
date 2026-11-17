@@ -31,7 +31,7 @@ def main(repo, release, remote, apply_changes):
     prs = source_prs(branch, [])
     if not prs:
         print("No merged PRs with the backport label.")
-        return
+        return 0
     if repo is not None:
         return relabel(repo, branch, version, prs, remote, apply_changes)
     with Repo(".", search_parent_directories=True) as repo:
@@ -40,7 +40,7 @@ def main(repo, release, remote, apply_changes):
 
 def relabel(repo, branch, version, prs, remote, apply_changes):
     ref = fetch_release(repo, remote, branch)
-    picked = backported_commits(repo, ref)
+    picked = backported_commits(repo, ref, [pr["mergeCommit"]["oid"] for pr in prs])
     pending, completed = f"backport_{version}", f"backported_{version}"
     matches = [pr for pr in prs if pr["mergeCommit"]["oid"] in picked]
     if apply_changes and matches:

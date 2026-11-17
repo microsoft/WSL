@@ -99,39 +99,67 @@ def fetch_release(repo, remote, branch):
     return ref
 
 
-def backported_commits(repo, ref):
+def backported_commits(repo, ref, source_commits=()):
+    """Return recognized provenance, refusing ambiguous reversals of selected sources."""
     records = list(repo.iter_commits(ref, topo_order=True))
     parents = {commit.hexsha: commit.parents for commit in records}
-    present, reverted, seen_targets = set(), set(), set()
+    sources = {
+        commit.hexsha: re.findall(r"^\(cherry picked from commit ([0-9a-f]{40})\)$", commit.message, re.MULTILINE)
+        for commit in records
+    }
+    aliases = {}
+    for sha, originals in sources.items():
+        group = {sha, *originals}
+        for alias in tuple(group):
+            group.update(aliases.get(alias, ()))
+        for alias in group:
+            aliases[alias] = group
+    present, reverted, seen_targets, active_targets = set(), set(), set(), set()
     # Walk newest first: an active revert disables its target; reverting that
     # revert disables the reversal instead, restoring the original commit.
     for commit in records:
         sha, message = commit.hexsha, commit.message
         # Squash messages can quote old revert bodies without reverting anything.
         reversal = re.match(
-            r'(?:(?:Revert|Reapply) "[^\n]*"(?: \(#[1-9][0-9]*\))?\n\n)?'
+            r'(?:(?:\[release/[^\]\n]+\] )?(?:Revert|Reapply) "[^\n]*"'
+            r'(?: \(#[1-9][0-9]*\))*\n\n)?'
             r'This reverts commit ([0-9a-f]{40})[.,]', message,
         )
         targets = [reversal.group(1)] if reversal else []
-        if any(target in seen_targets for target in targets):
+        if any(aliases.get(target, {target}) & seen_targets for target in targets):
             raise ValueError(
-                "Release history reverts the same commit more than once; "
+                "Release history reverts the same change more than once, possibly through cherry-pick aliases; "
                 "manual review is required before generating backports or updating labels."
             )
-        seen_targets.update(targets)
-        sources = re.findall(r"^\(cherry picked from commit ([0-9a-f]{40})\)$", message, re.MULTILINE)
-        if sha in reverted or any(source in reverted for source in sources):
+        for target in targets:
+            seen_targets.update(aliases.get(target, {target}))
+        if sha in reverted or any(source in reverted for source in sources[sha]):
             continue
         present.add(sha)
-        present.update(sources)
+        present.update(sources[sha])
         merge_targets = set(re.findall(r"^This reverts commit ([0-9a-f]{40}), reversing\b", message, re.MULTILINE))
         for target in targets:
+            if target not in parents:
+                raise ValueError(
+                    f"Release history contains active revert {sha} of {target} outside its reachable history; "
+                    "manual review is required before generating backports or updating labels."
+                )
             if len(parents.get(target, [])) > 1 or target in merge_targets:
                 raise ValueError(
                     f"Release history contains active revert {sha} of merge {target}; "
                     "manual review is required before generating backports or updating labels."
                 )
+            active_targets.update(aliases.get(target, {target}))
         reverted.update(targets)
+    for source in source_commits:
+        if source not in present or len(parents.get(source, ())) < 2:
+            continue
+        merged_changes = {commit.hexsha for commit in repo.iter_commits(f"{source}^1..{source}")}
+        if active_targets & merged_changes:
+            raise ValueError(
+                f"Release history reverts a constituent change of source merge {source}; "
+                "manual review is required before generating backports or updating labels."
+            )
     return present
 
 
@@ -154,7 +182,7 @@ def active_backports(repo, pr, candidates, present):
                 continue
             if source in present:
                 active.append(item)
-            elif source not in backported_commits(repo, merge):
+            elif source not in backported_commits(repo, merge, (source,)):
                 raise ValueError(
                     f"Merged backport {item['url']} has no recognizable source provenance; "
                     "manual review is required before generating another backport."
