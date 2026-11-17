@@ -232,9 +232,11 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
             auto targetPath = m_rootFsPath / LXSS_VM_MODE_INITRD_NAME;
             THROW_IF_WIN32_BOOL_FALSE(CopyFileW(initRdPath.c_str(), targetPath.c_str(), FALSE));
+            THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(targetPath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
 
             targetPath = m_rootFsPath / LXSS_VM_MODE_KERNEL_NAME;
             THROW_IF_WIN32_BOOL_FALSE(CopyFileW(m_vmConfig.KernelPath.c_str(), targetPath.c_str(), FALSE));
+            THROW_IF_WIN32_BOOL_FALSE(SetFileAttributesW(targetPath.c_str(), FILE_ATTRIBUTE_TEMPORARY));
         }
     }
 
