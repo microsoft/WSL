@@ -51,7 +51,7 @@ extern int DetachScsiDisk(unsigned int Lun);
 
 extern std::string GetLunDeviceName(unsigned int Lun);
 
-void ProcessMessages(wsl::shared::SocketChannel& Channel);
+void ProcessMessages(wsl::shared::SocketChannel& Channel, bool AllowAuditBootstrap = false);
 int MountInit(const char* Target);
 
 extern int EnableInterface(int Socket, const char* Name);
@@ -1285,7 +1285,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
     }
 }
 
-void ProcessMessages(wsl::shared::SocketChannel& Channel)
+void ProcessMessages(wsl::shared::SocketChannel& Channel, bool AllowAuditBootstrap)
 {
     while (Channel.Connected())
     {
@@ -1296,7 +1296,26 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel)
             break;
         }
 
-        ProcessMessage(Channel, transaction, Message->MessageType, Range);
+        if (AllowAuditBootstrap && Message->MessageType == LxMiniInitMessageInitialConfig)
+        {
+            try
+            {
+                THROW_ERRNO_IF(EINVAL, Range.size() != sizeof(LX_MINI_INIT_CONFIG_MESSAGE));
+                const auto* config = gslhelpers::try_get_struct<LX_MINI_INIT_CONFIG_MESSAGE>(Range);
+                THROW_ERRNO_IF(EINVAL, !config);
+                if (config->EnableSecurityAudit)
+                {
+                    StartSecurityAudit(config->IncludeAuditCommandLine);
+                }
+            }
+            CATCH_LOG();
+        }
+        else
+        {
+            ProcessMessage(Channel, transaction, Message->MessageType, Range);
+        }
+        // Fork the audit worker before WSLC creates threads or changes the root filesystem.
+        AllowAuditBootstrap = false;
     }
 
     LOG_INFO("Process {} exiting", getpid());
@@ -1505,7 +1524,7 @@ int WSLCEntryPoint(int Argc, char* Argv[])
     }
     try
     {
-        ProcessMessages(channel);
+        ProcessMessages(channel, true);
     }
     CATCH_LOG();
 

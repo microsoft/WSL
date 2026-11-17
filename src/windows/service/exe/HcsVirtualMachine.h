@@ -27,6 +27,7 @@ Abstract:
 #include <map>
 #include <optional>
 #include <string>
+#include <thread>
 
 #define MAX_VHD_COUNT 254
 
@@ -66,6 +67,7 @@ private:
     static void CALLBACK OnVmExitCallback(HCS_EVENT* Event, void* Context);
     void OnExit(const HCS_EVENT* Event);
     void OnCrash(const HCS_EVENT* Event);
+    void SecurityAuditWorker(wil::unique_socket Socket, bool IncludeCommandLine);
 
     std::filesystem::path GetCrashDumpFolder();
     void CreateVmSavedStateFile(HANDLE UserToken);
@@ -90,6 +92,9 @@ private:
     bool m_swiotlbConfigured = false;
 
     wil::unique_socket m_listenSocket;
+    bool m_initConnectionAccepted = false;
+    wil::unique_event m_securityAuditStop{wil::EventOptions::ManualReset};
+    std::thread m_securityAuditThread;
     wil::unique_event m_vmExitEvent{wil::EventOptions::ManualReset};
     std::shared_ptr<DmesgCollector> m_dmesgCollector;
     std::shared_ptr<GuestDeviceManager> m_guestDeviceManager;

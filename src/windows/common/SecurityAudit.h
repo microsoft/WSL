@@ -3,6 +3,7 @@
 #pragma once
 
 #include <authz.h>
+#include <gsl/gsl>
 #include <wil/resource.h>
 #include <span>
 #include <string_view>
@@ -35,5 +36,8 @@ private:
     wil::unique_handle m_token;
     wil::unique_any<AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE, decltype(&Close), Close> m_provider;
 };
+
+struct ProcessExecutionDistribution;
+void ReportEvent(EventSource& source, gsl::span<gsl::byte> bytes, bool includeCommandLine, const ProcessExecutionDistribution* distribution = nullptr);
 
 } // namespace wsl::windows::common::securityaudit

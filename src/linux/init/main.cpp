@@ -155,6 +155,16 @@ void StartWorkerProcess(const char* Name, const std::function<void()>& Worker, s
     g_WorkerProcesses.insert(pid);
 }
 
+void StartSecurityAudit(bool includeCommandLine)
+{
+    StartWorkerProcess("wsl-audit", [includeCommandLine] {
+        THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
+        THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
+        execl(LX_INIT_PATH, c_securityAuditName, includeCommandLine ? "1" : "0", nullptr);
+        THROW_LAST_ERROR();
+    });
+}
+
 int Chroot(const char* Target);
 
 void CreateSwap(unsigned int Lun);
@@ -3431,21 +3441,9 @@ try
 
         if (ConfigMessage->EnableSecurityAudit)
         {
-            auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, false);
-            THROW_LAST_ERROR_IF(!socket);
-
             try
             {
-                StartWorkerProcess(
-                    "wsl-audit",
-                    [fd = socket.get(), includeCommandLine = ConfigMessage->IncludeAuditCommandLine] {
-                        THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
-                        THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
-                        const auto argument = std::to_string(fd);
-                        execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), includeCommandLine ? "1" : "0", nullptr);
-                        THROW_LAST_ERROR();
-                    },
-                    {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket.get()});
+                StartSecurityAudit(ConfigMessage->IncludeAuditCommandLine);
             }
             CATCH_LOG();
         }
