@@ -2762,6 +2762,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>The compose file '{0}' is invalid: {1}.</value>
     <comment>{Locked="{0}"}{Locked="{1}"}File paths, property names, and error details should not be translated</comment>
   </data>
+  <data name="MessageWslcComposePathResolveFailed" xml:space="preserve">
+    <value>Failed to resolve the Compose file path '{0}'.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
+  </data>
   <data name="MessageWslcComposeFileOpenFailed" xml:space="preserve">
     <value>Failed to open the Compose file '{0}'.</value>
     <comment>{Locked="{0}"}File paths should not be translated</comment>
