@@ -962,6 +962,10 @@ private:
                     if (WI_IsFlagSet(flags, OpenFlags::Directory))
                     {
                         qid = newFile->MkDir(name, mode, gid);
+                        if (qid)
+                        {
+                            qid = newFile->Walk(name);
+                        }
                     }
                     else
                     {
