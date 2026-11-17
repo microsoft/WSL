@@ -428,7 +428,6 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
     LxMessageWSLCMountModules,
-    LxMiniInitMessageStartSecurityAudit,
     LxInitMessageProcessExecuted,
     LxInitMessageProcessExecutedDetails,
     LxInitMessageProcessCreated,
@@ -553,7 +552,6 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
         X(LxMessageWSLCMountModules)
-        X(LxMiniInitMessageStartSecurityAudit)
         X(LxInitMessageProcessExecuted)
         X(LxInitMessageProcessExecutedDetails)
         X(LxInitMessageProcessCreated)
@@ -1412,6 +1410,8 @@ typedef struct _LX_MINI_INIT_CONFIG_MESSAGE
     bool EnableGuiApps;
     bool MountGpuShares;
     bool EnableInboxGpuLibs;
+    bool EnableSecurityAudit;
+    bool IncludeAuditCommandLine;
     LX_MINI_INIT_NETWORKING_CONFIGURATION NetworkingConfiguration;
     char Buffer[];
 
@@ -1421,6 +1421,8 @@ typedef struct _LX_MINI_INIT_CONFIG_MESSAGE
         FIELD(MountGpuShares),
         FIELD(EntropyOffset),
         FIELD(EnableInboxGpuLibs),
+        FIELD(EnableSecurityAudit),
+        FIELD(IncludeAuditCommandLine),
         FIELD(NetworkingConfiguration.NetworkingMode),
         FIELD(NetworkingConfiguration.PortTrackerType),
         FIELD(NetworkingConfiguration.EphemeralPortRangeStart),
@@ -1548,15 +1550,6 @@ typedef struct _LX_MINI_INIT_CHILD_EXIT_MESSAGE
 
     PRETTY_PRINT(FIELD(Header), FIELD(ChildPid), FIELD(InstanceId));
 } LX_MINI_INIT_CHILD_EXIT_MESSAGE, *PLX_MINI_INIT_CHILD_EXIT_MESSAGE;
-
-struct LX_MINI_INIT_START_SECURITY_AUDIT
-{
-    static inline auto Type = LxMiniInitMessageStartSecurityAudit;
-    MESSAGE_HEADER Header;
-    uint32_t IncludeCommandLine;
-
-    PRETTY_PRINT(FIELD(Header), FIELD(IncludeCommandLine));
-};
 
 struct LX_INIT_PROCESS_EXECUTED
 {

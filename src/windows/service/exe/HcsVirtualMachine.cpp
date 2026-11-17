@@ -28,6 +28,7 @@ Abstract:
 #include "SecurityAudit.h"
 #include "securityaudit/ProcessExecutionAudit.h"
 #include "SocketChannel.h"
+#include "message.h"
 
 using namespace wsl::windows::common;
 using helpers::WindowsBuildNumbers;
@@ -457,20 +458,14 @@ try
     if (includeCommandLine)
     {
         // The one-way bootstrap request completes before the session takes ownership of this channel.
-        LX_MINI_INIT_START_SECURITY_AUDIT audit{};
-        audit.Header.MessageType = audit.Type;
-        audit.Header.MessageSize = sizeof(audit);
-        audit.IncludeCommandLine = *includeCommandLine;
+        wsl::shared::MessageWriter<LX_MINI_INIT_CONFIG_MESSAGE> audit;
+        audit->EnableSecurityAudit = true;
+        audit->IncludeAuditCommandLine = *includeCommandLine;
         auto transaction = channel.StartTransaction(m_bootTimeoutMs);
-        transaction.Send(audit);
-        try
-        {
-            auto auditSocket =
-                wsl::windows::common::socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
-            THROW_HR_IF(E_ABORT, !auditSocket.has_value());
-            m_securityAuditThread = std::thread(&HcsVirtualMachine::SecurityAuditWorker, this, std::move(*auditSocket), *includeCommandLine);
-        }
-        CATCH_LOG();
+        transaction.Send<LX_MINI_INIT_CONFIG_MESSAGE>(audit.Span());
+        auto auditSocket = wsl::windows::common::socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+        THROW_HR_IF(E_ABORT, !auditSocket.has_value());
+        m_securityAuditThread = std::thread(&HcsVirtualMachine::SecurityAuditWorker, this, std::move(*auditSocket), *includeCommandLine);
     }
 
     *Socket = reinterpret_cast<HANDLE>(channel.Release().release());

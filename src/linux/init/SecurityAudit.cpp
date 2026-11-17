@@ -21,31 +21,75 @@ namespace {
 struct AuditContext
 {
     wsl::shared::SocketChannel channel;
-    std::mutex lock;
     std::atomic<bool> failed{};
     bool includeCommandLine = false;
 };
 
+// The SDK invokes event callbacks serially on its polling thread.
 void ProcessEvent(void* context, int, void* data, unsigned int size)
 {
     auto& audit = *static_cast<AuditContext*>(context);
-    std::unique_lock lock(audit.lock, std::defer_lock);
     try
     {
-        lock.lock();
         if (audit.failed)
         {
             return;
         }
 
-        THROW_ERRNO_IF(EINVAL, !data || size < sizeof(event_begin_s));
+        if (!data)
+        {
+            LOG_ERROR("Discarding security audit event: null data");
+            return;
+        }
+
+        if (size < sizeof(event_begin_s))
+        {
+            LOG_ERROR("Discarding security audit event: size {} is smaller than header size {}", size, sizeof(event_begin_s));
+            return;
+        }
+
         event_begin_s header{};
         memcpy(&header, data, sizeof(header));
-        THROW_ERRNO_IF(EINVAL, header.code_bytes_start != CODE_BYTES || header.version != VERSION || header.size != size);
+        if (header.code_bytes_start != CODE_BYTES)
+        {
+            LOG_ERROR("Discarding security audit event: invalid start marker {:#x}", header.code_bytes_start);
+            return;
+        }
+
+        if (header.version != VERSION)
+        {
+            LOG_ERROR("Discarding security audit event: version {} does not match {}", header.version, VERSION);
+            return;
+        }
+
+        if (header.size != size)
+        {
+            LOG_ERROR("Discarding security audit event: declared size {} does not match received size {}", header.size, size);
+            return;
+        }
+
+        const auto bytes = gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size};
+        // Malformed records are discarded; transport errors must still stop the collector.
+        const auto decode = [&](auto decoder, auto... arguments) {
+            try
+            {
+                return decoder(bytes, arguments...);
+            }
+            catch (const wil::ResultException& error)
+            {
+                if (error.GetErrorCode() != EINVAL)
+                {
+                    throw;
+                }
+                LOG_ERROR("Discarding invalid security audit record of type {}", header.event_type);
+                LOG_CAUGHT_EXCEPTION();
+                return decltype(decoder(bytes, arguments...)){};
+            }
+        };
+
         if (header.event_type == event_type_fork_process)
         {
-            auto message =
-                wsl::linux::securityaudit::DecodeProcessCreation(gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size});
+            auto message = decode(wsl::linux::securityaudit::DecodeProcessCreation);
             if (message)
             {
                 audit.channel.SendMessage(*message);
@@ -54,19 +98,17 @@ void ProcessEvent(void* context, int, void* data, unsigned int size)
         }
         if (header.event_type != event_type_exec_process)
         {
-            const auto bytes = gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size};
-            if (auto message = wsl::linux::securityaudit::DecodeNetworkAudit(bytes))
+            if (auto message = decode(wsl::linux::securityaudit::DecodeNetworkAudit))
             {
                 audit.channel.SendMessage(*message);
             }
-            else if (auto message = wsl::linux::securityaudit::DecodeSystemAudit(bytes))
+            else if (auto message = decode(wsl::linux::securityaudit::DecodeSystemAudit))
             {
                 audit.channel.SendMessage(*message);
             }
             return;
         }
-        auto message = wsl::linux::securityaudit::DecodeProcessExecution(
-            gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size}, audit.includeCommandLine);
+        auto message = decode(wsl::linux::securityaudit::DecodeProcessExecution, audit.includeCommandLine);
         if (message)
         {
             audit.channel.SendMessage<LX_INIT_PROCESS_EXECUTED_DETAILS>(message->Span());
@@ -94,21 +136,26 @@ void PollError(void* context, int error)
 int RunSecurityAudit(bool includeCommandLine)
 {
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
+
     // Keep mount changes local to this worker, independent of mini-init and distributions.
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
     THROW_LAST_ERROR_IF(mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr) < 0);
+
     // Connecting releases the host's bootstrap wait; WSLC may then move mounts into its new root.
     auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true);
     THROW_LAST_ERROR_IF(!socket);
     AuditContext audit{wsl::shared::SocketChannel{std::move(socket), "SecurityAudit"}};
     audit.includeCommandLine = includeCommandLine;
+
     struct statfs filesystem{};
     THROW_LAST_ERROR_IF(statfs("/sys/kernel/tracing", &filesystem) < 0);
     if (filesystem.f_type != 0x74726163)
     {
         THROW_LAST_ERROR_IF(mount("tracefs", "/sys/kernel/tracing", "tracefs", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr) < 0);
     }
+    // The packaged eBPF objects require kernel BTF.
     THROW_LAST_ERROR_IF(access("/sys/kernel/btf/vmlinux", R_OK) < 0);
+
     auto cleanup = wil::scope_exit([&] {
         // Sends remain blocking to tolerate backpressure. Unblock callbacks before the SDK joins its polling thread.
         if (shutdown(audit.channel.Socket(), SHUT_RDWR) < 0 && errno != ENOTCONN)
@@ -121,6 +168,7 @@ int RunSecurityAudit(bool includeCommandLine)
             LOG_ERROR("Security audit shutdown failed: {}", result);
         }
     });
+
     std::array<char, 8192> error{};
     // The SDK's fork selector controls task_newtask for clone/fork/vfork/clone3, excluding CLONE_THREAD.
     const syscall_config syscalls[] = {
@@ -157,15 +205,18 @@ int RunSecurityAudit(bool includeCommandLine)
         LOG_ERROR("eBPF startup failed: {}, hooks {}, {}", info.return_code, info.hooks_attach_code, error.data());
         THROW_ERRNO(EIO);
     }
+
     const auto result = ebpf_plugin_start_polling(&audit, ProcessEvent, EventsLost, PollError, error.data(), error.size(), 64, 8);
     if (result != no_error)
     {
         LOG_ERROR("eBPF polling startup failed: {}, {}", result, error.data());
         THROW_ERRNO(EIO);
     }
+
     LOG_INFO(
         "Security audit collecting ProcessExecuted fields, ProcessCreated, network and system events; command line enabled: {}", includeCommandLine);
 
+    // Terminal failures stop this collector, not mini-init or the distributions.
     while (!audit.failed)
     {
         pollfd descriptor{audit.channel.Socket(), POLLIN, 0};
@@ -176,5 +227,6 @@ int RunSecurityAudit(bool includeCommandLine)
             break;
         }
     }
+
     return audit.failed ? 1 : 0;
 }

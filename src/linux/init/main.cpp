@@ -3438,18 +3438,16 @@ try
         Config.EnableInboxGpuLibs = ConfigMessage->EnableInboxGpuLibs;
         Config.EnableGpuSupport = ConfigMessage->MountGpuShares;
         Config.EnableGuiApps = ConfigMessage->EnableGuiApps;
-        return 0;
-    }
-    case LxMiniInitMessageStartSecurityAudit:
-    {
-        try
+
+        if (ConfigMessage->EnableSecurityAudit)
         {
-            THROW_ERRNO_IF(EINVAL, Buffer.size() != sizeof(LX_MINI_INIT_START_SECURITY_AUDIT));
-            const auto* message = gslhelpers::try_get_struct<LX_MINI_INIT_START_SECURITY_AUDIT>(Buffer);
-            THROW_ERRNO_IF(EINVAL, !message || message->IncludeCommandLine > 1);
-            StartSecurityAudit(message->IncludeCommandLine != 0);
+            try
+            {
+                StartSecurityAudit(ConfigMessage->IncludeAuditCommandLine);
+            }
+            CATCH_LOG();
         }
-        CATCH_LOG();
+
         return 0;
     }
 

@@ -1296,14 +1296,17 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel, bool AllowAuditBootstr
             break;
         }
 
-        if (AllowAuditBootstrap && Message->MessageType == LxMiniInitMessageStartSecurityAudit)
+        if (AllowAuditBootstrap && Message->MessageType == LxMiniInitMessageInitialConfig)
         {
             try
             {
-                THROW_ERRNO_IF(EINVAL, Range.size() != sizeof(LX_MINI_INIT_START_SECURITY_AUDIT));
-                const auto* audit = gslhelpers::try_get_struct<LX_MINI_INIT_START_SECURITY_AUDIT>(Range);
-                THROW_ERRNO_IF(EINVAL, !audit || audit->IncludeCommandLine > 1);
-                StartSecurityAudit(audit->IncludeCommandLine != 0);
+                THROW_ERRNO_IF(EINVAL, Range.size() != sizeof(LX_MINI_INIT_CONFIG_MESSAGE));
+                const auto* config = gslhelpers::try_get_struct<LX_MINI_INIT_CONFIG_MESSAGE>(Range);
+                THROW_ERRNO_IF(EINVAL, !config);
+                if (config->EnableSecurityAudit)
+                {
+                    StartSecurityAudit(config->IncludeAuditCommandLine);
+                }
             }
             CATCH_LOG();
         }
