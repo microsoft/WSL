@@ -1273,6 +1273,9 @@ See recovery instructions on: https://aka.ms/wsldiskmountrecovery</value>
     <value>This USB device is unavailable to your WSL session.</value>
     <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageUsbAudioVideoNotSupported" xml:space="preserve">
+    <value>Video and audio devices are currently not supported.</value>
+  </data>
   <data name="MessageUsbAlreadyAttached" xml:space="preserve">
     <value>This USB device is already attached to your WSL session.</value>
     <comment>{Locked="USB"}Command line arguments, file names and string inserts should not be translated</comment>

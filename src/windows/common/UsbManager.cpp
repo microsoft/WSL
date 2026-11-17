@@ -541,6 +541,8 @@ DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCall
         HRESULT_FROM_WIN32(ERROR_BUSY),
         wsl::shared::Localization::MessageUsbUnavailable(),
         m_registry.HasReservation(identity) || source->IsRedirected());
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageUsbAudioVideoNotSupported(), source->HasUnsupportedClass());
 
     THROW_IF_FAILED(CoCreateGuid(&identity.Id));
     Record value;
