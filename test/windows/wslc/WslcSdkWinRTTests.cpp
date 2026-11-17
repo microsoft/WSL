@@ -169,6 +169,8 @@ class WslcSdkWinRtTests
     template <typename T>
     static void VerifyFinalReleaseFromCallback(T owner, WSLCSDK::Process process, ProcessCallbackKind kind)
     {
+        constexpr DWORD c_completionTimeoutMs = 2 * 60 * 1000;
+
         struct CallbackState
         {
             wil::unique_event releaseReturned{wil::EventOptions::ManualReset};
@@ -212,7 +214,7 @@ class WslcSdkWinRtTests
 
             owner = nullptr;
             state->releaseReturned.SetEvent();
-            state->callbackTimedOut = !state->resumeCallback.wait(2 * 60 * 1000);
+            state->callbackTimedOut = !state->resumeCallback.wait(c_completionTimeoutMs);
             state->callbackReturned.SetEvent();
         });
 
@@ -236,11 +238,11 @@ class WslcSdkWinRtTests
         writer.DetachStream();
         input.Close();
 
-        VERIFY_IS_TRUE(state->releaseReturned.wait(2 * 60 * 1000));
+        VERIFY_IS_TRUE(state->releaseReturned.wait(c_completionTimeoutMs));
         VERIFY_IS_FALSE(state->processDestroyed.wait(2 * 1000));
         state->resumeCallback.SetEvent();
-        VERIFY_IS_TRUE(state->callbackReturned.wait(2 * 60 * 1000));
-        VERIFY_IS_TRUE(state->processDestroyed.wait(2 * 60 * 1000));
+        VERIFY_IS_TRUE(state->callbackReturned.wait(c_completionTimeoutMs));
+        VERIFY_IS_TRUE(state->processDestroyed.wait(c_completionTimeoutMs));
         VERIFY_IS_FALSE(state->callbackTimedOut.load());
     }
 
