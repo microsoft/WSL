@@ -1,2 +1,3 @@
 add_mc(wslservicemc wsleventschema.mc)
-set_target_properties(wslservicemc PROPERTIES FOLDER windows)
+add_mc(wslsecurityauditmc wslsecurityaudit.mc NO_CUSTOMER_BIT)
+set_target_properties(wslservicemc wslsecurityauditmc PROPERTIES FOLDER windows)

@@ -26,6 +26,7 @@ Abstract:
 #include "WslCoreFirewallSupport.h"
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
+#include "SecurityAudit.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -851,6 +852,11 @@ WslCoreVm::~WslCoreVm() noexcept
         m_crashDumpCollectionThread.join();
     }
 
+    if (m_securityAuditThread.joinable())
+    {
+        m_securityAuditThread.join();
+    }
+
     m_guestListener = VmGuestListener{};
 
     if (m_pluginPlan9Server)
@@ -1609,6 +1615,12 @@ void WslCoreVm::InitializeGuest()
     message->EnableGuiApps = LXSS_ENABLE_GUI_APPS();
     message->MountGpuShares = m_vmConfig.EnableGpuSupport;
     message->EnableInboxGpuLibs = m_enableInboxGpuLibs;
+    try
+    {
+        message->EnableSecurityAudit = securityaudit::Enabled();
+    }
+    CATCH_LOG();
+
     if (m_networkingEngine)
     {
         m_networkingEngine->FillInitialConfiguration(message->NetworkingConfiguration);
@@ -1657,6 +1669,13 @@ void WslCoreVm::InitializeGuest()
 
     default:
         break;
+    }
+
+    if (message->EnableSecurityAudit)
+    {
+        // This listener is shared: a failed accept must not leave a late connection for the next operation.
+        auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
+        m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket));
     }
 }
 
@@ -2313,6 +2332,27 @@ void WslCoreVm::VerifyPlan9Servers()
                 m_drvfsToken.reset();
             }
         }
+    }
+}
+
+void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket)
+try
+{
+    auto self = wil::run_as_self();
+    securityaudit::EventSource source;
+    wsl::shared::SocketChannel channel{std::move(socket), "SecurityAudit", {m_terminatingEvent.get()}};
+    for (;;)
+    {
+        const auto& event = channel.ReceiveMessage<LX_INIT_PROCESS_EXECUTED>();
+        THROW_HR_IF(E_INVALIDARG, event.Header.MessageSize != sizeof(event));
+        source.ProcessExecuted(event.Pid);
+    }
+}
+catch (...)
+{
+    if (!m_terminatingEvent.is_signaled())
+    {
+        LOG_CAUGHT_EXCEPTION();
     }
 }
 

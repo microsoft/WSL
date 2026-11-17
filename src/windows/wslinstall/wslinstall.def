@@ -6,6 +6,7 @@ EXPORTS
     DeprovisionMsix
     WslValidateInstallation
     WslFinalizeInstallation
+    UninstallSecurityAudit
     InstallMsix
     InstallMsixAsUser
     RegisterLspCategories

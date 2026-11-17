@@ -686,6 +686,9 @@
         <Binary Id="wslinstall.dll" SourceFile="${PACKAGE_INPUT_DIR}/wslinstall.dll" />
         <Binary Id="msixpackage" SourceFile="${PACKAGE_INPUT_DIR}/gluepackage.msix"/>
 
+        <CustomAction Id="UninstallSecurityAudit" Impersonate="no" BinaryRef="wslinstall.dll"
+            DllEntry="UninstallSecurityAudit" Execute="commit" Return="ignore" />
+
         <CustomAction Id="ValidateInstall"
             Impersonate="no"
             BinaryRef="wslinstall.dll"
@@ -856,6 +859,8 @@
             <?endif?>
 
             <Custom Action="FinalizeInstall" After="PublishFeatures"/>
+            <!-- The audit worker installs its event source on demand. Clean it up only after a successful full uninstall. -->
+            <Custom Action="UninstallSecurityAudit" Before="RemoveFiles" Condition='REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE' />
             <?if "${OFFICIAL_BUILD}" != "TRUE" ?>
             <Custom Action="TestForceInstallFailure" After="FinalizeInstall" Condition='WSL_TEST_FORCE_INSTALL_FAILURE = 1 and (not UPGRADINGPRODUCTCODE)' />
             <?endif?>

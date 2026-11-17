@@ -1,13 +1,13 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-# Creates a CPIO newc format initramfs archive containing a single file named "init"
-# with mode 0100755 (rwxr-xr-x), uid 0, gid 0.
+# Creates a CPIO newc initramfs containing init and its optional eBPF resources.
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory)][string]$InputFile,
-    [Parameter(Mandatory)][string]$OutputFile
+    [Parameter(Mandatory, Position = 0)][string]$InputFile,
+    [Parameter(Mandatory, Position = 1)][string]$OutputFile,
+    [Parameter(Position = 2, ValueFromRemainingArguments)][string[]]$AuditPayloadFiles = @()
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,6 +58,16 @@ $out = [System.IO.File]::Create($OutputFile)
 try
 {
     Write-CpioEntry $out $name $data 0x81ED $mtime  # S_IFREG | 0755
+    if ($AuditPayloadFiles.Count -gt 0)
+    {
+        Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit`0")) ([byte[]]::new(0)) 0x41ED $mtime
+        foreach ($file in $AuditPayloadFiles)
+        {
+            $bytes = [IO.File]::ReadAllBytes($file)
+            $name = [IO.Path]::GetFileName($file)
+            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/$name`0")) $bytes 0x8124 $mtime  # S_IFREG | 0444
+        }
+    }
     $trailer = [System.Text.Encoding]::ASCII.GetBytes("TRAILER!!!`0")
     Write-CpioEntry $out $trailer ([byte[]]::new(0)) 0 0
 }

@@ -20,6 +20,7 @@ Abstract:
 #include <winrt/windows.management.deployment.h>
 #include <Sfc.h>
 #include "defs.h"
+#include "SecurityAudit.h"
 
 using unique_msi_handle = wil::unique_any<MSIHANDLE, decltype(MsiCloseHandle), &MsiCloseHandle>;
 
@@ -821,6 +822,17 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
     }
     CATCH_LOG();
 
+    return NOERROR;
+}
+
+extern "C" UINT __stdcall UninstallSecurityAudit(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("UninstallSecurityAudit");
+        wsl::windows::common::securityaudit::Uninstall();
+    }
+    CATCH_LOG();
     return NOERROR;
 }
 

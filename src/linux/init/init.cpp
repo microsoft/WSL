@@ -28,6 +28,7 @@ Abstract:
 #include <sysexits.h>
 #include <iostream>
 #include <cstddef>
+#include <charconv>
 #include <lxbusapi.h>
 #include "p9tracelogging.h"
 #include "common.h"
@@ -194,7 +195,20 @@ int WslEntryPoint(int Argc, char* Argv[])
     }
     else
     {
-        if (strcmp(BaseName, WSLPATH_NAME) == 0)
+        if (strcmp(BaseName, c_securityAuditName) == 0)
+        {
+            try
+            {
+                THROW_ERRNO_IF(EINVAL, Pid == 1 || Argc != 2);
+                int socket = -1;
+                const auto* end = Argv[1] + strlen(Argv[1]);
+                const auto parsed = std::from_chars(Argv[1], end, socket);
+                THROW_ERRNO_IF(EINVAL, parsed.ec != std::errc{} || parsed.ptr != end || socket <= STDERR_FILENO);
+                ExitCode = RunSecurityAudit(socket);
+            }
+            CATCH_LOG();
+        }
+        else if (strcmp(BaseName, WSLPATH_NAME) == 0)
         {
             ExitCode = WslPathEntry(Argc, Argv);
         }
