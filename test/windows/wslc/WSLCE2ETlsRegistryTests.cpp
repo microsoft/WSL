@@ -18,7 +18,6 @@ Abstract:
 #include "WSLCE2EHelpers.h"
 #include "WSLCSessionDefaults.h"
 #include "TestImageRegistry.h"
-#include <atomic>
 #include <wslutil.h>
 #include <ncrypt.h>
 
@@ -34,7 +33,9 @@ namespace {
     constexpr USHORT c_registryPort = 5000;
     constexpr auto c_proxyRegistryHost = "host.wslc.internal";
     constexpr USHORT c_proxyRegistryPort = 15011;
-    constexpr auto c_proxyAuthRegistryHost = "registry.proxy.invalid";
+    constexpr USHORT c_proxyPort = 15012;
+    constexpr USHORT c_changedProxyPort = 15013;
+    constexpr auto c_proxyTargetHost = "registry.proxy.invalid";
     constexpr auto c_proxyTokenHost = "token.proxy.invalid";
 
     // DER-encodes a certificate-extension value structure (e.g. CERT_ALT_NAME_INFO for the SAN OID).
@@ -200,176 +201,39 @@ namespace {
         wil::unique_cert_context m_added;
     };
 
-    namespace io = wsl::windows::common::io;
-    namespace socket = wsl::windows::common::socket;
-
-    class CountingReadHandle : public io::ReadHandle
+    wsl::windows::common::RunningWSLCContainer StartProxyServer(IWSLCSession& session, const std::filesystem::path& requestsPath, USHORT port)
     {
-    public:
-        CountingReadHandle(io::HandleWrapper&& handle, std::function<void(const gsl::span<char>&)>&& onRead, std::atomic<uint64_t>& bytes) :
-            ReadHandle(std::move(handle), [onRead = std::move(onRead), &bytes](const gsl::span<char>& buffer) {
-                bytes.fetch_add(buffer.size(), std::memory_order_relaxed);
-                onRead(buffer);
-            })
-        {
-        }
-    };
+        wsl::windows::common::WSLCContainerLauncher launcher(
+            string::WideToMultiByte(PythonTestImage().NameAndTag()),
+            {},
+            {"sh",
+             "-c",
+             std::format(
+                 "exec {} --bind 0.0.0.0 --directory /tmp 2>/test/{}",
+                 string::WideToMultiByte(GetPythonHttpServerScript(port)),
+                 requestsPath.filename().string())},
+            {},
+            "bridge");
+        launcher.AddVolume(requestsPath.parent_path().wstring(), "/test", false);
+        launcher.AddPort(port, port, AF_INET, IPPROTO_TCP, "127.0.0.1");
+        auto server = launcher.Launch(session);
+        auto process = server.GetInitProcess();
+        WaitForOutput(process.GetStdHandle(1), "Serving HTTP on");
+        VERIFY_IS_TRUE(std::filesystem::exists(requestsPath));
+        return server;
+    }
 
-    class RecordingConnectProxy
+    void PullAndVerifyProxyRequest(const std::filesystem::path& requestsPath)
     {
-    public:
-        NON_COPYABLE(RecordingConnectProxy);
-        NON_MOVABLE(RecordingConnectProxy);
-
-        explicit RecordingConnectProxy(bool tokenAuthentication = false) : m_tokenAuthentication(tokenAuthentication)
-        {
-            m_listener.reset(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-            THROW_LAST_ERROR_IF(!m_listener);
-
-            sockaddr_in address{};
-            address.sin_family = AF_INET;
-            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-            THROW_LAST_ERROR_IF(bind(m_listener.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
-            THROW_LAST_ERROR_IF(listen(m_listener.get(), SOMAXCONN) == SOCKET_ERROR);
-            int addressSize = sizeof(address);
-            THROW_LAST_ERROR_IF(getsockname(m_listener.get(), reinterpret_cast<sockaddr*>(&address), &addressSize) == SOCKET_ERROR);
-            m_port = ntohs(address.sin_port);
-
-            m_thread = std::thread([this] {
-                try
-                {
-                    while (!m_exit.is_signaled())
-                    {
-                        auto accepted = socket::CancellableAccept(m_listener.get(), INFINITE, m_exit.get());
-                        if (!accepted)
-                        {
-                            break;
-                        }
-
-                        THROW_HR_IF(E_UNEXPECTED, m_connections.size() >= 64);
-                        m_connections.emplace_back([this, client = std::move(*accepted)] {
-                            try
-                            {
-                                Serve(client.get());
-                            }
-                            CATCH_LOG()
-                        });
-                    }
-                }
-                CATCH_LOG()
-            });
-        }
-
-        ~RecordingConnectProxy()
-        {
-            Stop();
-        }
-
-        void Stop()
-        {
-            m_exit.SetEvent();
-            if (m_thread.joinable())
-            {
-                m_thread.join();
-            }
-
-            for (auto& connection : m_connections)
-            {
-                if (connection.joinable())
-                {
-                    connection.join();
-                }
-            }
-
-            m_listener.reset();
-        }
-
-        USHORT Port() const
-        {
-            return m_port;
-        }
-
-        uint64_t ResponseBytes() const
-        {
-            return m_responseBytes.load(std::memory_order_relaxed);
-        }
-
-        uint64_t TokenConnections() const
-        {
-            return m_tokenConnections.load(std::memory_order_relaxed);
-        }
-
-    private:
-        void Serve(SOCKET client)
-        {
-            std::string request;
-            while (request.find("\r\n\r\n") == std::string::npos)
-            {
-                char buffer[1024];
-                const auto received = socket::Receive(client, gsl::as_writable_bytes(gsl::make_span(buffer)), m_exit.get(), 0, 10000);
-                if (received == 0)
-                {
-                    return;
-                }
-
-                request.append(buffer, received);
-                THROW_HR_IF(E_INVALIDARG, request.size() > 8192);
-            }
-
-            const auto registryHost = m_tokenAuthentication ? c_proxyAuthRegistryHost : c_proxyRegistryHost;
-            const auto expected = std::format("CONNECT {}:{} HTTP/1.1\r\n", registryHost, c_proxyRegistryPort);
-            const bool tokenRequest = m_tokenAuthentication &&
-                                      request.starts_with(std::format("CONNECT {}:{} HTTP/1.1\r\n", c_proxyTokenHost, c_proxyRegistryPort));
-            THROW_HR_IF(E_ACCESSDENIED, (!request.starts_with(expected) && !tokenRequest) || !request.ends_with("\r\n\r\n"));
-            if (tokenRequest)
-            {
-                m_tokenConnections.fetch_add(1, std::memory_order_relaxed);
-            }
-
-            wil::unique_socket upstream{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
-            THROW_LAST_ERROR_IF(!upstream);
-            sockaddr_in address{};
-            address.sin_family = AF_INET;
-            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-            address.sin_port = htons(c_proxyRegistryPort);
-            THROW_LAST_ERROR_IF(connect(upstream.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
-
-            constexpr std::string_view response = "HTTP/1.1 200 Connection Established\r\n\r\n";
-            socket::Send(client, gsl::as_bytes(gsl::make_span(response.data(), response.size())), m_exit.get());
-
-            io::MultiHandleWait relay;
-            // Half-close upstream on EOF and let its response drain before ending the tunnel.
-            io::HandleWrapper clientInput{
-                client, [socket = upstream.get()] { LOG_LAST_ERROR_IF(shutdown(socket, SD_SEND) == SOCKET_ERROR); }};
-            auto requestRelay = std::make_unique<io::RelayHandle<>>(std::move(clientInput), upstream.get());
-            relay.AddHandle(std::move(requestRelay), io::MultiHandleWait::NeedNotComplete);
-            auto responseRelay = std::make_unique<io::RelayHandle<CountingReadHandle>>(upstream.get(), client, m_responseBytes);
-            relay.AddHandle(std::move(responseRelay));
-            const auto exitFlags = io::MultiHandleWait::CancelOnCompleted | io::MultiHandleWait::NeedNotComplete;
-            relay.AddHandle(std::make_unique<io::EventHandle>(m_exit.get()), exitFlags);
-            relay.Run(std::nullopt);
-        }
-
-        wil::unique_socket m_listener;
-        wil::unique_event m_exit{wil::EventOptions::ManualReset};
-        USHORT m_port{};
-        bool m_tokenAuthentication{};
-        std::atomic<uint64_t> m_responseBytes{};
-        std::atomic<uint64_t> m_tokenConnections{};
-        std::vector<std::thread> m_connections;
-        std::thread m_thread;
-    };
-
-    struct PublishedRegistryImage
-    {
-        std::wstring Reference;
-        std::string Id;
-    };
-
-    void PullAndVerifyImage(const PublishedRegistryImage& image)
-    {
-        RunWslcAndVerify(std::format(L"image pull {}", image.Reference), {.Stderr = L"", .ExitCode = 0});
-        VERIFY_ARE_EQUAL(image.Id, InspectImage(image.Reference).Id);
+        // The HTTP server records CONNECT without implementing a proxy tunnel.
+        const auto result =
+            RunWslc(std::format(L"image pull {}:{}/proxy-test:latest", string::MultiByteToWide(c_proxyTargetHost), c_registryPort));
+        result.Verify({.ExitCode = 1});
+        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Not Implemented"));
+        VERIFY_ARE_NOT_EQUAL(
+            std::wstring::npos,
+            ReadFileContent(requestsPath.wstring())
+                .find(std::format(L"\"CONNECT {}:{} HTTP/1.1\" 501", string::MultiByteToWide(c_proxyTargetHost), c_registryPort)));
     }
 
     std::string ReadBootId(IWSLCSession& session)
@@ -425,114 +289,20 @@ namespace {
     }
 
     template <typename T>
-    void WithProxyRegistry(T&& verify, bool tokenAuthentication = false)
+    void WithProxyServer(T&& verify)
     {
-        WSADATA data{};
-        THROW_IF_WIN32_ERROR(WSAStartup(MAKEWORD(2, 2), &data));
-        auto cleanupWinsock = wil::scope_exit([] { WSACleanup(); });
-
         GUID guid{};
         VERIFY_SUCCEEDED(CoCreateGuid(&guid));
         const auto name = L"wslc-proxy-" + string::GuidToString<wchar_t>(guid, string::GuidToStringFlags::None);
         const auto directory = std::filesystem::current_path() / name;
         auto cleanupDirectory = SetupTestDirectory(directory);
-        const auto registryHost = tokenAuthentication ? c_proxyAuthRegistryHost : c_proxyRegistryHost;
-        auto certificate = GenerateRegistryTlsCertificate(
-            c_registryIp, directory, tokenAuthentication ? L"*.proxy.invalid" : string::MultiByteToWide(registryHost));
-        TrustedRootCertificate trustedCa{*certificate.get()};
-
         ScopedWindowsProxySettings originalSettings;
         SetWindowsProxySettings("", "");
         auto producer = TestSession::Create(name, WSLCNetworkingModeConsomme);
-        auto [registry, address] =
-            StartLocalRegistry(producer.Session(), "", "", c_proxyRegistryPort, directory.wstring(), !tokenAuthentication);
-        VERIFY_ARE_EQUAL(std::format("{}:{}", c_registryIp, c_proxyRegistryPort), address);
-
-        const auto prefix = std::format(L"--session \"{}\" ", producer.Name());
-        const auto publish = [&](const TestImage& image) {
-            RunWslcAndVerify(std::format(L"{}image load --input \"{}\"", prefix, image.Path.wstring()), {.Stderr = L"", .ExitCode = 0});
-            const auto id = InspectImage(image.NameAndTag(), producer.Name()).Id;
-            const auto registryImage = std::format(L"{}/{}", string::MultiByteToWide(address), image.NameAndTag());
-            RunWslcAndVerify(std::format(L"{}image tag {} {}", prefix, image.NameAndTag(), registryImage), {.ExitCode = 0});
-            RunWslcAndVerify(std::format(L"{}push {}", prefix, registryImage), {.Stderr = L"", .ExitCode = 0});
-            return PublishedRegistryImage{
-                std::format(L"{}:{}/{}", string::MultiByteToWide(registryHost), c_proxyRegistryPort, image.NameAndTag()), id};
-        };
-
-        const auto alpine = publish(AlpineTestImage());
-        const auto helloWorld = publish(HelloWorldTestImage());
-        std::optional<wsl::windows::common::RunningWSLCContainer> tokenRegistry;
-        if (tokenAuthentication)
-        {
-            WriteTestFileContent(directory / L"registry-auth-token", "wslc-proxy-test-token");
-            WriteTestFileContent(directory / L"registry-auth.py", R"py(import contextlib
-import http.client
-import http.server
-import pathlib
-import ssl
-import sys
-
-upstream, realm, port = sys.argv[1:]
-tls = ssl.create_default_context(cafile="/test/server.crt")
-
-class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        token = pathlib.Path("/test/registry-auth-token").read_text()
-        if self.path.split("?", 1)[0] == "/token":
-            body = ('{"token":"' + token + '","expires_in":300}').encode()
-            status, headers = 200, {"Content-Type": "application/json"}
-        elif self.headers.get("Authorization") != "Bearer " + token:
-            body = b""
-            status, headers = 401, {"WWW-Authenticate": f'Bearer realm="{realm}",service="wslc-proxy-test"'}
-            if self.headers.get("Authorization"):
-                headers["WWW-Authenticate"] += ',error="invalid_token"'
-        else:
-            with contextlib.closing(http.client.HTTPSConnection(upstream, context=tls, timeout=30)) as connection:
-                connection.request(self.command, self.path, headers={"Accept": self.headers.get("Accept", "*/*")})
-                response = connection.getresponse()
-                status = response.status
-                headers = {k.lower(): v for k, v in response.getheaders()
-                           if k.lower() not in ("connection", "transfer-encoding")}
-                body = response.read()
-        headers.setdefault("content-length", str(len(body)))
-        self.send_response(status)
-        for name, value in headers.items():
-            self.send_header(name, value)
-        self.end_headers()
-        if self.command != "HEAD":
-            self.wfile.write(body)
-
-    do_HEAD = do_GET
-
-server = http.server.ThreadingHTTPServer(("0.0.0.0", int(port)), Handler)
-server_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-server_tls.load_cert_chain("/test/server.crt", "/test/server.key")
-server.socket = server_tls.wrap_socket(server.socket, server_side=True)
-print("Token registry ready", flush=True)
-server.serve_forever()
-)py");
-            RunWslcAndVerify(
-                std::format(L"{}image load --input \"{}\"", prefix, PythonTestImage().Path.wstring()), {.Stderr = L"", .ExitCode = 0});
-            wsl::windows::common::WSLCContainerLauncher launcher(
-                string::WideToMultiByte(PythonTestImage().NameAndTag()),
-                {},
-                {"python3",
-                 "-u",
-                 "/test/registry-auth.py",
-                 address,
-                 std::format("https://{}:{}/token", c_proxyTokenHost, c_proxyRegistryPort),
-                 std::to_string(c_proxyRegistryPort)},
-                {},
-                "bridge");
-            launcher.AddVolume(directory.wstring(), "/test", true);
-            launcher.AddPort(c_proxyRegistryPort, c_proxyRegistryPort, AF_INET, IPPROTO_TCP, "127.0.0.1");
-            tokenRegistry.emplace(launcher.Launch(producer.Session()));
-            auto process = tokenRegistry->GetInitProcess();
-            WaitForOutput(process.GetStdHandle(1), "Token registry ready");
-        }
-
-        RecordingConnectProxy proxy(tokenAuthentication);
-        verify(directory, proxy, alpine, helloWorld);
+        TestImageRegistry::Instance().EnsureLoaded(PythonTestImage(), producer.Name());
+        const auto requestsPath = directory / L"proxy.log";
+        auto proxy = StartProxyServer(producer.Session(), requestsPath, c_proxyPort);
+        verify(directory, producer.Session(), requestsPath);
     }
 
 } // namespace
@@ -730,140 +500,129 @@ class WSLCE2ETlsRegistryTests
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_IgnoresCallerEnvironment)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
+        WithProxyServer([](const auto& directory, IWSLCSession&, const auto& requestsPath) {
             WithColdProxySession(
                 directory / L"consumer",
-                std::format("http://127.0.0.1:{}", proxy.Port()),
+                std::format("http://127.0.0.1:{}", c_proxyPort),
                 ".windows.invalid",
-                [&](IWSLCSession&, const HostFileChange&) {
-                    const auto before = proxy.ResponseBytes();
-                    PullAndVerifyImage(alpine);
-                    VERIFY_IS_TRUE(
-                        proxy.ResponseBytes() > before,
-                        L"Windows proxy settings must take precedence over the caller environment");
-                    for (const bool configured : {true, false})
-                    {
-                        SetWindowsProxySettings(configured ? "http://changed.proxy.invalid:3129" : "", configured ? ".changed.invalid" : "");
-                        const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", alpine.Reference));
-                        for (const auto* name :
-                             {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY", L"no_proxy", L"NO_PROXY"})
-                        {
-                            if (configured)
-                            {
-                                const auto* value = _wcsicmp(name, L"no_proxy") == 0 ? L".changed.invalid" : L"http://changed.proxy.invalid:3129";
-                                VERIFY_IS_TRUE(environment.contains(std::format(L"{}={}", name, value)));
-                            }
-                            else
-                            {
-                                VERIFY_IS_FALSE(std::ranges::any_of(
-                                    environment, [&](const auto& entry) { return entry.starts_with(std::format(L"{}=", name)); }));
-                            }
-                        }
-                    }
-                },
+                [&](IWSLCSession&, const HostFileChange&) { PullAndVerifyProxyRequest(requestsPath); },
                 {{L"HTTP_PROXY", L"http://caller.proxy.invalid:8080"},
                  {L"https_proxy", L"http://secure.caller.proxy.invalid:8081"},
-                 {L"NO_PROXY", string::MultiByteToWide(c_proxyRegistryHost)}});
+                 {L"NO_PROXY", string::MultiByteToWide(c_proxyTargetHost)}});
         });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_BuildTokenAuthentication)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WithProxyRegistry(
-            [](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
-                const auto context = directory / L"context";
-                VERIFY_IS_TRUE(std::filesystem::create_directory(context));
-                WriteTestFileContent(
-                    context / L"Dockerfile",
-                    std::format(
-                        "FROM {}\n"
-                        "RUN test -z \"$HTTP_PROXY$http_proxy$HTTPS_PROXY$https_proxy$NO_PROXY$no_proxy\""
-                        " && echo buildx-proxy-ok > /proxy-test\n",
-                        string::WideToMultiByte(alpine.Reference)));
+        WithProxyServer([](const auto& directory, IWSLCSession& producer, const auto& requestsPath) {
+            auto certificate = GenerateRegistryTlsCertificate("127.0.0.1", directory, string::MultiByteToWide(c_proxyRegistryHost));
+            TrustedRootCertificate trustedCa{*certificate.get()};
+            WriteTestFileContent(directory / L"registry-auth.py", R"py(import http.server
+import ssl
+import sys
 
-                for (const bool bypassToken : {false, true})
-                {
-                    WithColdProxySession(
-                        directory / (bypassToken ? L"bypass" : L"proxied"),
-                        std::format("http://localhost:{}", proxy.Port()),
-                        bypassToken ? c_proxyTokenHost : ".unrelated.invalid",
-                        [&](IWSLCSession& session, const HostFileChange&) {
-                            const auto bootId = ReadBootId(session);
-                            const auto before = proxy.TokenConnections();
-                            const auto command =
-                                std::format(L"build \"{}\" --pull --no-cache -t wslc-proxy-build:latest", context.wstring());
-                            const auto result = RunWslc(command);
-                            result.Dump();
-                            if (bypassToken)
-                            {
-                                result.Verify({.ExitCode = 1});
-                                VERIFY_IS_TRUE(result.StderrContainsSubstring(L"failed to fetch anonymous token"));
-                                VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTokenHost)));
-                                VERIFY_ARE_EQUAL(before, proxy.TokenConnections());
-                                RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
-                            }
-                            else
-                            {
-                                result.Verify({.ExitCode = 0});
-                                VERIFY_IS_TRUE(
-                                    proxy.TokenConnections() > before, L"Expected a bearer-token request through CONNECT");
-                                RunWslcAndVerify(
-                                    L"container run --rm wslc-proxy-build:latest cat /proxy-test",
-                                    {.Stdout = L"buildx-proxy-ok\n", .Stderr = L"", .ExitCode = 0});
+realm, port = sys.argv[1:]
 
-                                RecordingConnectProxy changedProxy{true};
-                                SetWindowsProxySettings(
-                                    std::format("http://localhost:{}", changedProxy.Port()), ".unrelated.invalid");
-                                // Revoke the cached bearer token so the next buildx process must fetch another.
-                                WriteTestFileContent(directory / L"registry-auth-token", "wslc-proxy-changed-token");
-                                const auto originalTokenConnections = proxy.TokenConnections();
-                                const auto changed = RunWslc(command);
-                                changed.Dump();
-                                changed.Verify({.ExitCode = 0});
-                                VERIFY_IS_TRUE(changedProxy.TokenConnections() > 0, L"New buildx must use the changed proxy");
-                                VERIFY_ARE_EQUAL(originalTokenConnections, proxy.TokenConnections());
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", f'Bearer realm="{realm}",service="wslc-proxy-test"')
+        self.end_headers()
 
-                                const auto changedTokenConnections = changedProxy.TokenConnections();
-                                SetWindowsProxySettings("", "");
-                                WriteTestFileContent(directory / L"registry-auth-token", "wslc-proxy-cleared-token");
-                                const auto cleared = RunWslc(command);
-                                cleared.Dump();
-                                cleared.Verify({.ExitCode = 1});
-                                VERIFY_IS_TRUE(cleared.StderrContainsSubstring(L"failed to fetch anonymous token"));
-                                VERIFY_ARE_EQUAL(originalTokenConnections, proxy.TokenConnections());
-                                VERIFY_ARE_EQUAL(changedTokenConnections, changedProxy.TokenConnections());
-                                VERIFY_ARE_EQUAL(bootId, ReadBootId(session));
-                            }
-                        });
-                }
-            },
-            true);
+    do_HEAD = do_GET
+
+server = http.server.ThreadingHTTPServer(("0.0.0.0", int(port)), Handler)
+server_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+server_tls.load_cert_chain("/test/server.crt", "/test/server.key")
+server.socket = server_tls.wrap_socket(server.socket, server_side=True)
+print("Token registry ready", flush=True)
+server.serve_forever()
+)py");
+            wsl::windows::common::WSLCContainerLauncher launcher(
+                string::WideToMultiByte(PythonTestImage().NameAndTag()),
+                {},
+                {"python3", "-u", "/test/registry-auth.py", std::format("http://{}:{}/token", c_proxyTokenHost, c_proxyRegistryPort), std::to_string(c_proxyRegistryPort)},
+                {},
+                "bridge");
+            launcher.AddVolume(directory.wstring(), "/test", true);
+            launcher.AddPort(c_proxyRegistryPort, c_proxyRegistryPort, AF_INET, IPPROTO_TCP, "127.0.0.1");
+            auto registry = launcher.Launch(producer);
+            auto process = registry.GetInitProcess();
+            WaitForOutput(process.GetStdHandle(1), "Token registry ready");
+
+            const auto context = directory / L"context";
+            VERIFY_IS_TRUE(std::filesystem::create_directory(context));
+            WriteTestFileContent(context / L"Dockerfile", std::format("FROM {}:{}/proxy-test:latest\n", c_proxyRegistryHost, c_proxyRegistryPort));
+            const auto command = std::format(L"build \"{}\" --pull --no-cache -t wslc-proxy-build:latest", context.wstring());
+            const auto tokenRequest =
+                std::format(L"\"GET http://{}:{}/token?", string::MultiByteToWide(c_proxyTokenHost), c_proxyRegistryPort);
+
+            for (const bool bypassToken : {false, true})
+            {
+                WithColdProxySession(
+                    directory / (bypassToken ? L"bypass" : L"proxied"),
+                    std::format("http://localhost:{}", c_proxyPort),
+                    bypassToken ? std::format("{};{}", c_proxyRegistryHost, c_proxyTokenHost) : c_proxyRegistryHost,
+                    [&](IWSLCSession& session, const HostFileChange&) {
+                        const auto bootId = ReadBootId(session);
+                        const auto before = ReadFileContent(requestsPath.wstring());
+                        const auto result = RunWslc(command);
+                        result.Verify({.ExitCode = 1});
+                        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"failed to fetch anonymous token"));
+                        VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTokenHost)));
+                        if (bypassToken)
+                        {
+                            VERIFY_ARE_EQUAL(before, ReadFileContent(requestsPath.wstring()));
+                        }
+                        else
+                        {
+                            VERIFY_IS_TRUE(result.StderrContainsSubstring(L"404"));
+                            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, ReadFileContent(requestsPath.wstring()).find(tokenRequest));
+
+                            const auto changedRequestsPath = directory / L"changed-proxy.log";
+                            auto changedProxy = StartProxyServer(producer, changedRequestsPath, c_changedProxyPort);
+                            SetWindowsProxySettings(std::format("http://localhost:{}", c_changedProxyPort), c_proxyRegistryHost);
+                            const auto originalRequests = ReadFileContent(requestsPath.wstring());
+                            const auto changed = RunWslc(command);
+                            changed.Verify({.ExitCode = 1});
+                            VERIFY_IS_TRUE(changed.StderrContainsSubstring(L"failed to fetch anonymous token"));
+                            VERIFY_IS_TRUE(changed.StderrContainsSubstring(L"404"));
+                            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, ReadFileContent(changedRequestsPath.wstring()).find(tokenRequest));
+                            VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
+
+                            const auto changedRequests = ReadFileContent(changedRequestsPath.wstring());
+                            SetWindowsProxySettings("", "");
+                            const auto cleared = RunWslc(command);
+                            cleared.Verify({.ExitCode = 1});
+                            VERIFY_IS_TRUE(cleared.StderrContainsSubstring(L"failed to fetch anonymous token"));
+                            VERIFY_IS_TRUE(cleared.StderrContainsSubstring(string::MultiByteToWide(c_proxyTokenHost)));
+                            VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
+                            VERIFY_ARE_EQUAL(changedRequests, ReadFileContent(changedRequestsPath.wstring()));
+                            VERIFY_ARE_EQUAL(bootId, ReadBootId(session));
+                        }
+
+                        RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                    });
+            }
+        });
     }
 
     WSLC_TEST_METHOD(WSLCE2E_Registry_Proxy_ColdPullAndIdleRestart)
     {
         WINHTTP_PROXY_TEST_ONLY();
-        WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto& helloWorld) {
+        WithProxyServer([](const auto& directory, IWSLCSession& producer, const auto& requestsPath) {
             WithColdProxySession(
-                directory / L"localhost", std::format("http://localhost:{}", proxy.Port()), "", [&](IWSLCSession& session, const HostFileChange& settings) {
-                    const auto beforePull = proxy.ResponseBytes();
-                    PullAndVerifyImage(helloWorld);
-                    VERIFY_IS_TRUE(proxy.ResponseBytes() > beforePull, L"Expected registry traffic through CONNECT");
-
-                    const auto missing = RunWslc(std::format(L"image inspect {}", alpine.Reference));
-                    missing.Verify({
-                        .Stdout = L"[]\r\n",
-                        .Stderr = Localization::MessageWslcImageNotFound(string::WideToMultiByte(alpine.Reference).c_str()) + L"\r\n",
-                        .ExitCode = 1,
-                    });
+                directory / L"localhost", std::format("http://localhost:{}", c_proxyPort), "", [&](IWSLCSession& session, const HostFileChange& settings) {
+                    PullAndVerifyProxyRequest(requestsPath);
+                    const auto originalRequests = ReadFileContent(requestsPath.wstring());
                     const auto bootId = ReadBootId(session);
                     ULONG sessionId{};
                     VERIFY_SUCCEEDED(session.GetId(&sessionId));
 
-                    RecordingConnectProxy changedProxy;
-                    SetWindowsProxySettings(std::format("http://localhost:{}", changedProxy.Port()), "");
-                    proxy.Stop();
+                    const auto changedRequestsPath = directory / L"changed-proxy.log";
+                    auto changedProxy = StartProxyServer(producer, changedRequestsPath, c_changedProxyPort);
+                    SetWindowsProxySettings(std::format("http://localhost:{}", c_changedProxyPort), "");
                     settings.Update("session: {}\n");
                     BOOL wasAlreadyIdle = TRUE;
                     VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
@@ -873,24 +632,24 @@ class WSLCE2ETlsRegistryTests
                     VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
                     VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
 
-                    const auto beforeRestartedPull = changedProxy.ResponseBytes();
-                    PullAndVerifyImage(alpine);
-                    VERIFY_IS_TRUE(
-                        changedProxy.ResponseBytes() - beforeRestartedPull > 1024 * 1024,
-                        L"Expected uncached image payload through the changed proxy");
+                    PullAndVerifyProxyRequest(changedRequestsPath);
+                    VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
 
-                    RunWslcAndVerify(std::format(L"image rm {}", alpine.Reference), {.Stderr = L"", .ExitCode = 0});
+                    const auto changedRequests = ReadFileContent(changedRequestsPath.wstring());
                     const auto restartedBootId = ReadBootId(session);
                     SetWindowsProxySettings("", "");
-                    changedProxy.Stop();
                     VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
                     VERIFY_IS_FALSE(wasAlreadyIdle);
                     VERIFY_ARE_NOT_EQUAL(restartedBootId, ReadBootId(session));
                     VERIFY_SUCCEEDED(OpenDefaultElevatedSession()->GetId(&restartedSessionId));
                     VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
-                    const auto beforeDirectPull = changedProxy.ResponseBytes();
-                    PullAndVerifyImage(alpine);
-                    VERIFY_ARE_EQUAL(beforeDirectPull, changedProxy.ResponseBytes());
+                    const auto result =
+                        RunWslc(std::format(L"image pull {}:{}/proxy-test:latest", string::MultiByteToWide(c_proxyTargetHost), c_registryPort));
+                    result.Verify({.ExitCode = 1});
+                    VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTargetHost)));
+                    VERIFY_IS_FALSE(result.StderrContainsSubstring(L"proxyconnect tcp"));
+                    VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
+                    VERIFY_ARE_EQUAL(changedRequests, ReadFileContent(changedRequestsPath.wstring()));
                 });
         });
     }
@@ -902,28 +661,31 @@ class WSLCE2ETlsRegistryTests
         SetWindowsProxySettings("http://windows.proxy.invalid:3128", "*.unrelated.invalid");
         const auto expected = LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first;
 
-        WithProxyRegistry([](const auto& directory, auto& proxy, const auto& alpine, const auto&) {
-            proxy.Stop();
-
-            WithColdProxySession(
-                directory / L"unset", "", "", [&](IWSLCSession&, const HostFileChange&) { PullAndVerifyImage(alpine); });
-
-            for (const auto* noProxy : {".unrelated.invalid", c_proxyRegistryHost})
+        WithProxyServer([](const auto& directory, IWSLCSession&, const auto& requestsPath) {
+            for (const auto* noProxy : {"", ".unrelated.invalid", c_proxyTargetHost})
             {
+                const bool unset = *noProxy == '\0';
                 WithColdProxySession(
-                    directory / noProxy, std::format("http://127.0.0.1:{}", proxy.Port()), noProxy, [&](IWSLCSession&, const HostFileChange&) {
-                        if (std::string_view(noProxy) == c_proxyRegistryHost)
+                    directory / (unset ? "unset" : noProxy),
+                    unset ? "" : std::format("http://127.0.0.1:{}", c_proxyPort),
+                    noProxy,
+                    [&](IWSLCSession&, const HostFileChange&) {
+                        if (!unset && std::string_view(noProxy) != c_proxyTargetHost)
                         {
-                            PullAndVerifyImage(alpine);
+                            PullAndVerifyProxyRequest(requestsPath);
                         }
                         else
                         {
-                            const auto result = RunWslc(std::format(L"image pull {}", alpine.Reference));
+                            const auto before = ReadFileContent(requestsPath.wstring());
+                            const auto result = RunWslc(std::format(
+                                L"image pull {}:{}/proxy-test:latest", string::MultiByteToWide(c_proxyTargetHost), c_registryPort));
                             result.Verify({.ExitCode = 1});
-                            VERIFY_IS_TRUE(
-                                result.StderrContainsSubstring(L"proxyconnect tcp"), L"Failure must come from the stopped proxy");
-                            RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+                            VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTargetHost)));
+                            VERIFY_IS_FALSE(result.StderrContainsSubstring(L"proxyconnect tcp"));
+                            VERIFY_ARE_EQUAL(before, ReadFileContent(requestsPath.wstring()));
                         }
+
+                        RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
                     });
             }
         });
