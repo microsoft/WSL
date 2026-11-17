@@ -2072,6 +2072,18 @@ You can also access more VS Code Remote options through the command palette with
   <data name="Settings_KeepWslRunning.Header" xml:space="preserve">
     <value>Keep WSL running</value>
   </data>
+  <data name="Settings_SecurityAudit.Header" xml:space="preserve">
+    <value>Security audit</value>
+  </data>
+  <data name="Settings_SecurityAudit.Description" xml:space="preserve">
+    <value>Allow Linux security events from WSL 2 and WSLC to be written to the Windows Security log when Windows audit policies are enabled. Changes take effect after the virtual machines restart.</value>
+  </data>
+  <data name="Settings_SecurityAuditToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Security audit</value>
+  </data>
+  <data name="Settings_SecurityAuditToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
+    <value>Allow security event collection when Windows audit policies are enabled. Restart the WSL 2 and WSLC virtual machines to apply changes.</value>
+  </data>
   <data name="Settings_KeepWslRunning.Description" xml:space="preserve">
     <value>Keep running distributions, and the WSL virtual machine hosting them, from being automatically shut down after they have been idle.</value>
   </data>

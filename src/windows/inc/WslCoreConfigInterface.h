@@ -48,6 +48,7 @@ enum WslConfigEntry
     SystemDistroPath,
     KernelModulesPath,
     InstanceIdleTimeout,
+    SecurityAuditEnabled,
 };
 
 enum NetworkingConfiguration

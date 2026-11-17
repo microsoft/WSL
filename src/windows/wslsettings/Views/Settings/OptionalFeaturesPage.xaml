@@ -38,6 +38,9 @@
                 <ctControls:SettingsCard x:Uid="Settings_SafeMode">
                     <ToggleSwitch x:Uid="Settings_SafeModeToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnSafeMode, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>
+                <ctControls:SettingsCard x:Uid="Settings_SecurityAudit">
+                    <ToggleSwitch x:Uid="Settings_SecurityAuditToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnSecurityAudit, Mode=TwoWay}"/>
+                </ctControls:SettingsCard>
                 <ctControls:SettingsCard x:Uid="Settings_SparseVHD">
                     <ToggleSwitch x:Uid="Settings_SparseVHDToggleSwitch" HorizontalAlignment="Right" MinWidth="0" IsOn="{x:Bind ViewModel.IsOnSparseVHD, Mode=TwoWay}"/>
                 </ctControls:SettingsCard>

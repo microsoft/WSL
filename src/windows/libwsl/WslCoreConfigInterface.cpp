@@ -159,6 +159,10 @@ WslConfigSetting GetWslConfigSetting(WslConfig_t wslConfig, WslConfigEntry wslCo
         static_assert(std::is_same<decltype(wslConfigSetting.BoolValue), decltype(wslConfig->Config.EnableGuiApps)>::value);
         wslConfigSetting.BoolValue = wslConfig->Config.EnableGuiApps;
         break;
+    case SecurityAuditEnabled:
+        static_assert(std::is_same<decltype(wslConfigSetting.BoolValue), decltype(wslConfig->Config.EnableSecurityAudit)>::value);
+        wslConfigSetting.BoolValue = wslConfig->Config.EnableSecurityAudit;
+        break;
     case NestedVirtualizationEnabled:
         static_assert(std::is_same<decltype(wslConfigSetting.BoolValue), decltype(wslConfig->Config.EnableNestedVirtualization)>::value);
         wslConfigSetting.BoolValue = wslConfig->Config.EnableNestedVirtualization;
@@ -492,6 +496,13 @@ unsigned long SetWslConfigSetting(WslConfig_t wslConfig, WslConfigSetting wslCon
     case GUIApplicationsEnabled:
         return SetWslConfigSetting(
             wslConfig, ConfigSetting::GuiApplications, defaultConfig.EnableGuiApps, wslConfigSetting.BoolValue, wslConfig->Config.EnableGuiApps);
+    case SecurityAuditEnabled:
+        return SetWslConfigSetting(
+            wslConfig,
+            ConfigSetting::SecurityAudit,
+            defaultConfig.EnableSecurityAudit,
+            wslConfigSetting.BoolValue,
+            wslConfig->Config.EnableSecurityAudit);
     case NestedVirtualizationEnabled:
         return SetWslConfigSetting(
             wslConfig,
