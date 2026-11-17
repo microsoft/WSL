@@ -18115,18 +18115,10 @@ sys.exit(1 if queries else 0)
                 {
                     VERIFY_IS_TRUE(environment.find(std::format("\n{}\n", value)) != std::string::npos);
                 }
-                for (const auto* name : {"http_proxy", "HTTPS_PROXY"})
+                for (const auto* name : {"http_proxy", "HTTPS_PROXY", "no_proxy"})
                 {
-                    if (Supported)
-                    {
-                        VERIFY_IS_TRUE(environment.find(std::format("\n{}={}\n", name, proxy)) != std::string::npos);
-                    }
-                    else
-                    {
-                        VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
-                    }
+                    VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
                 }
-                VERIFY_IS_TRUE(environment.find("\nno_proxy=.windows.invalid\n") != std::string::npos);
             }
             else
             {
@@ -18155,17 +18147,7 @@ sys.exit(1 if queries else 0)
             }
             for (const auto* name : {"HTTP_PROXY", "https_proxy", "NO_PROXY"})
             {
-                const auto prefix = std::format("\n{}=", name);
-                const auto start = environment.find(prefix);
-                if (start == std::string::npos)
-                {
-                    VERIFY_IS_TRUE(overriddenEnvironment.find(prefix) == std::string::npos);
-                }
-                else
-                {
-                    const auto end = environment.find('\n', start + 1);
-                    VERIFY_IS_TRUE(overriddenEnvironment.find(environment.substr(start, end - start + 1)) != std::string::npos);
-                }
+                VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}=", name)) == std::string::npos);
             }
         }
     }

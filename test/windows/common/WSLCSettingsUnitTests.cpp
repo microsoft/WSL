@@ -651,7 +651,7 @@ class WSLCCLISettingsUnitTests
         }
     }
 
-    TEST_METHOD(ProxyEnvironment_ExplicitCasingOverridesOnlyMatchingDefault)
+    TEST_METHOD(ProxyEnvironment_ExplicitCasingSuppressesDefaultAliases)
     {
         const std::vector<std::string> defaults{
             "http_proxy=http://windows:3128",
@@ -660,30 +660,34 @@ class WSLCCLISettingsUnitTests
             "HTTPS_PROXY=http://windows:3128",
             "no_proxy=.example.com",
             "NO_PROXY=.example.com"};
+        std::vector<std::string> allDefaults;
+        AddProxyEnvironmentDefaults(allDefaults, defaults);
+        VERIFY_IS_TRUE(allDefaults == defaults);
+
         for (const bool upper : {false, true})
         {
             const auto* name = upper ? "HTTP_PROXY" : "http_proxy";
-            std::vector<std::string> environment{std::format("{}=http://manual:8080", name), "PATH=/bin"};
-            AddProxyEnvironmentDefaults(environment, defaults);
-            const std::vector<std::string> expected{
-                std::format("{}=http://manual:8080", name),
-                "PATH=/bin",
-                std::format("{}=http://windows:3128", upper ? "http_proxy" : "HTTP_PROXY"),
-                "https_proxy=http://windows:3128",
-                "HTTPS_PROXY=http://windows:3128",
-                "no_proxy=.example.com",
-                "NO_PROXY=.example.com"};
-            VERIFY_IS_TRUE(environment == expected);
+            for (const auto* value : {"http://manual:8080", ""})
+            {
+                std::vector<std::string> environment{std::format("{}={}", name, value), "PATH=/bin"};
+                AddProxyEnvironmentDefaults(environment, defaults);
+                const std::vector<std::string> expected{
+                    std::format("{}={}", name, value),
+                    "PATH=/bin",
+                    "https_proxy=http://windows:3128",
+                    "HTTPS_PROXY=http://windows:3128",
+                    "no_proxy=.example.com",
+                    "NO_PROXY=.example.com"};
+                VERIFY_IS_TRUE(environment == expected);
+            }
         }
     }
 
     TEST_METHOD(ProxyEnvironment_EmptyAndConflictingExplicitValuesWin)
     {
         std::vector<std::string> environment{
-            "HTTP_PROXY=", "https_proxy=http://lower:8080", "HTTPS_PROXY=http://upper:8080", "no_proxy="};
-        auto expected = environment;
-        expected.emplace_back("http_proxy=http://windows:3128");
-        expected.emplace_back("NO_PROXY=.example.com");
+            "http_proxy=http://lower:8080", "HTTP_PROXY=http://upper:8080", "https_proxy=", "no_proxy="};
+        const auto expected = environment;
         AddProxyEnvironmentDefaults(
             environment,
             {"http_proxy=http://windows:3128",

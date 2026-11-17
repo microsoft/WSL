@@ -64,9 +64,22 @@ bool IsProxyEnvironmentVariable(std::string_view Entry)
 
 void AddProxyEnvironmentDefaults(std::vector<std::string>& Environment, const std::vector<std::string>& Defaults)
 {
+    const auto explicitCount = Environment.size();
     for (const auto& entry : Defaults)
     {
-        if (std::ranges::none_of(Environment, [&](const auto& value) { return EnvironmentName(value) == EnvironmentName(entry); }))
+        const auto name = EnvironmentName(entry);
+        const auto aliases =
+            std::ranges::find_if(c_proxyNames, [&](const auto& names) { return name == names.first || name == names.second; });
+        if (aliases != c_proxyNames.end() &&
+            std::ranges::any_of(Environment.begin(), Environment.begin() + explicitCount, [&](const auto& value) {
+                const auto explicitName = EnvironmentName(value);
+                return explicitName == aliases->first || explicitName == aliases->second;
+            }))
+        {
+            continue;
+        }
+
+        if (std::ranges::none_of(Environment, [&](const auto& value) { return EnvironmentName(value) == name; }))
         {
             Environment.emplace_back(entry);
         }
