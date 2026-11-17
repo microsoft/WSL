@@ -4200,7 +4200,7 @@ class NetworkTests
         WINHTTP_PROXY_TEST_ONLY();
         VERIFY_SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
 
-        auto restoreProxySettings = wil::scope_exit([&] { ClearHttpProxySettings(true); });
+        ScopedWindowsProxySettings originalSettings;
         SetHttpProxySettings(c_httpProxyLocalhostv4, L"", L"", true);
 
         wil::unique_handle userToken;
