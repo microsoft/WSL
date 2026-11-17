@@ -20,15 +20,15 @@ namespace {
         L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Security\\Microsoft-Windows-WSL-SecurityAudit";
     static_assert(MSG_PROCESS_EXECUTED <= UINT16_MAX);
 
-    wil::unique_handle Authority(PCWSTR privilege)
+    wil::unique_handle AcquireTokenWithPrivilege(PCWSTR privilege)
     {
         wil::unique_handle processToken;
         THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &processToken));
         wil::unique_handle token;
         THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
             processToken.get(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES | TOKEN_IMPERSONATE, nullptr, SecurityImpersonation, TokenImpersonation, &token));
-        SetLastError(ERROR_SUCCESS);
         security::EnableTokenPrivilege(token.get(), privilege);
+        // AdjustTokenPrivileges can return TRUE without assigning the requested privilege.
         THROW_IF_WIN32_ERROR(GetLastError());
         return token;
     }
@@ -52,7 +52,7 @@ namespace {
             THROW_HR_IF(result, result != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) && result != HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
         }
 
-        auto token = Authority(SE_SECURITY_NAME);
+        auto token = AcquireTokenWithPrivilege(SE_SECURITY_NAME);
         auto impersonation = wil::impersonate_token(token.get());
         if (key)
         {
@@ -77,9 +77,7 @@ bool Enabled()
 {
     auto self = wil::run_as_self();
     // Both collection policy and the policy required by Authz must already be enabled.
-    GUID categories[] = {
-        {0x0cce922b, 0x69ae, 0x11d9, {0xbe, 0xd3, 0x50, 0x50, 0x54, 0x50, 0x30, 0x30}},
-        {0x0cce9222, 0x69ae, 0x11d9, {0xbe, 0xd3, 0x50, 0x50, 0x54, 0x50, 0x30, 0x30}}};
+    GUID categories[] = {c_processCreationAuditSubcategory, c_applicationGeneratedAuditSubcategory};
     wil::unique_any<PAUDIT_POLICY_INFORMATION, decltype(&AuditFree), AuditFree> policy;
     THROW_LAST_ERROR_IF(!AuditQuerySystemPolicy(categories, ARRAYSIZE(categories), &policy));
     return (policy.get()[0].AuditingInformation & POLICY_AUDIT_EVENT_SUCCESS) != 0 &&
@@ -88,7 +86,7 @@ bool Enabled()
 
 void Uninstall()
 {
-    auto token = Authority(SE_SECURITY_NAME);
+    auto token = AcquireTokenWithPrivilege(SE_SECURITY_NAME);
     auto impersonation = wil::impersonate_token(token.get());
     if (!AuthzUninstallSecurityEventSource(0, c_source))
     {
@@ -98,7 +96,7 @@ void Uninstall()
     }
 }
 
-EventSource::EventSource() : m_token(Authority(SE_AUDIT_NAME))
+EventSource::EventSource() : m_token(AcquireTokenWithPrivilege(SE_AUDIT_NAME))
 {
     auto impersonation = wil::impersonate_token(m_token.get());
     EnsureInstalled();

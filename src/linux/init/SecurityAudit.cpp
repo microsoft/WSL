@@ -17,17 +17,15 @@ namespace {
 struct AuditContext
 {
     wsl::shared::SocketChannel channel;
-    std::mutex lock;
     std::atomic<bool> failed{};
 };
 
+// The SDK invokes event callbacks serially on its polling thread.
 void ProcessEvent(void* context, int, void* data, unsigned int size)
 {
     auto& audit = *static_cast<AuditContext*>(context);
-    std::unique_lock lock(audit.lock, std::defer_lock);
     try
     {
-        lock.lock();
         if (audit.failed)
         {
             return;
@@ -41,6 +39,7 @@ void ProcessEvent(void* context, int, void* data, unsigned int size)
         {
             return;
         }
+
         THROW_ERRNO_IF(EINVAL, size != sizeof(event_exec_process_s));
         event_exec_process_s event{};
         memcpy(&event, data, sizeof(event));
@@ -75,16 +74,20 @@ int RunSecurityAudit(int socket)
 {
     AuditContext audit{wsl::shared::SocketChannel{wil::unique_fd{socket}, "SecurityAudit"}};
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
+
     // Keep mount changes local to this worker, independent of mini-init and distributions.
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
     THROW_LAST_ERROR_IF(mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr) < 0);
+
     struct statfs filesystem{};
     THROW_LAST_ERROR_IF(statfs("/sys/kernel/tracing", &filesystem) < 0);
     if (filesystem.f_type != 0x74726163)
     {
         THROW_LAST_ERROR_IF(mount("tracefs", "/sys/kernel/tracing", "tracefs", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr) < 0);
     }
+    // The packaged eBPF objects require kernel BTF.
     THROW_LAST_ERROR_IF(access("/sys/kernel/btf/vmlinux", R_OK) < 0);
+
     auto cleanup = wil::scope_exit([&] {
         // Sends remain blocking to tolerate backpressure. Unblock callbacks before the SDK joins its polling thread.
         if (shutdown(socket, SHUT_RDWR) < 0 && errno != ENOTCONN)
@@ -97,6 +100,7 @@ int RunSecurityAudit(int socket)
             LOG_ERROR("Security audit shutdown failed: {}", result);
         }
     });
+
     std::array<char, 8192> error{};
     const syscall_config syscalls[] = {{__NR_execve, true}};
     const auto info = ebpf_plugin_start(
@@ -118,14 +122,17 @@ int RunSecurityAudit(int socket)
         LOG_ERROR("eBPF startup failed: {}, hooks {}, {}", info.return_code, info.hooks_attach_code, error.data());
         THROW_ERRNO(EIO);
     }
+
     const auto result = ebpf_plugin_start_polling(&audit, ProcessEvent, EventsLost, PollError, error.data(), error.size(), 64, 8);
     if (result != no_error)
     {
         LOG_ERROR("eBPF polling startup failed: {}, {}", result, error.data());
         THROW_ERRNO(EIO);
     }
+
     LOG_INFO("Security audit collecting ProcessExecuted PID");
 
+    // Terminal failures stop this collector, not mini-init or the distributions.
     while (!audit.failed)
     {
         pollfd descriptor{socket, POLLIN, 0};
@@ -136,5 +143,6 @@ int RunSecurityAudit(int socket)
             break;
         }
     }
+
     return audit.failed ? 1 : 0;
 }

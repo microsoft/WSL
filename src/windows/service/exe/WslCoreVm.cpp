@@ -756,21 +756,6 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // Perform additional initialization.
     InitializeGuest();
-
-    try
-    {
-        if (securityaudit::Enabled())
-        {
-            LX_MINI_INIT_START_SECURITY_AUDIT audit{};
-            audit.Header.MessageType = audit.Type;
-            audit.Header.MessageSize = sizeof(audit);
-            auto auditTransaction = m_miniInitChannel.StartTransaction();
-            auditTransaction.Send(audit);
-            auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
-            m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket));
-        }
-    }
-    CATCH_LOG();
 }
 
 WslCoreVm::~WslCoreVm() noexcept
@@ -1630,6 +1615,12 @@ void WslCoreVm::InitializeGuest()
     message->EnableGuiApps = LXSS_ENABLE_GUI_APPS();
     message->MountGpuShares = m_vmConfig.EnableGpuSupport;
     message->EnableInboxGpuLibs = m_enableInboxGpuLibs;
+    try
+    {
+        message->EnableSecurityAudit = securityaudit::Enabled();
+    }
+    CATCH_LOG();
+
     if (m_networkingEngine)
     {
         m_networkingEngine->FillInitialConfiguration(message->NetworkingConfiguration);
@@ -1678,6 +1669,13 @@ void WslCoreVm::InitializeGuest()
 
     default:
         break;
+    }
+
+    if (message->EnableSecurityAudit)
+    {
+        // This listener is shared: a failed accept must not leave a late connection for the next operation.
+        auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
+        m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket));
     }
 }
 
