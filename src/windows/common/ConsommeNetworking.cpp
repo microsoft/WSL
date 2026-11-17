@@ -489,8 +489,12 @@ void ConsommeNetworking::RefreshGuestConnection()
 
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
-        UpdateIpv6Address(networkSettings->PreferredIpv6Address);
-        UpdateDefaultRoute(AF_INET6, defaultRouteIpv6, m_trackedDefaultRouteIpv6);
+        try
+        {
+            UpdateIpv6Address(networkSettings->PreferredIpv6Address);
+            UpdateDefaultRoute(AF_INET6, defaultRouteIpv6, m_trackedDefaultRouteIpv6);
+        }
+        CATCH_LOG()
     }
 
     UpdateDnsSettings(currentDns);
