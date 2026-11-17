@@ -716,6 +716,12 @@ Argumente:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Es wird nach Updates gesucht.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Das GitHub-API-Ratenlimit wurde erreicht. Versuchen Sie es später noch einmal.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Das GitHub-API-Ratenlimit wurde erreicht. Mit Windows Update wird nach Updates gesucht.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Diese Distribution ist nur im Microsoft Store verfügbar.</value>
   </data>

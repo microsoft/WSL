@@ -710,6 +710,12 @@ Argumentit:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Tarkistetaan päivityksiä.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub-ohjelmointirajapinnan tiedonsiirtorajoitus saavutettiin. Yritä myöhemmin uudelleen.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub-ohjelmointirajapinnan tiedonsiirtorajoitus saavutettiin. Tarkistetaan päivitysten saatavuutta Windows Update avulla.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Tämä jakelu on käytettävissä vain Microsoft Storesta.</value>
   </data>

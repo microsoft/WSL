@@ -716,6 +716,12 @@ Windows 版本： {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>正在檢查更新。</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>已達到 GitHub API 速率限制。請稍後再試。</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>已達到 GitHub API 速率限制。正在使用 Windows Update 檢查更新。</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>此發佈僅可從 Microsoft Store 取得。</value>
   </data>

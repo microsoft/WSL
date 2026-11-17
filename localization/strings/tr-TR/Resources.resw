@@ -710,6 +710,12 @@ Bağımsız değişkenler:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Güncelleştirmeler denetleniyor.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API'si hız sınırına ulaşıldı. Daha sonra yeniden deneyin.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API'si hız sınırına ulaşıldı. Windows Update kullanarak güncelleştirmeler denetleniyor.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Bu dağıtım yalnızca Microsoft Store’dan kullanılabilir.</value>
   </data>

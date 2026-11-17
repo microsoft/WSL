@@ -710,6 +710,12 @@ Argumenten:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Controleren op updates.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>De frequentielimiet van de GitHub API is bereikt. Probeer het later opnieuw.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>De frequentielimiet van de GitHub API is bereikt. Controleren op updates met behulp van Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Deze distributie is alleen beschikbaar vanuit de Microsoft Store.</value>
   </data>

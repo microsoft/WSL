@@ -710,6 +710,12 @@ Argumenty:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Zjišťuje se dostupnost aktualizací.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Dosáhlo se limitu rychlosti rozhraní API GitHubu. Zkuste to znovu později.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Dosáhlo se limitu rychlosti rozhraní API GitHubu. Vyhledávají se aktualizace pomocí služby Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Tato distribuce je k dispozici pouze z Microsoft Store.</value>
   </data>

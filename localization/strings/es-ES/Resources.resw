@@ -716,6 +716,12 @@ Argumentos:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Comprobando actualizaciones.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Se alcanzó el límite de velocidad de la API de GitHub. Inténtelo de nuevo más tarde.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Se alcanzó el límite de velocidad de la API de GitHub. Buscando actualizaciones con Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Esta distribución solo está disponible desde Microsoft Store.</value>
   </data>

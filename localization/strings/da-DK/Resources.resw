@@ -710,6 +710,12 @@ Argumenter:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Søger efter opdateringer.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Hastighedsgrænsen for GitHub API blev nået. Prøv igen senere.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Hastighedsgrænsen for GitHub API blev nået. Søger efter opdateringer ved hjælp af Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Denne distribution er kun tilgængelig fra Microsoft Store.</value>
   </data>

@@ -717,6 +717,12 @@ Arguments :
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Recherche des mises à jour.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>The GitHub API rate limit was reached. Try again later.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>La limite de débit de l’API GitHub a été atteinte. Recherche de mises à jour à l’aide de Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Cette distribution est disponible uniquement à partir du Microsoft Store.</value>
   </data>

@@ -710,6 +710,12 @@ Argumenter:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Ser etter oppdateringer.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API-hastighetsgrensen er nådd. Prøv på nytt senere.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API-hastighetsgrensen er nådd. Ser etter oppdateringer ved hjelp av Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Denne distribusjonen er bare tilgjengelig fra Microsoft Store.</value>
   </data>
