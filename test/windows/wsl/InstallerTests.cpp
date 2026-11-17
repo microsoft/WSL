@@ -821,7 +821,8 @@ class InstallerTests
 
         const auto runUpgrade = [this](LPCWSTR busy) {
             PrepareForMsiOperation();
-            return RunMsiExec(std::format(L"/qn /norestart /i \"{}\" WSL_TEST_INSTALL_BUSY={} /L*V {}", m_msiPath, busy, GenerateMsiLogPath()));
+            return RunMsiExec(std::format(
+                L"/qn /norestart /i \"{}\" WSL_TEST_INSTALL_BUSY={} /L*V \"{}\"", m_msiPath, busy, GenerateMsiLogPath()));
         };
 
         VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, runUpgrade(L"1"));
