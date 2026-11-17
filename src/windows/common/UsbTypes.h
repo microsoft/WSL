@@ -14,7 +14,8 @@ enum class DeviceState
 {
     Unattached,
     Attached,
-    Unavailable
+    Unavailable,
+    Unsupported
 };
 
 struct PortId

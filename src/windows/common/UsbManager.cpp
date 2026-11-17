@@ -226,11 +226,25 @@ std::vector<ListedDevice> Manager::List(PSID UserSid)
             CATCH_LOG()
         }
 
+        auto state = reserved ? (owner == sid ? DeviceState::Attached : DeviceState::Unavailable) : DeviceState::Unattached;
+        try
+        {
+            if (device.HasUnsupportedClass())
+            {
+                state = DeviceState::Unsupported;
+            }
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            continue;
+        }
+
         result.push_back(
             {inventory.GetPortId(device).ToString(),
              record == m_records.end() || record->Name.empty() ? device.Name : record->Name,
              record == m_records.end() || record->DisplayInstanceId.empty() ? device.DisplayInstanceId : record->DisplayInstanceId,
-             reserved ? (owner == sid ? DeviceState::Attached : DeviceState::Unavailable) : DeviceState::Unattached});
+             state});
     }
     return result;
 }

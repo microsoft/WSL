@@ -194,7 +194,7 @@ class UsbTests
         registry::WriteString(key.get(), nullptr, name.c_str(), L"usb\\ms_comp_vmredir");
         VERIFY_IS_TRUE(uxdRegistry.MappingMatches(identity));
 
-        for (const auto* nonmatching : {L"USB\\MS_COMP_WINUSB", L"USB\\MS_COMP_VMREDIX", L"USB\\OTHER", L"USB\\MS_COMP_VMREDIR_EXTRA"})
+        for (const auto* nonmatching : {L"USB\\MS_COMP_VMREDIX", L"USB\\OTHER", L"USB\\MS_COMP_VMREDIR_EXTRA"})
         {
             registry::WriteString(key.get(), nullptr, name.c_str(), nonmatching);
             VERIFY_IS_FALSE(uxdRegistry.MappingMatches(identity));
@@ -279,9 +279,6 @@ class UsbTests
         device.Status = DN_STARTED;
         device.InterfacePaths = {L"opaque-device-interface"};
         VERIFY_IS_TRUE(device.IsReady());
-        device.HardwareIds = {L"USB\\MS_COMP_WINUSB"};
-        VERIFY_IS_FALSE(device.IsRedirected());
-        VERIFY_IS_FALSE(device.IsReady());
         device.HardwareIds = {L"usb\\ms_comp_vmredir"};
         VERIFY_IS_TRUE(device.IsReady());
         device.Status |= DN_HAS_PROBLEM;
@@ -333,6 +330,22 @@ class UsbTests
                 return wsl::shared::string::IsEqual(hub.InstanceId, device.InstanceId, true);
             }));
         }
+    }
+
+    TEST_METHOD(UnsupportedClassQueriesPropagateErrors)
+    {
+        usb::Device device;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, wil::ResultFromException([&]() { device.HasUnsupportedClass(); }));
+
+        GUID id{};
+        VERIFY_SUCCEEDED(CoCreateGuid(&id));
+        device.InstanceId = L"USB\\WSL_USB_TEST\\" + wsl::shared::string::GuidToString<wchar_t>(id);
+        device.HardwareIds = {L"USB\\MS_COMP_VMREDIR"};
+        device.Service = L"WINUSB";
+        device.Status = DN_STARTED;
+        device.InterfacePaths = {L"opaque-device-interface"};
+        VERIFY_THROWS(device.HasUnsupportedClass(), wil::ResultException);
+        VERIFY_IS_TRUE(device.IsReady());
     }
 };
 

@@ -368,6 +368,44 @@ bool Device::IsReady() const
            WI_IsFlagClear(Status, DN_HAS_PROBLEM) && !InterfacePaths.empty();
 }
 
+bool Device::HasUnsupportedClass() const
+{
+    THROW_HR_IF(E_INVALIDARG, InstanceId.empty());
+
+    auto instanceId = InstanceId;
+    DEVINST node{};
+    ThrowIfConfigurationManagerError(CM_Locate_DevNodeW(&node, instanceId.data(), CM_LOCATE_DEVNODE_NORMAL));
+
+    std::vector<DEVINST> pending{node};
+    while (!pending.empty())
+    {
+        const auto current = pending.back();
+        pending.pop_back();
+
+        const auto compatible = GetDevicePropertyStrings(current, DEVPKEY_Device_CompatibleIds, DEVPROP_TYPE_STRING_LIST);
+        if (std::ranges::any_of(compatible, [](std::wstring_view compatibleId) {
+                const auto deviceClass = compatibleId.substr(0, compatibleId.find(L'&'));
+                return IsEqual(deviceClass, L"USB\\Class_01", true) || IsEqual(deviceClass, L"USB\\Class_0E", true);
+            }))
+        {
+            return true;
+        }
+
+        DEVINST child{};
+        auto result = CM_Get_Child(&child, current, 0);
+        while (result == CR_SUCCESS)
+        {
+            pending.push_back(child);
+            result = CM_Get_Sibling(&child, child, 0);
+        }
+        if (result != CR_NO_SUCH_DEVNODE)
+        {
+            ThrowIfConfigurationManagerError(result);
+        }
+    }
+    return false;
+}
+
 std::optional<std::wstring> Device::ProbeWinUsb() const
 {
     if (!IsReady())

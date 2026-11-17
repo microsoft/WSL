@@ -25,6 +25,7 @@ struct Device
 {
     bool IsRedirected() const;
     bool IsReady() const;
+    bool HasUnsupportedClass() const;
     std::optional<std::wstring> ProbeWinUsb() const;
 
     std::wstring HubInstanceId;

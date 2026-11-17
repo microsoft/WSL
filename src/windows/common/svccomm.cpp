@@ -736,6 +736,7 @@ std::vector<wsl::windows::common::usb::ListedDevice> wsl::windows::common::SvcCo
     static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Unattached) == WslUsbDeviceStateUnattached);
     static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Attached) == WslUsbDeviceStateAttached);
     static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Unavailable) == WslUsbDeviceStateUnavailable);
+    static_assert(static_cast<WslUsbDeviceState>(usb::DeviceState::Unsupported) == WslUsbDeviceStateUnsupported);
 
     ClientExecutionContext context;
     wil::unique_cotaskmem_array_ptr<WSL_USB_DEVICE> devices;

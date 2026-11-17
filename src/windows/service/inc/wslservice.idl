@@ -63,7 +63,8 @@ typedef enum _WslUsbDeviceState
 {
     WslUsbDeviceStateUnattached = 0,
     WslUsbDeviceStateAttached,
-    WslUsbDeviceStateUnavailable
+    WslUsbDeviceStateUnavailable,
+    WslUsbDeviceStateUnsupported
 } WslUsbDeviceState;
 
 cpp_quote("#define LXSS_HANDLE_USE_CONSOLE 0")
