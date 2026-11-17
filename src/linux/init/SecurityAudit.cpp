@@ -31,19 +31,62 @@ void ProcessEvent(void* context, int, void* data, unsigned int size)
             return;
         }
 
-        THROW_ERRNO_IF(EINVAL, !data || size < sizeof(event_begin_s));
+        if (!data)
+        {
+            LOG_ERROR("Discarding security audit event: null data");
+            return;
+        }
+
+        if (size < sizeof(event_begin_s))
+        {
+            LOG_ERROR("Discarding security audit event: size {} is smaller than header size {}", size, sizeof(event_begin_s));
+            return;
+        }
+
         event_begin_s header{};
         memcpy(&header, data, sizeof(header));
-        THROW_ERRNO_IF(EINVAL, header.code_bytes_start != CODE_BYTES || header.version != VERSION || header.size != size);
+        if (header.code_bytes_start != CODE_BYTES)
+        {
+            LOG_ERROR("Discarding security audit event: invalid start marker {:#x}", header.code_bytes_start);
+            return;
+        }
+
+        if (header.version != VERSION)
+        {
+            LOG_ERROR("Discarding security audit event: version {} does not match {}", header.version, VERSION);
+            return;
+        }
+
+        if (header.size != size)
+        {
+            LOG_ERROR("Discarding security audit event: declared size {} does not match received size {}", header.size, size);
+            return;
+        }
+
         if (header.event_type != event_type_exec_process)
         {
             return;
         }
 
-        THROW_ERRNO_IF(EINVAL, size != sizeof(event_exec_process_s));
+        if (size != sizeof(event_exec_process_s))
+        {
+            LOG_ERROR("Discarding security audit exec event: size {} does not match {}", size, sizeof(event_exec_process_s));
+            return;
+        }
+
         event_exec_process_s event{};
         memcpy(&event, data, sizeof(event));
-        THROW_ERRNO_IF(EINVAL, event.end.code_bytes_end != CODE_BYTES || event.base.pid == 0);
+        if (event.end.code_bytes_end != CODE_BYTES)
+        {
+            LOG_ERROR("Discarding security audit exec event: invalid end marker {:#x}", event.end.code_bytes_end);
+            return;
+        }
+
+        if (event.base.pid == 0)
+        {
+            LOG_ERROR("Discarding security audit exec event: PID is zero");
+            return;
+        }
 
         LX_INIT_PROCESS_EXECUTED message{};
         message.Header.MessageType = message.Type;
