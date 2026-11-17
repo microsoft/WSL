@@ -710,6 +710,12 @@ Argumenty:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Sprawdzanie dostępności aktualizacji.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Osiągnięto limit szybkości interfejsu API usługi GitHub. Spróbuj ponownie później.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Osiągnięto limit szybkości interfejsu API usługi GitHub. Sprawdzanie aktualizacji za pomocą usługi Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Ta dystrybucja jest dostępna tylko w sklepie Microsoft Store.</value>
   </data>

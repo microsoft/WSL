@@ -717,6 +717,12 @@ Argumentos:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Verificando se há atualizações.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>O limite de taxa da API do GitHub foi atingido. Tente novamente mais tarde.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>O limite de taxa da API do GitHub foi atingido. Verificando se há atualizações usando o Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Esta distribuição só está disponível no Microsoft Store.</value>
   </data>
