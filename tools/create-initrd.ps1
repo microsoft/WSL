@@ -5,10 +5,9 @@
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory)][string]$InputFile,
-    [Parameter(Mandatory)][string]$OutputFile,
-    [string]$AuditPayloadDirectory,
-    [ValidateSet('x86_64', 'aarch64')][string]$Architecture
+    [Parameter(Mandatory, Position = 0)][string]$InputFile,
+    [Parameter(Mandatory, Position = 1)][string]$OutputFile,
+    [Parameter(Position = 2, ValueFromRemainingArguments)][string[]]$AuditPayloadFiles = @()
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,19 +58,14 @@ $out = [System.IO.File]::Create($OutputFile)
 try
 {
     Write-CpioEntry $out $name $data 0x81ED $mtime  # S_IFREG | 0755
-    if ($AuditPayloadDirectory)
+    if ($AuditPayloadFiles.Count -gt 0)
     {
-        if (-not $Architecture) { throw 'Architecture is required for the audit payload.' }
         Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit`0")) ([byte[]]::new(0)) 0x41ED $mtime
-        $syscalls = if ($Architecture -eq 'aarch64') { 'syscalls_aarch64.conf' } else { 'syscalls.conf' }
-        foreach ($file in @(
-            'ebpf_wrapper_kern_raw_tp_sub4096_btf_rbuff_enriched_fmap.o',
-            'ebpf_wrapper_kern_raw_tp_btf_rbuff_enriched_fmap.o',
-            'ebpf_wrapper_kern_raw_tp_args64_krsi_btf_rbuff_enriched_fmap.o',
-            $syscalls))
+        foreach ($file in $AuditPayloadFiles)
         {
-            $bytes = [IO.File]::ReadAllBytes((Join-Path $AuditPayloadDirectory $file))
-            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/$file`0")) $bytes 0x8124 $mtime
+            $bytes = [IO.File]::ReadAllBytes($file)
+            $name = [IO.Path]::GetFileName($file)
+            Write-CpioEntry $out ([Text.Encoding]::ASCII.GetBytes("wsl-security-audit/$name`0")) $bytes 0x8124 $mtime  # S_IFREG | 0444
         }
     }
     $trailer = [System.Text.Encoding]::ASCII.GetBytes("TRAILER!!!`0")

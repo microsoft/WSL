@@ -2,7 +2,8 @@
 
 #include "precomp.h"
 #include "Common.h"
-#include "SubProcess.h"
+#include "PluginTests.h"
+#include "SecurityAudit.h"
 #include "WslSecurity.h"
 #include "registry.hpp"
 #include "wslsecurityaudit.h"
@@ -92,7 +93,7 @@ namespace {
 
     void VerifyRenderedEvent(const AuditEvent& event, uint32_t pid)
     {
-        VERIFY_ARE_EQUAL(size_t{3}, event.strings.size());
+        VERIFY_ARE_EQUAL(size_t{4}, event.strings.size());
         VERIFY_ARE_EQUAL(std::to_wstring(pid), event.strings[0]);
         VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageSecurityAuditProcessExecution(), event.strings[1]);
         const auto details = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(event.strings[2]));
@@ -107,7 +108,8 @@ namespace {
         DWORD_PTR arguments[] = {
             reinterpret_cast<DWORD_PTR>(event.strings[0].c_str()),
             reinterpret_cast<DWORD_PTR>(event.strings[1].c_str()),
-            reinterpret_cast<DWORD_PTR>(event.strings[2].c_str())};
+            reinterpret_cast<DWORD_PTR>(event.strings[2].c_str()),
+            reinterpret_cast<DWORD_PTR>(event.strings[3].c_str())};
         wil::unique_hlocal_string rendered;
         THROW_LAST_ERROR_IF(
             FormatMessageW(
@@ -118,59 +120,7 @@ namespace {
                 reinterpret_cast<PWSTR>(rendered.put()),
                 0,
                 reinterpret_cast<va_list*>(arguments)) == 0);
-        VERIFY_ARE_EQUAL(event.strings[1] + L"\r\n" + event.strings[2] + L"\r\n", std::wstring(rendered.get()));
-    }
-
-    std::pair<uint32_t, bool> ExecuteInVm(HANDLE input, HANDLE output, HANDLE process)
-    {
-        GUID id{};
-        THROW_IF_FAILED(CoCreateGuid(&id));
-        const auto marker = std::format("AUDIT_{:08x}_{:04x}_{:04x}", id.Data1, id.Data2, id.Data3);
-        // The debug shell runs in the VM's root PID namespace, unlike distribution shells.
-        const auto script = std::format(
-            "\nsh -c 'printf \"\\n{}_PID=%s\\n\" \"$$\"; exec /bin/true'\n"
-            "if pgrep -f '^wsl-audit-collector ' >/dev/null; then printf '\\n%s_RUNNING\\n' '{}'; fi\n"
-            "printf '\\n%s_DONE\\n' '{}'\n",
-            marker,
-            marker,
-            marker);
-        DWORD written{};
-        THROW_IF_WIN32_BOOL_FALSE(WriteFile(input, script.data(), static_cast<DWORD>(script.size()), &written, nullptr));
-        VERIFY_ARE_EQUAL(script.size(), static_cast<size_t>(written));
-
-        std::string result;
-        const auto deadline = std::chrono::steady_clock::now() + 15s;
-        while (result.find(marker + "_DONE") == std::string::npos && std::chrono::steady_clock::now() < deadline)
-        {
-            DWORD available{};
-            if (!PeekNamedPipe(output, nullptr, 0, nullptr, &available, nullptr))
-            {
-                const auto error = GetLastError();
-                LogError("Debug shell output before pipe failure: %hs", result.c_str());
-                THROW_WIN32(error);
-            }
-            if (available != 0)
-            {
-                char buffer[4096];
-                DWORD bytes{};
-                THROW_IF_WIN32_BOOL_FALSE(ReadFile(output, buffer, std::min(available, static_cast<DWORD>(sizeof(buffer))), &bytes, nullptr));
-                result.append(buffer, bytes);
-            }
-            else
-            {
-                THROW_HR_IF(E_UNEXPECTED, WaitForSingleObject(process, 0) != WAIT_TIMEOUT);
-                std::this_thread::sleep_for(20ms);
-            }
-        }
-        std::smatch match;
-        if (result.find(marker + "_DONE") == std::string::npos || !std::regex_search(result, match, std::regex(marker + "_PID=([0-9]+)")))
-        {
-            LogError("Incomplete VM audit probe output: %hs", result.c_str());
-            VERIFY_FAIL(L"VM audit probe did not complete");
-        }
-        const auto pid = std::stoull(match[1].str());
-        VERIFY_IS_TRUE(pid != 0 && pid <= UINT32_MAX);
-        return {static_cast<uint32_t>(pid), result.find(marker + "_RUNNING") != std::string::npos};
+        VERIFY_ARE_EQUAL(event.strings[1] + L"\r\n\r\n" + event.strings[3] + L"\r\n", std::wstring(rendered.get()));
     }
 
     void VerifyAuditPolicy(bool processCreation, bool applicationGenerated)
@@ -180,14 +130,14 @@ namespace {
         wil::unique_handle token;
         THROW_IF_WIN32_BOOL_FALSE(DuplicateTokenEx(
             processToken.get(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES | TOKEN_IMPERSONATE, nullptr, SecurityImpersonation, TokenImpersonation, &token));
-        SetLastError(ERROR_SUCCESS);
         wsl::windows::common::security::EnableTokenPrivilege(token.get(), SE_SECURITY_NAME);
+        // A successful BOOL result does not guarantee that the privilege was assigned.
         THROW_IF_WIN32_ERROR(GetLastError());
         auto impersonation = wil::impersonate_token(token.get());
 
         GUID categories[] = {
-            {0x0cce922b, 0x69ae, 0x11d9, {0xbe, 0xd3, 0x50, 0x50, 0x54, 0x50, 0x30, 0x30}},
-            {0x0cce9222, 0x69ae, 0x11d9, {0xbe, 0xd3, 0x50, 0x50, 0x54, 0x50, 0x30, 0x30}}};
+            wsl::windows::common::securityaudit::c_processCreationAuditSubcategory,
+            wsl::windows::common::securityaudit::c_applicationGeneratedAuditSubcategory};
         unique_audit_policy original;
         THROW_LAST_ERROR_IF(!AuditQuerySystemPolicy(categories, ARRAYSIZE(categories), &original));
         for (size_t index = 0; index < ARRAYSIZE(categories); ++index)
@@ -198,56 +148,80 @@ namespace {
                 original.get()[index].AuditingInformation = POLICY_AUDIT_EVENT_NONE;
             }
         }
+        StopWslService();
+        auto restart = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { RestartWslService(); });
         auto restore = wil::scope_exit_log(
             WI_DIAGNOSTICS_INFO, [&] { VERIFY_IS_TRUE(AuditSetSystemPolicy(original.get(), ARRAYSIZE(categories)) != FALSE); });
-        auto shutdown = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { WslShutdown(); });
-        WslShutdown();
 
         AUDIT_POLICY_INFORMATION policy[] = {original.get()[0], original.get()[1]};
         policy[0].AuditingInformation = processCreation ? POLICY_AUDIT_EVENT_SUCCESS : POLICY_AUDIT_EVENT_NONE;
         policy[1].AuditingInformation = applicationGenerated ? POLICY_AUDIT_EVENT_SUCCESS : POLICY_AUDIT_EVENT_NONE;
         THROW_LAST_ERROR_IF(!AuditSetSystemPolicy(policy, ARRAYSIZE(policy)));
 
-        const auto after = LatestSecurityRecord();
-        WslKeepAlive keepAlive;
-        auto [input, write] = CreateSubprocessPipe(true, false);
-        auto [read, output] = CreateSubprocessPipe(false, true);
-        wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
-        THROW_LAST_ERROR_IF(!job);
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
-        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        THROW_IF_WIN32_BOOL_FALSE(SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits)));
-        wsl::windows::common::SubProcess shell(nullptr, LxssGenerateWslCommandLine(L"--debug-shell").c_str());
-        shell.SetStdHandles(input.get(), output.get(), output.get());
-        shell.SetJobObject(job.get());
-        const auto process = shell.Start();
-        auto stop = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
-            job.reset();
-            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(process.get(), 5000));
-        });
-        input.reset();
-        output.reset();
-
         const bool enabled = processCreation && applicationGenerated;
-        const auto deadline = std::chrono::steady_clock::now() + (enabled ? 30s : 3s);
-        do
+        const size_t probeCount = enabled ? 120 : 12;
+        const auto command = std::format(
+            L"set -eu\n"
+            L"i=0\n"
+            L"while [ \"$i\" -lt {} ]; do\n"
+            L"  sh -c 'printf \"AUDIT_PID=%s\\n\" \"$$\"; exec /bin/true'\n"
+            L"  if pgrep -f '^wsl-audit-collector ' >/dev/null; then printf 'AUDIT_COLLECTING\\n'; fi\n"
+            L"  i=$((i + 1))\n"
+            L"  sleep 0.25\n"
+            L"done\n"
+            L"printf 'AUDIT_DONE\\n'\n",
+            probeCount);
+
+        GUID id{};
+        THROW_IF_FAILED(CoCreateGuid(&id));
+        const auto logFile =
+            std::filesystem::temp_directory_path() / std::format(L"wsl-audit-{}.log", wsl::shared::string::GuidToString<wchar_t>(id));
+        auto deleteLog = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { std::filesystem::remove(logFile); });
+        const auto plugin = std::filesystem::path(wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get()).parent_path() /
+                            L"testplugin.dll";
+        VERIFY_IS_TRUE(std::filesystem::exists(plugin));
+
+        RegistryKeyChange pluginRegistration(
+            HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Lxss\\Plugins", L"TestPlugin", plugin.wstring());
+        RegistryKeyChange testType(HKEY_LOCAL_MACHINE, c_configKey, c_testType, static_cast<DWORD>(PluginTestType::RunVmCommand));
+        RegistryKeyChange pluginLog(HKEY_LOCAL_MACHINE, c_configKey, c_logFile, logFile.wstring());
+        RegistryKeyChange vmCommand(HKEY_LOCAL_MACHINE, c_configKey, c_vmCommand, command);
+        auto stop = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { StopWslService(); });
+
+        const auto after = LatestSecurityRecord();
+        RestartWslService();
         {
-            const auto [pid, collecting] = ExecuteInVm(write.get(), read.get(), process.get());
-            LogInfo("Audit probe: VM pid=%u, collector=%d", pid, collecting);
-            if (!enabled)
-            {
-                VERIFY_IS_FALSE(collecting);
-            }
-            std::this_thread::sleep_for(250ms);
+            // The plugin probes the root PID namespace without occupying the watchdog's debug console.
+            WslKeepAlive keepAlive;
+        }
+        StopWslService();
+        stop.release();
+
+        const auto output = wsl::shared::string::ReadFile<char>(logFile.c_str());
+        LogInfo("Audit plugin output: %hs", output.c_str());
+        VERIFY_IS_TRUE(output.find("AUDIT_DONE") != std::string::npos);
+        VERIFY_ARE_EQUAL(enabled, output.find("AUDIT_COLLECTING") != std::string::npos);
+
+        const std::regex pattern("AUDIT_PID=([0-9]+)");
+        std::vector<uint32_t> pids;
+        for (auto match = std::sregex_iterator(output.begin(), output.end(), pattern); match != std::sregex_iterator(); ++match)
+        {
+            const auto pid = std::stoull((*match)[1].str());
+            VERIFY_IS_TRUE(pid != 0 && pid <= UINT32_MAX);
+            pids.push_back(static_cast<uint32_t>(pid));
+        }
+        VERIFY_ARE_EQUAL(probeCount, pids.size());
+
+        for (const auto pid : pids)
+        {
             const auto event = FindAuditEvent(after, pid);
             if (enabled && event)
             {
-                VERIFY_IS_TRUE(collecting);
                 VerifyRenderedEvent(*event, pid);
                 return;
             }
             VERIFY_IS_FALSE(!enabled && event.has_value());
-        } while (std::chrono::steady_clock::now() < deadline);
+        }
         VERIFY_IS_FALSE(enabled, L"No matching WSL process execution event was written to the Security log");
     }
 } // namespace

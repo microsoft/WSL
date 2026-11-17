@@ -3428,30 +3428,28 @@ try
         Config.EnableInboxGpuLibs = ConfigMessage->EnableInboxGpuLibs;
         Config.EnableGpuSupport = ConfigMessage->MountGpuShares;
         Config.EnableGuiApps = ConfigMessage->EnableGuiApps;
-        return 0;
-    }
-    case LxMiniInitMessageStartSecurityAudit:
-    {
-        try
+
+        if (ConfigMessage->EnableSecurityAudit)
         {
-            THROW_ERRNO_IF(EINVAL, Buffer.size() != sizeof(LX_MINI_INIT_START_SECURITY_AUDIT));
-            const auto* message = gslhelpers::try_get_struct<LX_MINI_INIT_START_SECURITY_AUDIT>(Buffer);
-            THROW_ERRNO_IF(EINVAL, !message || message->IncludeCommandLine > 1);
-            auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true);
+            auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, false);
             THROW_LAST_ERROR_IF(!socket);
-            StartWorkerProcess(
-                "wsl-audit",
-                [fd = socket.get(), includeCommandLine = message->IncludeCommandLine] {
-                    THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
-                    THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
-                    THROW_LAST_ERROR_IF(fcntl(fd, F_SETFD, 0) < 0);
-                    const auto argument = std::to_string(fd);
-                    execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), includeCommandLine ? "1" : "0", nullptr);
-                    THROW_LAST_ERROR();
-                },
-                {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket.get()});
+
+            try
+            {
+                StartWorkerProcess(
+                    "wsl-audit",
+                    [fd = socket.get(), includeCommandLine = ConfigMessage->IncludeAuditCommandLine] {
+                        THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
+                        THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
+                        const auto argument = std::to_string(fd);
+                        execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), includeCommandLine ? "1" : "0", nullptr);
+                        THROW_LAST_ERROR();
+                    },
+                    {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket.get()});
+            }
+            CATCH_LOG();
         }
-        CATCH_LOG();
+
         return 0;
     }
 
