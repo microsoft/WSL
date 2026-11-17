@@ -1274,6 +1274,11 @@ class WSLCCLIExecutionUnitTests
                 dataMap.Add<Data::Json>(std::vector<std::wstring>{});
                 handled = true;
             }
+            else if (dataType == Data::ComposeProject)
+            {
+                dataMap.Add<Data::ComposeProject>(wsl::windows::wslc::models::ComposeProject{std::string{"project"}});
+                handled = true;
+            }
 
             if (!handled)
             {
@@ -1293,6 +1298,9 @@ class WSLCCLIExecutionUnitTests
 
         auto& confirmMessage = dataMap.Get<Data::ConfirmMessage>();
         VERIFY_ARE_EQUAL(std::wstring{L"message"}, confirmMessage);
+
+        const auto& composeProject = dataMap.Get<Data::ComposeProject>();
+        VERIFY_ARE_EQUAL(std::string{"project"}, std::get<std::string>(composeProject.Value));
 
         // Other more complex EnumVariantMap tests are in the Args unit tests.
         // This one will just verify all the data types in the Data Map work as expected.
