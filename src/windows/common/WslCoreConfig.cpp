@@ -23,10 +23,43 @@ constexpr auto c_natGatewayAddress = L"NatGatewayIpAddress";
 constexpr auto c_natNetwork = L"NatNetwork";
 constexpr auto c_natIpAddress = L"NatIpAddress";
 
+namespace {
+void ParseConfigurationKeys(std::vector<ConfigKey>& keys, LPCWSTR path, int flags = CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES)
+{
+    wil::unique_file file;
+    if (path != nullptr)
+    {
+        file.reset(_wfopen(path, L"rt,ccs=UTF-8"));
+        if (!file)
+        {
+            const auto error = _doserrno;
+            LOG_WIN32_MSG(error, "opening config file failed");
+            if (error != ERROR_FILE_NOT_FOUND)
+            {
+                EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToOpenConfigFile(
+                    path, wsl::windows::common::wslutil::GetErrorString(HRESULT_FROM_WIN32(error))));
+            }
+        }
+    }
+    WI_VERIFY(::ParseConfigFile(keys, file.get(), flags, path) == 0);
+}
+} // namespace
+
 wsl::core::Config::Config(_In_opt_ LPCWSTR Path, _In_opt_ HANDLE UserToken)
 {
     ParseConfigFile(Path, UserToken);
     Initialize(UserToken);
+}
+
+bool wsl::core::Config::ReadSecurityAuditSetting(_In_ HANDLE UserToken)
+{
+    windows::common::ExecutionContext context(windows::common::ParseConfig);
+    auto impersonation = wil::impersonate_token(UserToken);
+    const auto path = windows::common::helpers::GetWslConfigPath(UserToken);
+    bool enabled = c_defaultSecurityAudit;
+    std::vector<ConfigKey> keys{ConfigKey(ConfigSetting::SecurityAudit, enabled)};
+    ParseConfigurationKeys(keys, path.c_str(), CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES | CFG_IGNORE_UNKNOWN_KEYS);
+    return enabled;
 }
 
 void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt_ HANDLE UserToken)
@@ -108,6 +141,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::MaxCrashDumpCount, MaxCrashDumpCount),
         ConfigKey(ConfigSetting::DistributionInstallPath, DefaultDistributionLocation),
         ConfigKey(ConfigSetting::InstanceIdleTimeout, InstanceIdleTimeout),
+        ConfigKey(ConfigSetting::SecurityAudit, EnableSecurityAudit),
         ConfigKey(ConfigSetting::LoadDefaultKernelModules, LoadDefaultKernelModules, &LoadKernelModulesPresence),
         ConfigKey(ConfigSetting::LoadKernelModules, userKernelModules, &LoadKernelModulesPresence),
         ConfigKey(ConfigSetting::IsolateDistroCgroup, IsolateDistroCgroup),
@@ -130,24 +164,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
         ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
 
-    wil::unique_file ConfigFile;
-    if (ConfigFilePath != nullptr)
-    {
-        ConfigFile.reset(_wfopen(ConfigFilePath, L"rt,ccs=UTF-8"));
-        if (!ConfigFile)
-        {
-            const auto error = _doserrno;
-            LOG_WIN32_MSG(error, "opening config file failed");
-            if (error != ERROR_FILE_NOT_FOUND)
-            {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageFailedToOpenConfigFile(
-                    ConfigFilePath, wsl::windows::common::wslutil::GetErrorString(HRESULT_FROM_WIN32(error))));
-            }
-        }
-    }
-
-    // Parse the configuration keys.
-    WI_VERIFY(::ParseConfigFile(keys, ConfigFile.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), ConfigFilePath) == 0);
+    ParseConfigurationKeys(keys, ConfigFilePath);
 
     // Hyper-V firewall must always be configured for Mirrored Mode.
     // For NAT mode, we use the experimental config to determine if Hyper-V firewall should be enabled

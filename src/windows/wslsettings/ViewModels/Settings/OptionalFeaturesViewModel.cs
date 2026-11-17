@@ -13,6 +13,7 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
     private IWslConfigSetting? _gUIApplications;
     private IWslConfigSetting? _nestedVirtualization;
     private IWslConfigSetting? _safeMode;
+    private IWslConfigSetting? _securityAudit;
     private IWslConfigSetting? _sparseVHD;
     private IWslConfigSetting? _vMIdleTimeout;
     private int _defaultVMIdleTimeout;
@@ -35,6 +36,7 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
         _gUIApplications = wslConfigService.GetWslConfigSetting(WslConfigEntry.GUIApplicationsEnabled);
         _nestedVirtualization = wslConfigService.GetWslConfigSetting(WslConfigEntry.NestedVirtualizationEnabled);
         _safeMode = wslConfigService.GetWslConfigSetting(WslConfigEntry.SafeModeEnabled);
+        _securityAudit = wslConfigService.GetWslConfigSetting(WslConfigEntry.SecurityAuditEnabled);
         _sparseVHD = wslConfigService.GetWslConfigSetting(WslConfigEntry.SparseVHDEnabled);
         _vMIdleTimeout = wslConfigService.GetWslConfigSetting(WslConfigEntry.VMIdleTimeout);
         _instanceIdleTimeout = wslConfigService.GetWslConfigSetting(WslConfigEntry.InstanceIdleTimeout);
@@ -73,6 +75,12 @@ public partial class OptionalFeaturesViewModel : WslConfigSettingViewModel
     {
         get { return _safeMode!.BoolValue; }
         set { Set(ref _safeMode!, value); }
+    }
+
+    public bool IsOnSecurityAudit
+    {
+        get { return _securityAudit!.BoolValue; }
+        set { Set(ref _securityAudit!, value); }
     }
 
     public bool IsOnSparseVHD

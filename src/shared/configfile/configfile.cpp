@@ -208,12 +208,15 @@ std::wstring ConfigKey::GetValue() const
 }
 
 // Updates the configuration with the given value.
-static void SetConfig(std::vector<ConfigKey>& keys, const char* keyName, const char* value, bool debug, const wchar_t* filePath, unsigned long fileLine)
+static void SetConfig(std::vector<ConfigKey>& keys, const char* keyName, const char* value, int flags, const wchar_t* filePath, unsigned long fileLine)
 {
     const auto key = std::find_if(keys.begin(), keys.end(), [keyName](const auto& e) { return e.Matches(keyName); });
     if (key == keys.end())
     {
-        EMIT_USER_WARNING(Localization::MessageConfigUnknownKey(keyName, filePath, fileLine));
+        if (!(flags & CFG_IGNORE_UNKNOWN_KEYS))
+        {
+            EMIT_USER_WARNING(Localization::MessageConfigUnknownKey(keyName, filePath, fileLine));
+        }
         return;
     }
 
@@ -797,7 +800,7 @@ ValueDone:
         // Trim any trailing space.
         value.resize(trimmedLength);
         const auto valueUtf8 = wsl::shared::string::WideToMultiByte(value);
-        SetConfig(keys, key.c_str(), valueUtf8.c_str(), flags & CFG_DEBUG, filePath, line);
+        SetConfig(keys, key.c_str(), valueUtf8.c_str(), flags, filePath, line);
     }
 
     goto NewLine;
