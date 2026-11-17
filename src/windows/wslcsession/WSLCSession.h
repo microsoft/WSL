@@ -27,10 +27,12 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
 #include "IORelay.h"
+#include "LxssHttpProxy.h"
 #include "RuntimeClass.h"
 #include <atomic>
 #include <ctxtcall.h>
 #include <list>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 
@@ -471,6 +473,7 @@ private:
     std::optional<std::string> m_settingsHostLoopback;
     std::vector<std::string> m_proxyEnvironmentOverrides;
     std::vector<LPCSTR> m_proxyEnvironmentOverrideValues;
+    std::unique_ptr<HttpProxyStateTracker> m_httpProxyStateTracker;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};

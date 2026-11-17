@@ -26,7 +26,6 @@ Abstract:
 #include "APICompat.h"
 #include "WSLCContainerEntry.h"
 #include "wslc/WSLCProxy.h"
-#include "LxssHttpProxy.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -445,6 +444,13 @@ try
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
     PersistSettings(*Settings, tokenInfo->User.Sid);
 
+    LOG_IF_FAILED(wil::ResultFromException([&] {
+        THROW_IF_FAILED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+        wil::unique_handle userToken;
+        THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        m_httpProxyStateTracker = std::make_unique<HttpProxyStateTracker>(1000, userToken.get());
+    }));
+
     WSL_LOG(
         "SessionInitialized",
         TraceLoggingValue(m_id, "SessionId"),
@@ -616,11 +622,12 @@ std::vector<std::string> WSLCSession::GetProxyEnvironment() const
 {
     std::vector<std::string> windowsProxyEnvironment;
     LOG_IF_FAILED(wil::ResultFromException([&] {
-        THROW_IF_FAILED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
-        wil::unique_handle userToken;
-        THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
-        HttpProxyStateTracker tracker{1000, userToken.get()};
-        if (auto proxy = tracker.WaitForInitialProxySettings())
+        if (!m_httpProxyStateTracker)
+        {
+            return;
+        }
+
+        if (auto proxy = m_httpProxyStateTracker->WaitForInitialProxySettings())
         {
             for (auto* url : {&proxy->Proxy, &proxy->SecureProxy})
             {
