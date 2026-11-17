@@ -2664,13 +2664,17 @@ ScopedWindowsProxySettings::ScopedWindowsProxySettings()
 {
     INTERNET_PER_CONN_OPTIONW options[]{
         {INTERNET_PER_CONN_FLAGS_UI}, {INTERNET_PER_CONN_PROXY_SERVER}, {INTERNET_PER_CONN_PROXY_BYPASS}, {INTERNET_PER_CONN_AUTOCONFIG_URL}};
+
     INTERNET_PER_CONN_OPTION_LISTW list{sizeof(list), nullptr, ARRAYSIZE(options), 0, options};
     DWORD size = sizeof(list);
+
     const auto result =
         InternetQueryOptionW(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, &size) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+
     m_proxy.reset(options[1].Value.pszValue);
     m_bypasses.reset(options[2].Value.pszValue);
     m_autoconfigUrl.reset(options[3].Value.pszValue);
+
     THROW_IF_FAILED(result);
     m_flags = options[0].Value.dwValue;
 }
@@ -2682,7 +2686,9 @@ ScopedWindowsProxySettings::~ScopedWindowsProxySettings()
         {INTERNET_PER_CONN_PROXY_SERVER, {.pszValue = static_cast<PWSTR>(m_proxy.get())}},
         {INTERNET_PER_CONN_PROXY_BYPASS, {.pszValue = static_cast<PWSTR>(m_bypasses.get())}},
         {INTERNET_PER_CONN_AUTOCONFIG_URL, {.pszValue = static_cast<PWSTR>(m_autoconfigUrl.get())}}};
+
     INTERNET_PER_CONN_OPTION_LISTW list{sizeof(list), nullptr, ARRAYSIZE(options), 0, options};
+
     LOG_IF_WIN32_BOOL_FALSE(InternetSetOptionW(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, sizeof(list)));
     LOG_IF_WIN32_BOOL_FALSE(InternetSetOptionW(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0));
     LOG_IF_WIN32_BOOL_FALSE(InternetSetOptionW(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0));
