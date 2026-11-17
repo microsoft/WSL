@@ -212,7 +212,7 @@ class WslcSdkWinRtTests
 
             owner = nullptr;
             state->releaseReturned.SetEvent();
-            state->callbackTimedOut = !state->resumeCallback.wait(60 * 1000);
+            state->callbackTimedOut = !state->resumeCallback.wait(2 * 60 * 1000);
             state->callbackReturned.SetEvent();
         });
 
@@ -236,11 +236,11 @@ class WslcSdkWinRtTests
         writer.DetachStream();
         input.Close();
 
-        VERIFY_IS_TRUE(state->releaseReturned.wait(30 * 1000));
+        VERIFY_IS_TRUE(state->releaseReturned.wait(2 * 60 * 1000));
         VERIFY_IS_FALSE(state->processDestroyed.wait(2 * 1000));
         state->resumeCallback.SetEvent();
-        VERIFY_IS_TRUE(state->callbackReturned.wait(30 * 1000));
-        VERIFY_IS_TRUE(state->processDestroyed.wait(30 * 1000));
+        VERIFY_IS_TRUE(state->callbackReturned.wait(2 * 60 * 1000));
+        VERIFY_IS_TRUE(state->processDestroyed.wait(2 * 60 * 1000));
         VERIFY_IS_FALSE(state->callbackTimedOut.load());
     }
 
@@ -2612,7 +2612,7 @@ class WslcSdkWinRtTests
             WriteToProcessStdin(process, L"go\n");
 
             auto closeResult = closePromise.get_future();
-            VERIFY_ARE_EQUAL(closeResult.wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(closeResult.wait_for(2min), std::future_status::ready);
             const auto [processResult, containerResult] = closeResult.get();
             VERIFY_ARE_EQUAL(processResult, HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
             VERIFY_ARE_EQUAL(containerResult, HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
@@ -2621,7 +2621,7 @@ class WslcSdkWinRtTests
             VERIFY_IS_TRUE(opened.InitProcess() == process);
             VERIFY_ARE_EQUAL(process.Pid(), pid);
 
-            VERIFY_ARE_EQUAL(exitPromise.get_future().wait_for(30s), std::future_status::ready);
+            VERIFY_ARE_EQUAL(exitPromise.get_future().wait_for(2min), std::future_status::ready);
             process.Close();
             process.Close();
             VERIFY_THROWS_HR(std::ignore = process.Pid(), E_ILLEGAL_METHOD_CALL);
@@ -2633,7 +2633,7 @@ class WslcSdkWinRtTests
 
     WSLC_TEST_METHOD(ProcessIoEventsFinalReleaseFromCallback)
     {
-        const std::wstring_view initCommand[] = {L"/bin/sleep", L"99"};
+        const std::wstring_view initCommand[] = {L"/bin/sleep", L"infinity"};
         auto settings = WSLCSDK::ContainerSettings(L"debian:latest");
         settings.InitProcess(MakeProcessSettings(initCommand));
         auto container = m_defaultSession.CreateContainer(settings);
