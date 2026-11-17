@@ -313,6 +313,11 @@ try
             try
             {
                 wsl::windows::common::wslutil::SetThreadDescription(L"Port relay");
+                constexpr DWORD c_noDelay = 1;
+                THROW_LAST_ERROR_IF(
+                    setsockopt(InetSocket.get(), IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&c_noDelay), sizeof(c_noDelay)) ==
+                    SOCKET_ERROR);
+
                 const auto HvSocket = wsl::windows::common::hvsocket::Connect(VmId, HvSocketPort);
                 LX_INIT_START_SOCKET_RELAY Message{};
                 Message.Header.MessageType = LxInitMessageStartSocketRelay;
@@ -390,6 +395,10 @@ struct PortRelay
 
     static void RunRelay(SOCKET WindowsSocket, const GUID& VmId, uint32_t LinuxPort, uint32_t RelayPort, uint32_t Family)
     {
+        constexpr DWORD c_noDelay = 1;
+        THROW_LAST_ERROR_IF(
+            setsockopt(WindowsSocket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&c_noDelay), sizeof(c_noDelay)) == SOCKET_ERROR);
+
         wsl::shared::SocketChannel channel(wsl::windows::common::hvsocket::Connect(VmId, RelayPort), "SocketRelay");
 
         WI_VERIFY(Family == AF_INET || Family == AF_INET6);
