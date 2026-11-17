@@ -189,8 +189,8 @@ void ParseArgumentsStateMachine::AddValue(ArgType type, std::wstring value)
 
 // Parse rules:
 //  1. Token starting with a single '-' is an alias (1-2 chars):
-//     a. Value: '-a=VALUE' / '-ab=VALUE' / '-a VALUE' / '-ab VALUE'
-//     b. Flag:  trailing chars are additional flags; fails if any is non-flag.
+//     a. Value: '-aVALUE' / '-a=VALUE' / '-a VALUE', also ending a flag chain ('-xaVALUE' / '-xa=VALUE' / '-xa VALUE').
+//     b. Flag:  trailing chars are additional flags; fails if any is unknown.
 //  2. Token starting with '--' is the full name: '--arg=VALUE' or '--arg VALUE'.
 //  3. A bare '-' is positional when a positional is available.
 //  4. A bare '--' ends option parsing; every later token is positional or forwarded.
@@ -402,28 +402,30 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
         return m_anchorPositional.has_value() ? ArgumentException(message) : ArgumentException::CreateUnknownOption(message, currArg);
     }
 
+    // A value alias consumes the rest of the token as its value: '-aVALUE' or '-a=VALUE'.
+    // With nothing left in the token, the value is the next argument.
+    // '=' is only a separator when followed by a value, so '-a=' yields the value '='.
+    auto processValueAlias = [this, &currArg](const Argument& arg, size_t valuePos) -> State {
+        if (valuePos >= currArg.length())
+        {
+            return {arg.Type(), currArg};
+        }
+
+        if (currArg[valuePos] == WSLC_CLI_ARG_SPLIT_CHAR && valuePos + 1 < currArg.length())
+        {
+            ++valuePos;
+        }
+
+        ProcessAdjoinedValue(arg.Type(), currArg.substr(valuePos));
+        return {};
+    };
+
     // Position after the first alias
     size_t currentPos = 1 + aliasLength;
 
-    // Check if this argument expects a value
     if (firstArg->Kind() == Kind::Value)
     {
-        // Kind::Value is only allowed if it's the last flag (no more characters after it, or '=' follows)
-        if (currentPos >= currArg.length())
-        {
-            // No more characters - value should be in next argument
-            return {firstArg->Type(), currArg};
-        }
-
-        if (currArg[currentPos] != WSLC_CLI_ARG_SPLIT_CHAR)
-        {
-            // There are more characters but it's not '=' - this is invalid
-            return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *firstArg);
-        }
-
-        // Value is adjoined after '='
-        ProcessAdjoinedValue(firstArg->Type(), currArg.substr(currentPos + 1));
-        return {};
+        return processValueAlias(*firstArg, currentPos);
     }
 
     // Boolean flag - check for adjoined boolean value (e.g., -a=true or -a=false).
@@ -450,22 +452,7 @@ ParseArgumentsStateMachine::State ParseArgumentsStateMachine::ProcessAliasArgume
 
         if (nextArg->Kind() == Kind::Value)
         {
-            // Kind::Value is only allowed if it's the last flag
-            if (nextPos >= currArg.length())
-            {
-                // No more characters - value should be in next argument
-                return {nextArg->Type(), currArg};
-            }
-
-            if (currArg[nextPos] != WSLC_CLI_ARG_SPLIT_CHAR)
-            {
-                // There are more characters but it's not '=' - this is invalid
-                return ArgumentException(Localization::WSLCCLI_ValueMustBeLastInAliasChainError(currArg), *nextArg);
-            }
-
-            // Value is adjoined after '='
-            ProcessAdjoinedValue(nextArg->Type(), currArg.substr(nextPos + 1));
-            return {};
+            return processValueAlias(*nextArg, nextPos);
         }
 
         // Boolean flag in chain — check for adjoined boolean value.
