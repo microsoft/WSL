@@ -58,17 +58,17 @@ void Process::ApplyCallbacksToSettings()
 
 void Process::StartWaitingForExit()
 {
+    // Event mode receives exit notifications through the native callback.
+    if (m_outputMode == ProcessOutputMode::Event)
+    {
+        return;
+    }
+
     m_waitForExitAction = StartWaitingForExitAsync();
 }
 
 winrt::Windows::Foundation::IAsyncAction Process::StartWaitingForExitAsync()
 {
-    // Event mode uses the exit callback set in ApplyCallbacksToSettings; no need to wait here.
-    if (m_outputMode == ProcessOutputMode::Event)
-    {
-        co_return;
-    }
-
     wil::unique_handle exitEventHandle;
     winrt::check_hresult(WslcGetProcessExitEvent(ToHandle(), exitEventHandle.put()));
 
@@ -279,17 +279,39 @@ void Process::Close()
     if (m_waitForExitAction)
     {
         m_waitForExitAction.Cancel();
-        m_waitForExitAction = nullptr;
     }
 
-    // Methods called after Close() will fail due to EnsureStarted().
-    m_process.reset();
+    // EnsureStarted() rejects native operations after a successful release clears the process handle.
+    if (m_process)
+    {
+        winrt::check_hresult(WslcReleaseProcess(m_process.get()));
+        std::ignore = m_process.release();
+    }
+
+    m_waitForExitAction = nullptr;
 }
 
-void Process::final_release(std::unique_ptr<Process> self)
+winrt::fire_and_forget Process::final_release(std::unique_ptr<Process> self) noexcept
 {
-    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
+    // Clean up when the last reference is released, including clients that omit Close().
+    try
+    {
+        self->Close();
+        co_return;
+    }
+    catch (winrt::hresult_error const& error)
+    {
+        if (error.code() != HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE))
+        {
+            throw;
+        }
+    }
+
+    // Defer cleanup to a worker that can wait for the IO callback to return.
+    co_await winrt::resume_background();
+    auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
     self->Close();
+    self.reset();
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

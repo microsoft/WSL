@@ -22,9 +22,11 @@ Abstract:
 #include "wslpolicies.h"
 #include "WSLCE2EHelpers.h"
 
-#include "winrt/Session.h"
+#include "winrt/Container.h"
 #include "winrt/Helpers.h"
+#include "winrt/Process.h"
 #include "winrt/ProcessCrashInformation.h"
+#include "winrt/Session.h"
 
 #include <ctxtcall.h>
 #include <winrt/Microsoft.WSL.Containers.h>
@@ -125,6 +127,122 @@ class WslcSdkWinRtTests
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    enum class ProcessCallbackKind
+    {
+        Output,
+        Error,
+        Exit,
+    };
+
+    static winrt::event_token AddProcessCallback(WSLCSDK::Process const& process, ProcessCallbackKind kind, std::function<void()> handler)
+    {
+        switch (kind)
+        {
+        case ProcessCallbackKind::Output:
+            return process.OutputReceived([handler = std::move(handler)](winrt::array_view<const uint8_t>) { handler(); });
+        case ProcessCallbackKind::Error:
+            return process.ErrorReceived([handler = std::move(handler)](winrt::array_view<const uint8_t>) { handler(); });
+        case ProcessCallbackKind::Exit:
+            return process.Exited([handler = std::move(handler)](int32_t) { handler(); });
+        }
+
+        THROW_HR(E_UNEXPECTED);
+    }
+
+    static void RemoveProcessCallback(WSLCSDK::Process const& process, ProcessCallbackKind kind, winrt::event_token token)
+    {
+        switch (kind)
+        {
+        case ProcessCallbackKind::Output:
+            process.OutputReceived(token);
+            return;
+        case ProcessCallbackKind::Error:
+            process.ErrorReceived(token);
+            return;
+        case ProcessCallbackKind::Exit:
+            process.Exited(token);
+            return;
+        }
+    }
+
+    template <typename T>
+    static void VerifyFinalReleaseFromCallback(T owner, WSLCSDK::Process process, ProcessCallbackKind kind)
+    {
+        struct CallbackState
+        {
+            wil::unique_event releaseReturned{wil::EventOptions::ManualReset};
+            wil::unique_event resumeCallback{wil::EventOptions::ManualReset};
+            wil::unique_event callbackReturned{wil::EventOptions::ManualReset};
+            wil::unique_event processDestroyed{wil::EventOptions::ManualReset};
+            std::atomic<bool> callbackTimedOut{false};
+        };
+
+        struct DestructionSignal
+        {
+            std::shared_ptr<CallbackState> State;
+            ~DestructionSignal()
+            {
+                State->processDestroyed.SetEvent();
+            }
+        };
+
+        auto state = std::make_shared<CallbackState>();
+        {
+            auto signal = std::make_shared<DestructionSignal>(state);
+
+            // The marker's event must not be executing when the final reference is released.
+            switch (kind)
+            {
+            case ProcessCallbackKind::Output:
+            case ProcessCallbackKind::Error:
+                process.Exited([signal](int32_t) {});
+                break;
+            case ProcessCallbackKind::Exit:
+                process.OutputReceived([signal](winrt::array_view<const uint8_t>) {});
+                break;
+            }
+        }
+
+        const auto token = AddProcessCallback(process, kind, [owner = std::move(owner), state]() mutable {
+            if (!owner)
+            {
+                return;
+            }
+
+            owner = nullptr;
+            state->releaseReturned.SetEvent();
+            state->callbackTimedOut = !state->resumeCallback.wait(60 * 1000);
+            state->callbackReturned.SetEvent();
+        });
+
+        auto weakProcess = winrt::make_weak(process);
+        auto input = process.GetInputStream();
+        process = nullptr;
+
+        auto cleanup = wil::scope_exit([&]() {
+            state->resumeCallback.SetEvent();
+            IGNORE_ERRORS(input.Close());
+            if (auto strongProcess = weakProcess.get())
+            {
+                IGNORE_ERRORS(strongProcess.Close());
+                RemoveProcessCallback(strongProcess, kind, token);
+            }
+        });
+
+        DataWriter writer{input};
+        writer.WriteString(L"go\n");
+        writer.StoreAsync().get();
+        writer.DetachStream();
+        input.Close();
+
+        VERIFY_IS_TRUE(state->releaseReturned.wait(30 * 1000));
+        VERIFY_IS_FALSE(state->processDestroyed.wait(2 * 1000));
+        state->resumeCallback.SetEvent();
+        VERIFY_IS_TRUE(state->callbackReturned.wait(30 * 1000));
+        VERIFY_IS_TRUE(state->processDestroyed.wait(30 * 1000));
+        VERIFY_IS_FALSE(state->callbackTimedOut.load());
+    }
 
     void StartProcessAndWaitForExit(WSLCSDK::Process const& process, std::chrono::milliseconds timeout = 2min)
     {
@@ -2445,6 +2563,108 @@ class WslcSdkWinRtTests
         Sleep(200);
         VERIFY_ARE_EQUAL(callbackCount.load(), countAtRelease);
         VERIFY_IS_FALSE(exitFired.load());
+    }
+
+    WSLC_TEST_METHOD(ProcessIoEventsCloseFromCallbackFails)
+    {
+        for (const auto kind : {ProcessCallbackKind::Output, ProcessCallbackKind::Error, ProcessCallbackKind::Exit})
+        {
+            const std::wstring_view commandLine[] = {L"/bin/sh", L"-c", L"read line; echo OUT; echo ERR >&2"};
+            auto settings = WSLCSDK::ContainerSettings(L"debian:latest");
+            settings.InitProcess(MakeProcessSettings(commandLine, true));
+
+            auto container = m_defaultSession.CreateContainer(settings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            auto opened = m_defaultSession.OpenContainer(container.Id(), WSLCSDK::ProcessOutputMode::Event);
+            auto process = opened.InitProcess();
+
+            auto tryClose = [](auto const& object) -> HRESULT {
+                try
+                {
+                    object.Close();
+                    return S_OK;
+                }
+                catch (winrt::hresult_error const& error)
+                {
+                    return error.code();
+                }
+            };
+
+            std::promise<std::pair<HRESULT, HRESULT>> closePromise;
+            std::promise<void> exitPromise;
+            std::atomic<bool> closeAttempted{false};
+            AddProcessCallback(process, kind, [&]() {
+                if (!closeAttempted.exchange(true))
+                {
+                    closePromise.set_value({tryClose(process), tryClose(opened)});
+                }
+            });
+            process.Exited([&](int32_t) { exitPromise.set_value(); });
+            auto closeOnExit = wil::scope_exit([&]() {
+                IGNORE_ERRORS(process.Close());
+                IGNORE_ERRORS(opened.Close());
+            });
+
+            opened.Start();
+            const auto containerHandle = WSLCSDK::implementation::GetHandle(opened);
+            const auto processHandle = WSLCSDK::implementation::GetHandle(process);
+            const auto pid = process.Pid();
+            WriteToProcessStdin(process, L"go\n");
+
+            auto closeResult = closePromise.get_future();
+            VERIFY_ARE_EQUAL(closeResult.wait_for(30s), std::future_status::ready);
+            const auto [processResult, containerResult] = closeResult.get();
+            VERIFY_ARE_EQUAL(processResult, HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+            VERIFY_ARE_EQUAL(containerResult, HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+            VERIFY_IS_TRUE(WSLCSDK::implementation::GetHandle(opened) == containerHandle);
+            VERIFY_IS_TRUE(WSLCSDK::implementation::GetHandle(process) == processHandle);
+            VERIFY_IS_TRUE(opened.InitProcess() == process);
+            VERIFY_ARE_EQUAL(process.Pid(), pid);
+
+            VERIFY_ARE_EQUAL(exitPromise.get_future().wait_for(30s), std::future_status::ready);
+            process.Close();
+            process.Close();
+            VERIFY_THROWS_HR(std::ignore = process.Pid(), E_ILLEGAL_METHOD_CALL);
+            opened.Close();
+            opened.Close();
+            VERIFY_THROWS_HR(std::ignore = opened.State(), RO_E_CLOSED);
+        }
+    }
+
+    WSLC_TEST_METHOD(ProcessIoEventsFinalReleaseFromCallback)
+    {
+        const std::wstring_view initCommand[] = {L"/bin/sleep", L"99"};
+        auto settings = WSLCSDK::ContainerSettings(L"debian:latest");
+        settings.InitProcess(MakeProcessSettings(initCommand));
+        auto container = m_defaultSession.CreateContainer(settings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+        container.Start();
+
+        for (const auto kind : {ProcessCallbackKind::Output, ProcessCallbackKind::Error, ProcessCallbackKind::Exit})
+        {
+            const std::wstring_view commandLine[] = {L"/bin/sh", L"-c", L"read line; echo OUT; echo ERR >&2"};
+            auto process = container.CreateProcess(MakeProcessSettings(commandLine, true, WSLCSDK::ProcessOutputMode::Event));
+            process.Start();
+            auto owner = process;
+            VerifyFinalReleaseFromCallback(std::move(owner), std::move(process), kind);
+        }
+    }
+
+    WSLC_TEST_METHOD(OpenContainerEventModeFinalReleaseFromCallback)
+    {
+        for (const auto kind : {ProcessCallbackKind::Output, ProcessCallbackKind::Error, ProcessCallbackKind::Exit})
+        {
+            const std::wstring_view commandLine[] = {L"/bin/sh", L"-c", L"read line; echo OUT; echo ERR >&2"};
+            auto settings = WSLCSDK::ContainerSettings(L"debian:latest");
+            settings.InitProcess(MakeProcessSettings(commandLine, true));
+
+            auto container = m_defaultSession.CreateContainer(settings);
+            auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+            auto opened = m_defaultSession.OpenContainer(container.Id(), WSLCSDK::ProcessOutputMode::Event);
+            opened.Start();
+            auto process = opened.InitProcess();
+            VerifyFinalReleaseFromCallback(std::move(opened), std::move(process), kind);
+        }
     }
 
     WSLC_TEST_METHOD(ProcessIoEventsLargeOutput)
