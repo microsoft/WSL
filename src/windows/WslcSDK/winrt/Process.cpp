@@ -291,27 +291,21 @@ void Process::Close()
     m_waitForExitAction = nullptr;
 }
 
-winrt::fire_and_forget Process::final_release(std::unique_ptr<Process> self) noexcept
+void Process::final_release(std::unique_ptr<Process> self) noexcept
 {
     // Clean up when the last reference is released, including clients that omit Close().
     try
     {
         self->Close();
-        co_return;
+        return;
     }
     catch (winrt::hresult_error const& error)
     {
-        if (error.code() != HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE))
-        {
-            throw;
-        }
+        FAIL_FAST_HR_IF(static_cast<HRESULT>(error.code()), error.code() != HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
     }
 
     // Defer cleanup to a worker that can wait for the IO callback to return.
-    co_await winrt::resume_background();
-    auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
-    self->Close();
-    self.reset();
+    ReleaseOnBackgroundThread(std::move(self));
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

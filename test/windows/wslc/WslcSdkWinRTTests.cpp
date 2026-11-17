@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
+#include "SubProcess.h"
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
@@ -244,6 +245,45 @@ class WslcSdkWinRtTests
         VERIFY_IS_TRUE(state->callbackReturned.wait(c_completionTimeoutMs));
         VERIFY_IS_TRUE(state->processDestroyed.wait(c_completionTimeoutMs));
         VERIFY_IS_FALSE(state->callbackTimedOut.load());
+    }
+
+    void VerifyUnloadFromCallback(bool releaseContainer)
+    {
+        constexpr DWORD c_completionTimeoutMs = 2 * 60 * 1000;
+        const auto clientPath = std::filesystem::path(wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle())).parent_path() /
+                                L"wslcsdkunload.exe";
+        const auto ownerKind = releaseContainer ? L"container" : L"process";
+        const auto sessionName = std::format(L"wslc-winrt-unload-{}", ownerKind);
+        const auto commandLine = std::format(
+            L"\"{}\" \"{}\" \"{}\" \"{}\" {}",
+            clientPath.wstring(),
+            sessionName,
+            (m_storagePath / sessionName).wstring(),
+            GetTestImagePath("debian:latest").wstring(),
+            ownerKind);
+
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            wil::com_ptr<IWSLCSessionManager> manager;
+            THROW_IF_FAILED(CoCreateInstance(__uuidof(WSLCSessionManager), nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&manager)));
+            wsl::windows::common::security::ConfigureForCOMImpersonation(manager.get());
+            wil::com_ptr<IWSLCSession> session;
+            if (SUCCEEDED(manager->OpenSessionByName(sessionName.c_str(), &session)))
+            {
+                wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
+                LOG_IF_FAILED(session->Terminate());
+            }
+        });
+        wil::unique_handle job{CreateJobObjectW(nullptr, nullptr)};
+        VERIFY_IS_NOT_NULL(job.get());
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits{};
+        jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)));
+
+        wsl::windows::common::SubProcess client(clientPath.c_str(), commandLine.c_str());
+        client.SetJobObject(job.get());
+        const auto result = client.RunAndCaptureOutput(c_completionTimeoutMs);
+        LogInfo("SDK unload client (%ls): %ls%ls", ownerKind, result.Stdout.c_str(), result.Stderr.c_str());
+        VERIFY_ARE_EQUAL(0u, result.ExitCode);
     }
 
     void StartProcessAndWaitForExit(WSLCSDK::Process const& process, std::chrono::milliseconds timeout = 2min)
@@ -2667,6 +2707,16 @@ class WslcSdkWinRtTests
             auto process = opened.InitProcess();
             VerifyFinalReleaseFromCallback(std::move(opened), std::move(process), kind);
         }
+    }
+
+    WSLC_TEST_METHOD(ProcessIoEventsUnloadFromCallback)
+    {
+        VerifyUnloadFromCallback(false);
+    }
+
+    WSLC_TEST_METHOD(OpenContainerEventModeUnloadFromCallback)
+    {
+        VerifyUnloadFromCallback(true);
     }
 
     WSLC_TEST_METHOD(ProcessIoEventsLargeOutput)

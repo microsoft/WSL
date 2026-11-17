@@ -37,7 +37,7 @@ struct Container : ContainerT<Container>
     winrt::Microsoft::WSL::Containers::ContainerState State();
 
     void Close();
-    static winrt::fire_and_forget final_release(std::unique_ptr<Container> self) noexcept;
+    static void final_release(std::unique_ptr<Container> self) noexcept;
 
     WslcContainer ToHandle();
 
