@@ -1449,7 +1449,7 @@ Return Value:
     int Master = -1;
     CREATE_PROCESS_PARSED_COMMON Parsed = {nullptr};
     std::vector<gsl::byte> PendingStdin;
-    struct pollfd PollDescriptors[7];
+    struct pollfd PollDescriptors[8];
     pid_t RelayPid = -1;
     int Result;
     int SignalFd = -1;
@@ -1825,6 +1825,8 @@ Return Value:
     PollDescriptors[5].events = POLLIN;
     PollDescriptors[6].fd = Sockets[3].get();
     PollDescriptors[6].events = POLLIN;
+    PollDescriptors[7].fd = -1;
+    PollDescriptors[7].events = POLLOUT;
 
     TerminalControlChannel = {{Sockets[3].get()}, "TerminalControl"};
 
@@ -1856,8 +1858,17 @@ Return Value:
             UtilSocketShutdown(Sockets[0].get(), SHUT_RD);
         };
 
-        Result = poll(PollDescriptors, COUNT_OF(PollDescriptors), PendingStdin.empty() ? -1 : 100);
-        if (!PendingStdin.empty())
+        PollDescriptors[0].fd = (StdIn != -1 && PendingStdin.empty()) ? Sockets[0].get() : -1;
+        PollDescriptors[7].fd = PendingStdin.empty() ? -1 : StdIn;
+
+        Result = poll(PollDescriptors, COUNT_OF(PollDescriptors), -1);
+        if (Result < 0)
+        {
+            LOG_ERROR("poll failed {}", errno);
+            break;
+        }
+
+        if (PollDescriptors[7].revents & (POLLOUT | POLLHUP | POLLERR))
         {
             BytesWritten = write(StdIn, PendingStdin.data(), PendingStdin.size());
             if (BytesWritten < 0)
@@ -1869,6 +1880,7 @@ Return Value:
                 else if (errno != EAGAIN && errno != EWOULDBLOCK)
                 {
                     LOG_ERROR("delayed stdin write failed {}, ChildPid={}", errno, ChildPid);
+                    break;
                 }
             }
             else if (BytesWritten <= PendingStdin.size()) // Partial or complete write
@@ -1879,12 +1891,6 @@ Return Value:
             {
                 LOG_ERROR("Unexpected write result {}, pending={}", BytesWritten, PendingStdin.size());
             }
-        }
-
-        if (Result < 0)
-        {
-            LOG_ERROR("poll failed {}", errno);
-            break;
         }
 
         //
