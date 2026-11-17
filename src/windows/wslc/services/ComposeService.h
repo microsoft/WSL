@@ -17,24 +17,14 @@ Abstract:
 #include "SessionModel.h"
 #include "Terminal.h"
 #include <filesystem>
+#include <string>
 #include <variant>
 
 namespace wsl::windows::wslc::services {
 
 using namespace wsl::windows::wslc::cli;
 
-struct ComposeProjectReference
-{
-    explicit ComposeProjectReference(std::filesystem::path path) : Value(std::move(path))
-    {
-    }
-
-    explicit ComposeProjectReference(std::string projectKey) : Value(std::move(projectKey))
-    {
-    }
-
-    std::variant<std::filesystem::path, std::string> Value;
-};
+using ComposeProjectReference = std::variant<std::filesystem::path, std::string>;
 
 struct ComposeService
 {

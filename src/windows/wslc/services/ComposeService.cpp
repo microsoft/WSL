@@ -15,6 +15,8 @@ Abstract:
 #include "precomp.h"
 #include "ComposeService.h"
 #include "ConsoleService.h"
+#include <array>
+#include <filesystem.hpp>
 #include <relay.hpp>
 #include <WSLCContainerEntry.h>
 #include <WSLCProcessLauncher.h>
@@ -28,49 +30,38 @@ namespace {
         explicit CapturedComposeDocuments(const std::wstring& path)
         {
             std::error_code error;
-            sourcePath = std::filesystem::canonical(path, error);
+            sourcePath = wsl::windows::common::filesystem::GetCanonicalPath(path, error);
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(error.value()), wsl::shared::Localization::MessageWslcComposePathResolveFailed(path), static_cast<bool>(error));
             projectDirectory = sourcePath.parent_path();
 
             // Capture document bytes and source context as the input snapshot for interpretation.
-            std::ifstream stream{sourcePath, std::ios::binary | std::ios::ate};
+            std::ifstream stream{sourcePath, std::ios::binary};
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), wsl::shared::Localization::MessageWslcComposeFileOpenFailed(sourcePath.wstring()), !stream);
 
-            const auto documentSize = stream.tellg();
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
-                wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-                documentSize < 0);
-            THROW_HR_IF(E_INVALIDARG, documentSize == 0);
-            THROW_HR_IF_MSG(
-                HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
-                static_cast<uint64_t>(documentSize) > ULONG_MAX,
-                "Compose document exceeds the maximum transport size: %ls",
-                sourcePath.c_str());
-            const auto contentSize = gsl::narrow<ULONG>(static_cast<uint64_t>(documentSize));
-            const auto streamSize = gsl::narrow<std::streamsize>(contentSize);
+            std::array<char, 4096> buffer{};
+            while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
+            {
+                const auto bytesRead = gsl::narrow<size_t>(stream.gcount());
+                THROW_HR_IF_MSG(
+                    HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
+                    bytesRead > ULONG_MAX - content.size(),
+                    "Compose document exceeds the maximum transport size: %ls",
+                    sourcePath.c_str());
+                content.append(buffer.data(), bytesRead);
+            }
 
-            content.resize(contentSize);
-            stream.seekg(0, std::ios::beg);
-            stream.read(content.data(), streamSize);
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_READ_FAULT),
                 wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-                stream.gcount() != streamSize);
-
-            char extraByte{};
-            stream.read(&extraByte, 1);
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
-                wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-                stream.gcount() != 0);
+                stream.bad() || !stream.eof());
+            THROW_HR_IF(E_INVALIDARG, content.empty());
 
             document.SourcePath = sourcePath.c_str();
             document.BaseDirectory = projectDirectory.c_str();
             document.Content = reinterpret_cast<const byte*>(content.data());
-            document.ContentSize = contentSize;
+            document.ContentSize = gsl::narrow<ULONG>(content.size());
 
             documents.ProjectDirectory = projectDirectory.c_str();
             documents.Documents = &document;
@@ -79,7 +70,7 @@ namespace {
 
         std::filesystem::path sourcePath;
         std::filesystem::path projectDirectory;
-        std::vector<char> content;
+        std::string content;
         WSLCComposeDocument document{};
         WSLCComposeDocumentCollection documents{};
     };
@@ -114,7 +105,7 @@ namespace {
         std::optional<CapturedComposeDocuments> captured;
         WSLCComposeOperationRequest request{};
         request.Action = action;
-        if (const auto* path = std::get_if<std::filesystem::path>(&project.Value))
+        if (const auto* path = std::get_if<std::filesystem::path>(&project))
         {
             captured.emplace(path->wstring());
             request.Project.Type = WSLCComposeProjectTypeDocuments;
@@ -123,7 +114,7 @@ namespace {
         else
         {
             request.Project.Type = WSLCComposeProjectTypeProjectKey;
-            request.Project.Value.ProjectKey = std::get<std::string>(project.Value).c_str();
+            request.Project.Value.ProjectKey = std::get<std::string>(project).c_str();
         }
 
         if (timeout.has_value())
@@ -138,8 +129,8 @@ namespace {
 
         ComposeOperationResult result;
         THROW_IF_FAILED(session.Get()->ExecuteComposeOperation(&request, nullptr, cancelEvent, &result.value));
-        THROW_HR_WITH_USER_ERROR_IF(
-            result.value.Result, result.value.ErrorMessage, FAILED(result.value.Result) && result.value.ErrorMessage != nullptr);
+        const bool failedWithMessage = FAILED(result.value.Result) && result.value.ErrorMessage != nullptr;
+        THROW_HR_WITH_USER_ERROR_IF(result.value.Result, result.value.ErrorMessage, failedWithMessage);
         THROW_IF_FAILED(result.value.Result);
         THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusSucceeded);
         return result;
