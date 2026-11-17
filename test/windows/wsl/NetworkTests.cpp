@@ -2407,6 +2407,59 @@ class NetworkTests
         return {std::move(process), assignedPort};
     }
 
+    static void VerifyI386PortIsTracked(bool bindSocket)
+    {
+        WslKeepAlive keepAlive;
+
+        for (const auto* abi : {L"direct", L"socketcall"})
+        {
+            LogInfo("Testing i386 %ls via %ls", bindSocket ? L"bind" : L"listen", abi);
+            uint16_t selectedPort{};
+            if (bindSocket)
+            {
+                auto availablePort = BindHostPort(0, SOCK_DGRAM, IPPROTO_UDP, true);
+                SOCKADDR_IN availableAddress{};
+                int addressLength = sizeof(availableAddress);
+                VERIFY_ARE_EQUAL(getsockname(availablePort.get(), reinterpret_cast<SOCKADDR*>(&availableAddress), &addressLength), 0);
+                selectedPort = ntohs(availableAddress.sin_port);
+            }
+
+            auto [read, write] = CreateSubprocessPipe(false, true);
+            auto command = LxssGenerateWslCommandLine(
+                std::format(L"--exec timeout --signal=KILL 90s /data/test/socket_i386 {} {} {}", bindSocket ? L"bind" : L"listen", abi, selectedPort)
+                    .c_str());
+            unique_kill_process process(LxsstuStartProcess(command.data(), nullptr, write.get()));
+            write.reset();
+            PartialHandleRead output{read.get()};
+
+            std::string portBytes;
+            VERIFY_NO_THROW(portBytes = output.ConsumeBytes(sizeof(uint16_t)));
+            uint16_t networkPort{};
+            memcpy(&networkPort, portBytes.data(), sizeof(networkPort));
+            const auto port = ntohs(networkPort);
+            VERIFY_ARE_NOT_EQUAL(port, 0);
+            if (bindSocket)
+            {
+                VERIFY_ARE_EQUAL(port, selectedPort);
+                BindHostPort(port, SOCK_DGRAM, IPPROTO_UDP, false);
+                continue;
+            }
+
+            const auto connectToGuest = [&]() {
+                wil::unique_socket clientSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!clientSocket);
+
+                SOCKADDR_IN address{};
+                address.sin_family = AF_INET;
+                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                address.sin_port = networkPort;
+                THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
+            };
+
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+        }
+    }
+
     // Verifies that a listen() call with no preceding bind() (implicit autobind) is tracked
     // by the host port tracker, mirroring VerifyPortZeroBindIsTracked's coverage of the
     // pre-existing explicit bind(0) path.
@@ -5695,6 +5748,17 @@ class MirroredTests
                 ToString(wsl::core::NetworkingMode::Mirrored), ToString(wsl::core::NetworkingMode::None)));
         VERIFY_ARE_EQUAL(expectedWarnings, warnings);
     }
+
+    WSL2_TEST_METHOD(I386BindIsTracked)
+    {
+        SKIP_TEST_ARM64();
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyI386PortIsTracked(true);
+    }
 };
 
 class BridgedTests
@@ -6283,6 +6347,25 @@ class ConsommeTests
             },
             std::chrono::seconds(1),
             std::chrono::minutes(2));
+    }
+
+    WSL2_TEST_METHOD(I386BindIsTracked)
+    {
+        SKIP_TEST_ARM64();
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        NetworkTests::VerifyI386PortIsTracked(true);
+    }
+
+    WSL2_TEST_METHOD(I386ListenWithoutBindIsTracked)
+    {
+        SKIP_TEST_ARM64();
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
+        NetworkTests::VerifyI386PortIsTracked(false);
     }
 
     WSL2_TEST_METHOD(ConfigurationV6DnsServers)
