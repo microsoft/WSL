@@ -11,6 +11,7 @@
 #include <ntsecapi.h>
 #pragma pop_macro("_NTDEF_")
 #include <wil/token_helpers.h>
+#include <nlohmann/json.hpp>
 
 namespace wsl::windows::common::securityaudit {
 namespace {
@@ -74,6 +75,64 @@ void Uninstall()
     }
 }
 
+std::string EscapeEventParameters(std::string_view text)
+{
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char character : text)
+    {
+        if (character == '%')
+        {
+            escaped += "\\u0025"; // Prevent Event Viewer parameter-message expansion.
+        }
+        else
+        {
+            escaped += character;
+        }
+    }
+    return escaped;
+}
+
+std::wstring FormatEventField(const nlohmann::json& object, const char* name)
+{
+    const auto value = object.find(name);
+    if (value == object.end())
+    {
+        return L"-";
+    }
+    auto text = value->dump(-1, ' ', true);
+    if (value->is_string())
+    {
+        text = text.substr(1, text.size() - 2);
+    }
+    return wsl::shared::string::MultiByteToWide(EscapeEventParameters(text));
+}
+
+std::wstring NormalizeEventMessage(std::wstring_view text)
+{
+    std::wstring display;
+    for (const auto character : text)
+    {
+        if (character == L'\r')
+        {
+            continue;
+        }
+        if (character == L'\n')
+        {
+            display += L'\r';
+        }
+        display += character;
+    }
+    return display;
+}
+
+std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_view text)
+{
+    return NormalizeEventMessage(
+        wsl::shared::Localization::MessageSecurityAuditSystemCall(wsl::shared::string::MultiByteToWide(std::string(syscall))) +
+        L"\n\n" + std::wstring(text));
+}
+
 EventSource::EventSource() : m_token(AcquireTokenWithPrivilege(SE_AUDIT_NAME))
 {
     auto impersonation = wil::impersonate_token(m_token.get());
@@ -86,22 +145,18 @@ void EventSource::Close(AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE provider) noexcept
     LOG_IF_WIN32_BOOL_FALSE(AuthzUnregisterSecurityEventSource(0, &provider));
 }
 
-void EventSource::ProcessExecuted(uint32_t pid)
+void EventSource::Report(DWORD eventId, std::span<std::wstring> fields)
 {
-    THROW_HR_IF(E_INVALIDARG, pid == 0);
+    THROW_HR_IF(E_INVALIDARG, eventId > UINT16_MAX || fields.empty() || fields.size() > USHRT_MAX);
     auto impersonation = wil::impersonate_token(m_token.get());
-    std::wstring text[] = {
-        std::to_wstring(pid),
-        wsl::shared::Localization::MessageSecurityAuditProcessExecuted(),
-        wsl::shared::Localization::MessageSecurityAuditProcessId()};
-    AUDIT_PARAM inserts[ARRAYSIZE(text)]{};
-    for (size_t index = 0; index < ARRAYSIZE(text); ++index)
+    std::vector<AUDIT_PARAM> values(fields.size());
+    for (size_t index = 0; index < fields.size(); ++index)
     {
-        inserts[index].Type = APT_String;
-        inserts[index].String = text[index].data();
+        values[index].Type = APT_String;
+        values[index].String = fields[index].data();
     }
-    AUDIT_PARAMS parameters{sizeof(AUDIT_PARAMS), APF_AuditSuccess, ARRAYSIZE(inserts), inserts};
-    THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(0, m_provider.get(), MSG_PROCESS_EXECUTED, nullptr, &parameters));
+    AUDIT_PARAMS parameters{sizeof(AUDIT_PARAMS), APF_AuditSuccess, static_cast<USHORT>(values.size()), values.data()};
+    THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(0, m_provider.get(), eventId, nullptr, &parameters));
 }
 
 } // namespace wsl::windows::common::securityaudit

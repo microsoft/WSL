@@ -4,6 +4,9 @@
 
 #include <authz.h>
 #include <wil/resource.h>
+#include <span>
+#include <string_view>
+#include <nlohmann/json_fwd.hpp>
 
 namespace wsl::windows::common::securityaudit {
 
@@ -13,6 +16,11 @@ inline constexpr GUID c_applicationGeneratedAuditSubcategory{0x0cce9222, 0x69ae,
 bool Enabled();
 void Uninstall();
 
+std::string EscapeEventParameters(std::string_view text);
+std::wstring FormatEventField(const nlohmann::json& object, const char* name);
+std::wstring NormalizeEventMessage(std::wstring_view text);
+std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_view text);
+
 class EventSource
 {
 public:
@@ -20,7 +28,7 @@ public:
     NON_COPYABLE(EventSource);
     NON_MOVABLE(EventSource);
 
-    void ProcessExecuted(uint32_t pid);
+    void Report(DWORD eventId, std::span<std::wstring> fields);
 
 private:
     static void Close(AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE provider) noexcept;

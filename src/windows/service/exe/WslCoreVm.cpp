@@ -27,6 +27,10 @@ Abstract:
 #include "DnsResolver.h"
 #include "ConsommeNetworking.h"
 #include "SecurityAudit.h"
+#include "securityaudit/ProcessCreationAudit.h"
+#include "securityaudit/ProcessExecutionAudit.h"
+#include "securityaudit/NetworkAudit.h"
+#include "securityaudit/SystemAudit.h"
 
 #include <TraceLoggingProvider.h>
 
@@ -1617,7 +1621,9 @@ void WslCoreVm::InitializeGuest()
     message->EnableInboxGpuLibs = m_enableInboxGpuLibs;
     try
     {
-        message->EnableSecurityAudit = securityaudit::Enabled();
+        const auto enabled = securityaudit::ProcessExecutionEnabled();
+        message->IncludeAuditCommandLine = enabled && securityaudit::IncludeProcessCommandLine();
+        message->EnableSecurityAudit = enabled;
     }
     CATCH_LOG();
 
@@ -1675,7 +1681,7 @@ void WslCoreVm::InitializeGuest()
     {
         // This listener is shared: a failed accept must not leave a late connection for the next operation.
         auto socket = AcceptConnection(m_vmConfig.KernelBootTimeout);
-        m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket));
+        m_securityAuditThread = std::thread(&WslCoreVm::SecurityAuditWorker, this, std::move(socket), message->IncludeAuditCommandLine);
     }
 }
 
@@ -2335,7 +2341,26 @@ void WslCoreVm::VerifyPlan9Servers()
     }
 }
 
-void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket)
+void WslCoreVm::RegisterAuditDistribution(const WSLDistributionInformation& Distribution)
+{
+    if (!m_securityAuditThread.joinable())
+    {
+        return;
+    }
+
+    THROW_HR_IF(E_INVALIDARG, Distribution.PidNamespace == 0 || Distribution.Id == GUID{} || !Distribution.Name || !*Distribution.Name);
+    auto lock = m_auditDistributionLock.lock_exclusive();
+    m_auditDistributions.insert_or_assign(
+        Distribution.PidNamespace, securityaudit::ProcessExecutionDistribution{Distribution.Id, Distribution.Name});
+}
+
+void WslCoreVm::UnregisterAuditDistribution(uint64_t PidNamespace)
+{
+    auto lock = m_auditDistributionLock.lock_exclusive();
+    m_auditDistributions.erase(PidNamespace);
+}
+
+void WslCoreVm::SecurityAuditWorker(wil::unique_socket socket, bool includeCommandLine)
 try
 {
     auto self = wil::run_as_self();
@@ -2343,9 +2368,83 @@ try
     wsl::shared::SocketChannel channel{std::move(socket), "SecurityAudit", {m_terminatingEvent.get()}};
     for (;;)
     {
-        const auto& event = channel.ReceiveMessage<LX_INIT_PROCESS_EXECUTED>();
-        THROW_HR_IF(E_INVALIDARG, event.Header.MessageSize != sizeof(event));
-        source.ProcessExecuted(event.Pid);
+        gsl::span<gsl::byte> bytes;
+        const auto& header = channel.ReceiveMessage<MESSAGE_HEADER>(&bytes);
+        if (header.MessageType == LxInitMessageProcessExecuted)
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED>(bytes);
+            THROW_HR_IF(E_INVALIDARG, !event || bytes.size() != sizeof(*event));
+            securityaudit::ReportProcessExecution(source, event->Pid);
+            continue;
+        }
+        THROW_HR_IF(
+            E_INVALIDARG,
+            header.MessageType != LxInitMessageProcessCreated && header.MessageType != LxInitMessageProcessExecutedDetails &&
+                header.MessageType != LxInitMessageNetworkAudit && header.MessageType != LxInitMessageSystemAudit);
+        std::wstring details;
+        try
+        {
+            switch (header.MessageType)
+            {
+            case LxInitMessageProcessCreated:
+                details = securityaudit::FormatProcessCreation(bytes);
+                break;
+            case LxInitMessageNetworkAudit:
+                details = securityaudit::FormatNetworkAudit(bytes);
+                break;
+            case LxInitMessageSystemAudit:
+                details = securityaudit::FormatSystemAudit(bytes);
+                break;
+            case LxInitMessageProcessExecutedDetails:
+            {
+                const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+                THROW_HR_IF(E_INVALIDARG, !event);
+                std::optional<securityaudit::ProcessExecutionDistribution> distribution;
+                {
+                    auto lock = m_auditDistributionLock.lock_shared();
+                    if (const auto found = m_auditDistributions.find(event->PidNamespace); found != m_auditDistributions.end())
+                    {
+                        distribution = found->second;
+                    }
+                }
+                details = securityaudit::FormatProcessExecution(bytes, includeCommandLine, distribution ? &*distribution : nullptr);
+                break;
+            }
+            }
+        }
+        catch (const wil::ResultException& error)
+        {
+            THROW_HR_IF(error.GetErrorCode(), error.GetErrorCode() != E_INVALIDARG);
+            LOG_CAUGHT_EXCEPTION();
+            continue;
+        }
+        switch (header.MessageType)
+        {
+        case LxInitMessageProcessCreated:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_CREATED>(bytes);
+            securityaudit::ReportProcessCreation(source, event->ChildPid, details);
+            break;
+        }
+        case LxInitMessageNetworkAudit:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_NETWORK_AUDIT>(bytes);
+            securityaudit::ReportNetworkAudit(source, *event, details);
+            break;
+        }
+        case LxInitMessageSystemAudit:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_SYSTEM_AUDIT>(bytes);
+            securityaudit::ReportSystemAudit(source, *event, details);
+            break;
+        }
+        case LxInitMessageProcessExecutedDetails:
+        {
+            const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+            securityaudit::ReportProcessExecutionDetails(source, event->Pid, details);
+            break;
+        }
+        }
     }
 }
 catch (...)

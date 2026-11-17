@@ -17,6 +17,10 @@ set(SOURCES
     telemetry.cpp
     timezone.cpp
     SecCompDispatcher.cpp
+    securityaudit/ProcessCreationAudit.cpp
+    securityaudit/ProcessExecutionAudit.cpp
+    securityaudit/NetworkAudit.cpp
+    securityaudit/SystemAudit.cpp
     SecurityAudit.cpp
     util.cpp
     WslDistributionConfig.cpp
@@ -42,6 +46,10 @@ set(HEADERS
     telemetry.h
     timezone.h
     SecCompDispatcher.h
+    securityaudit/ProcessCreationAudit.h
+    securityaudit/ProcessExecutionAudit.h
+    securityaudit/NetworkAudit.h
+    securityaudit/SystemAudit.h
     util.h
     WslDistributionConfig.h
     wslinfo.h
@@ -55,6 +63,7 @@ list(APPEND HEADERS
     "${AUDIT_PAYLOAD_DIRECTORY}/ebpf_arch_macros.h")
 
 set(LINUX_CXXFLAGS ${LINUX_CXXFLAGS}
+    -I "${CMAKE_CURRENT_LIST_DIR}"
     -I "${CMAKE_CURRENT_LIST_DIR}/../netlinkutil"
     -I "${AUDIT_PAYLOAD_DIRECTORY}")
 

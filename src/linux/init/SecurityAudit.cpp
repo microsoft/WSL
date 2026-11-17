@@ -3,6 +3,10 @@
 #include "common.h"
 #include "util.h"
 #include "SocketChannel.h"
+#include "securityaudit/ProcessCreationAudit.h"
+#include "securityaudit/ProcessExecutionAudit.h"
+#include "securityaudit/NetworkAudit.h"
+#include "securityaudit/SystemAudit.h"
 #include <arpa/inet.h>
 #include <atomic>
 #include <netpacket/packet.h>
@@ -18,6 +22,7 @@ struct AuditContext
 {
     wsl::shared::SocketChannel channel;
     std::atomic<bool> failed{};
+    bool includeCommandLine = false;
 };
 
 // The SDK invokes event callbacks serially on its polling thread.
@@ -63,36 +68,51 @@ void ProcessEvent(void* context, int, void* data, unsigned int size)
             return;
         }
 
+        const auto bytes = gsl::span<const gsl::byte>{static_cast<const gsl::byte*>(data), size};
+        // Malformed records are discarded; transport errors must still stop the collector.
+        const auto decode = [&](auto decoder, auto... arguments) {
+            try
+            {
+                return decoder(bytes, arguments...);
+            }
+            catch (const wil::ResultException& error)
+            {
+                if (error.GetErrorCode() != EINVAL)
+                {
+                    throw;
+                }
+                LOG_ERROR("Discarding invalid security audit record of type {}", header.event_type);
+                LOG_CAUGHT_EXCEPTION();
+                return decltype(decoder(bytes, arguments...)){};
+            }
+        };
+
+        if (header.event_type == event_type_fork_process)
+        {
+            auto message = decode(wsl::linux::securityaudit::DecodeProcessCreation);
+            if (message)
+            {
+                audit.channel.SendMessage(*message);
+            }
+            return;
+        }
         if (header.event_type != event_type_exec_process)
         {
+            if (auto message = decode(wsl::linux::securityaudit::DecodeNetworkAudit))
+            {
+                audit.channel.SendMessage(*message);
+            }
+            else if (auto message = decode(wsl::linux::securityaudit::DecodeSystemAudit))
+            {
+                audit.channel.SendMessage(*message);
+            }
             return;
         }
-
-        if (size != sizeof(event_exec_process_s))
+        auto message = decode(wsl::linux::securityaudit::DecodeProcessExecution, audit.includeCommandLine);
+        if (message)
         {
-            LOG_ERROR("Discarding security audit exec event: size {} does not match {}", size, sizeof(event_exec_process_s));
-            return;
+            audit.channel.SendMessage<LX_INIT_PROCESS_EXECUTED_DETAILS>(message->Span());
         }
-
-        event_exec_process_s event{};
-        memcpy(&event, data, sizeof(event));
-        if (event.end.code_bytes_end != CODE_BYTES)
-        {
-            LOG_ERROR("Discarding security audit exec event: invalid end marker {:#x}", event.end.code_bytes_end);
-            return;
-        }
-
-        if (event.base.pid == 0)
-        {
-            LOG_ERROR("Discarding security audit exec event: PID is zero");
-            return;
-        }
-
-        LX_INIT_PROCESS_EXECUTED message{};
-        message.Header.MessageType = message.Type;
-        message.Header.MessageSize = sizeof(message);
-        message.Pid = event.base.pid;
-        audit.channel.SendMessage(message);
     }
     catch (...)
     {
@@ -113,9 +133,10 @@ void PollError(void* context, int error)
 }
 } // namespace
 
-int RunSecurityAudit(int socket)
+int RunSecurityAudit(int socket, bool includeCommandLine)
 {
     AuditContext audit{wsl::shared::SocketChannel{wil::unique_fd{socket}, "SecurityAudit"}};
+    audit.includeCommandLine = includeCommandLine;
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
 
     // Keep mount changes local to this worker, independent of mini-init and distributions.
@@ -145,13 +166,28 @@ int RunSecurityAudit(int socket)
     });
 
     std::array<char, 8192> error{};
-    const syscall_config syscalls[] = {{__NR_execve, true}};
+    // The SDK's fork selector controls task_newtask for clone/fork/vfork/clone3, excluding CLONE_THREAD.
+    const syscall_config syscalls[] = {
+        {__NR_execve, true},
+        {__NR_fork, true},
+        {__NR_socket, false},
+        {__NR_connect, false},
+        {__NR_bind, false},
+        {__NR_accept, false},
+        {__NR_accept4, false},
+        {__NR_init_module, false},
+        {__NR_finit_module, false},
+        {__NR_setuid, false},
+        {__NR_setgid, false},
+        {__NR_setresgid, false},
+        {__NR_setns, false},
+        {__NR_unshare, false}};
     const auto info = ebpf_plugin_start(
         "/wsl-security-audit",
-        PERF_FEATURES_BTF | FEATURE_RINGBUFF | FEATURE_ENRICHMENT_AT_SOURCE | FEATURE_RUNTIME_MAP_FLIGHTING,
-        FEATURE_SYSCALL_EXTENDED_DATA,
+        PERF_FEATURES_BTF | FEATURE_RINGBUFF | FEATURE_ENRICHMENT_AT_SOURCE | FEATURE_RUNTIME_MAP_FLIGHTING | FEATURE_PID_NS_ID_QUERY,
+        FEATURE_SYSCALL_EXTENDED_DATA | FEATURE_CONTAINER_RUNTIME_METADATA | FEATURE_CONNECT_ENDPOINT_ENRICHMENT | FEATURE_ACCEPT_ENDPOINT_ENRICHMENT,
         syscalls,
-        1,
+        COUNT_OF(syscalls),
         nullptr,
         0,
         (8 * 1024 * 1024) / 512,
@@ -173,7 +209,8 @@ int RunSecurityAudit(int socket)
         THROW_ERRNO(EIO);
     }
 
-    LOG_INFO("Security audit collecting ProcessExecuted PID");
+    LOG_INFO(
+        "Security audit collecting ProcessExecuted fields, ProcessCreated, network and system events; command line enabled: {}", includeCommandLine);
 
     // Terminal failures stop this collector, not mini-init or the distributions.
     while (!audit.failed)

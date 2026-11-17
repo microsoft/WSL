@@ -3438,11 +3438,11 @@ try
             {
                 StartWorkerProcess(
                     "wsl-audit",
-                    [fd = socket.get()] {
+                    [fd = socket.get(), includeCommandLine = ConfigMessage->IncludeAuditCommandLine] {
                         THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
                         THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
                         const auto argument = std::to_string(fd);
-                        execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), nullptr);
+                        execl(LX_INIT_PATH, c_securityAuditName, argument.c_str(), includeCommandLine ? "1" : "0", nullptr);
                         THROW_LAST_ERROR();
                     },
                     {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket.get()});

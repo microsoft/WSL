@@ -2910,8 +2910,15 @@ std::shared_ptr<LxssRunningInstance> LxssUserSessionImpl::_CreateInstance(_In_op
 
                 if (version == LXSS_WSL_VERSION_2)
                 {
-                    auto cleanupOnFailure =
-                        wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { m_runningInstances.erase(registration.Id()); });
+                    auto cleanupOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                        m_utilityVm->UnregisterAuditDistribution(distributionInfo->PidNamespace);
+                        m_runningInstances.erase(registration.Id());
+                    });
+                    try
+                    {
+                        m_utilityVm->RegisterAuditDistribution(*distributionInfo);
+                    }
+                    CATCH_LOG();
                     m_pluginManager.OnDistributionStarted(&m_session, instance->DistributionInformation());
                     cleanupOnFailure.release();
                 }
@@ -3960,6 +3967,10 @@ bool LxssUserSessionImpl::_TerminateInstanceInternal(_In_ LPCGUID DistroGuid, _I
                 instance->second->Stop();
 
                 const auto clientId = instance->second->GetClientId();
+                if (clientId != LXSS_CLIENT_ID_INVALID)
+                {
+                    m_utilityVm->UnregisterAuditDistribution(instance->second->DistributionInformation()->PidNamespace);
+                }
                 {
                     auto lock = m_terminatedInstanceLock.lock_exclusive();
                     m_terminatedInstances.push_back(std::move(instance->second));

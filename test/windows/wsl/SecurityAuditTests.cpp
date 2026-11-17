@@ -12,6 +12,7 @@
 #include <ntsecapi.h>
 #pragma pop_macro("_NTDEF_")
 #include <regex>
+#include <nlohmann/json.hpp>
 
 namespace SecurityAuditTests {
 namespace {
@@ -70,7 +71,7 @@ namespace {
                     return {};
                 }
                 const auto* source = reinterpret_cast<const wchar_t*>(record + 1);
-                if (wcscmp(source, c_source) == 0 && record->EventID == MSG_PROCESS_EXECUTED)
+                if (wcscmp(source, c_source) == 0 && record->EventID == MSG_PROCESS_EXECUTED_DETAILS)
                 {
                     VERIFY_ARE_EQUAL(static_cast<WORD>(EVENTLOG_AUDIT_SUCCESS), record->EventType);
                     AuditEvent event{record->EventID, {}};
@@ -92,10 +93,12 @@ namespace {
 
     void VerifyRenderedEvent(const AuditEvent& event, uint32_t pid)
     {
-        VERIFY_ARE_EQUAL(size_t{3}, event.strings.size());
+        VERIFY_ARE_EQUAL(size_t{4}, event.strings.size());
         VERIFY_ARE_EQUAL(std::to_wstring(pid), event.strings[0]);
-        VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageSecurityAuditProcessExecuted(), event.strings[1]);
-        VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageSecurityAuditProcessId(), event.strings[2]);
+        VERIFY_ARE_EQUAL(wsl::shared::Localization::MessageSecurityAuditProcessExecution(), event.strings[1]);
+        const auto details = nlohmann::json::parse(wsl::shared::string::WideToMultiByte(event.strings[2]));
+        VERIFY_ARE_EQUAL(1, details.at("schemaVersion").get<int>());
+        VERIFY_ARE_EQUAL(pid, details.at("pid").get<uint32_t>());
 
         const auto key = wsl::windows::common::registry::OpenKey(
             HKEY_LOCAL_MACHINE, std::format(L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Security\\{}", c_source).c_str(), KEY_READ);
@@ -105,7 +108,8 @@ namespace {
         DWORD_PTR arguments[] = {
             reinterpret_cast<DWORD_PTR>(event.strings[0].c_str()),
             reinterpret_cast<DWORD_PTR>(event.strings[1].c_str()),
-            reinterpret_cast<DWORD_PTR>(event.strings[2].c_str())};
+            reinterpret_cast<DWORD_PTR>(event.strings[2].c_str()),
+            reinterpret_cast<DWORD_PTR>(event.strings[3].c_str())};
         wil::unique_hlocal_string rendered;
         THROW_LAST_ERROR_IF(
             FormatMessageW(
@@ -116,7 +120,7 @@ namespace {
                 reinterpret_cast<PWSTR>(rendered.put()),
                 0,
                 reinterpret_cast<va_list*>(arguments)) == 0);
-        VERIFY_ARE_EQUAL(event.strings[1] + L"\r\n" + event.strings[2] + L" " + event.strings[0] + L"\r\n", std::wstring(rendered.get()));
+        VERIFY_ARE_EQUAL(event.strings[1] + L"\r\n\r\n" + event.strings[3] + L"\r\n", std::wstring(rendered.get()));
     }
 
     void VerifyAuditPolicy(bool processCreation, bool applicationGenerated)

@@ -199,12 +199,12 @@ int WslEntryPoint(int Argc, char* Argv[])
         {
             try
             {
-                THROW_ERRNO_IF(EINVAL, Pid == 1 || Argc != 2);
+                THROW_ERRNO_IF(EINVAL, Pid == 1 || Argc != 3 || (strcmp(Argv[2], "0") != 0 && strcmp(Argv[2], "1") != 0));
                 int socket = -1;
                 const auto* end = Argv[1] + strlen(Argv[1]);
                 const auto parsed = std::from_chars(Argv[1], end, socket);
                 THROW_ERRNO_IF(EINVAL, parsed.ec != std::errc{} || parsed.ptr != end || socket <= STDERR_FILENO);
-                ExitCode = RunSecurityAudit(socket);
+                ExitCode = RunSecurityAudit(socket, strcmp(Argv[2], "1") == 0);
             }
             CATCH_LOG();
         }
