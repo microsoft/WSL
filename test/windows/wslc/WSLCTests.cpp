@@ -18115,10 +18115,18 @@ sys.exit(1 if queries else 0)
                 {
                     VERIFY_IS_TRUE(environment.find(std::format("\n{}\n", value)) != std::string::npos);
                 }
-                for (const auto* name : {"http_proxy", "HTTPS_PROXY", "no_proxy"})
+                for (const auto* name : {"http_proxy", "HTTPS_PROXY"})
                 {
-                    VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
+                    if (Supported)
+                    {
+                        VERIFY_IS_TRUE(environment.find(std::format("\n{}={}\n", name, proxy)) != std::string::npos);
+                    }
+                    else
+                    {
+                        VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
+                    }
                 }
+                VERIFY_IS_TRUE(environment.find("\nno_proxy=.windows.invalid\n") != std::string::npos);
             }
             else
             {
@@ -18147,43 +18155,33 @@ sys.exit(1 if queries else 0)
             }
             for (const auto* name : {"HTTP_PROXY", "https_proxy", "NO_PROXY"})
             {
-                VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}=", name)) == std::string::npos);
+                const auto prefix = std::format("\n{}=", name);
+                const auto start = environment.find(prefix);
+                if (start == std::string::npos)
+                {
+                    VERIFY_IS_TRUE(overriddenEnvironment.find(prefix) == std::string::npos);
+                }
+                else
+                {
+                    const auto end = environment.find('\n', start + 1);
+                    VERIFY_IS_TRUE(overriddenEnvironment.find(environment.substr(start, end - start + 1)) != std::string::npos);
+                }
             }
         }
     }
 
-    WSLC_TEST_METHOD(ProxyEnvironmentMixedCaseSessionOverrides)
+    WSLC_TEST_METHOD(ProxyEnvironmentRejectsMixedCaseSessionOverrides)
     {
         SKIP_TEST_SERVER();
-        WINHTTP_PROXY_TEST_ONLY();
-        ScopedWindowsProxySettings originalSettings;
-        LxsstuLaunchPowershellAndCaptureOutput(
-            L"Set-WinhttpProxy -SettingScope User -Proxy 'http://windows.invalid:3128' "
-            L"-ProxyBypass '*.windows.invalid' -AutoconfigUrl ''");
-
         auto settings = GetDefaultSessionSettings(L"mixed-case-proxy", false, WSLCNetworkingModeConsomme);
-        const LPCSTR values[]{"Http_Proxy=http://Manual.Proxy:8080", "hTtPs_PrOxY=", "No_PrOxY=LocalHost,.Manual.Example"};
-        const WSLCStringArray proxyEnvironment{values, ARRAYSIZE(values)};
         const auto manager = OpenSessionManager();
-        wil::com_ptr<IWSLCSession> session;
-        VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, &proxyEnvironment, nullptr, &session));
-        wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-        auto terminate = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
-        LoadTestImage(*session, "alpine:latest");
-
-        WSLCContainerLauncher launcher("alpine:latest", "", {"env"}, {}, "bridge");
-        auto container = launcher.Launch(*session);
-        auto process = container.GetInitProcess();
-        const auto result = process.WaitAndCaptureOutput(30000);
-        VERIFY_ARE_EQUAL(0, result.Code);
-        const auto environment = "\n" + result.Output.at(1);
-        for (const auto* value : {"http_proxy=http://Manual.Proxy:8080", "https_proxy=", "no_proxy=LocalHost,.Manual.Example"})
+        for (const auto* value : {"Http_Proxy=http://Manual.Proxy:8080", "hTtPs_PrOxY=", "No_PrOxY=LocalHost,.Manual.Example"})
         {
-            VERIFY_IS_TRUE(environment.find(std::format("\n{}\n", value)) != std::string::npos);
-        }
-        for (const auto* name : {"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "Http_Proxy", "hTtPs_PrOxY", "No_PrOxY"})
-        {
-            VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
+            const LPCSTR values[]{value};
+            const WSLCStringArray proxyEnvironment{values, ARRAYSIZE(values)};
+            wil::com_ptr<IWSLCSession> session;
+            VERIFY_ARE_EQUAL(E_INVALIDARG, manager->CreateSession(&settings, WSLCSessionFlagsNone, &proxyEnvironment, nullptr, &session));
+            VERIFY_IS_NULL(session.get());
         }
     }
 

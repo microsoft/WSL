@@ -594,11 +594,10 @@ class WSLCE2ETlsRegistryTests
                     VERIFY_IS_TRUE(environment.contains(std::format(L"{}=127.0.0.1:8080", http)));
                     VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", https)));
                     VERIFY_IS_TRUE(environment.contains(std::format(L"{}=", noProxy)));
-                    for (const auto& entry : environment)
-                    {
-                        VERIFY_IS_TRUE(entry.find(L"windows.proxy.invalid") == std::wstring::npos);
-                        VERIFY_IS_TRUE(entry.find(L".windows.invalid") == std::wstring::npos);
-                    }
+                    VERIFY_IS_TRUE(environment.contains(std::format(L"{}=http://windows.proxy.invalid:3128", upper ? L"http_proxy" : L"HTTP_PROXY")));
+                    VERIFY_IS_TRUE(environment.contains(
+                        std::format(L"{}=http://windows.proxy.invalid:3128", upper ? L"https_proxy" : L"HTTPS_PROXY")));
+                    VERIFY_IS_TRUE(environment.contains(std::format(L"{}=.windows.invalid", upper ? L"no_proxy" : L"NO_PROXY")));
                 }
 
                 const auto imported =
@@ -606,8 +605,8 @@ class WSLCE2ETlsRegistryTests
                 VERIFY_IS_TRUE(imported.contains(L"http_proxy=http://caller.proxy.invalid:8080"));
                 VERIFY_IS_TRUE(imported.contains(L"no_proxy=.caller.invalid"));
                 VERIFY_IS_TRUE(imported.contains(L"HTTPS_PROXY=http://windows.proxy.invalid:3128"));
-                VERIFY_IS_FALSE(imported.contains(L"HTTP_PROXY=http://windows.proxy.invalid:3128"));
-                VERIFY_IS_FALSE(imported.contains(L"NO_PROXY=.windows.invalid"));
+                VERIFY_IS_TRUE(imported.contains(L"HTTP_PROXY=http://windows.proxy.invalid:3128"));
+                VERIFY_IS_TRUE(imported.contains(L"NO_PROXY=.windows.invalid"));
 
                 const auto envFile = directory / L"proxy.env";
                 WriteTestFileContent(envFile, "HTTP_PROXY=http://file.proxy.invalid:8080\nhttps_proxy=\nNO_PROXY=.file.invalid\n");
@@ -616,11 +615,9 @@ class WSLCE2ETlsRegistryTests
                 VERIFY_IS_TRUE(fromFile.contains(L"HTTP_PROXY=http://file.proxy.invalid:8080"));
                 VERIFY_IS_TRUE(fromFile.contains(L"https_proxy="));
                 VERIFY_IS_TRUE(fromFile.contains(L"NO_PROXY=.file.invalid"));
-                for (const auto& entry : fromFile)
-                {
-                    VERIFY_IS_TRUE(entry.find(L"windows.proxy.invalid") == std::wstring::npos);
-                    VERIFY_IS_TRUE(entry.find(L".windows.invalid") == std::wstring::npos);
-                }
+                VERIFY_IS_TRUE(fromFile.contains(L"http_proxy=http://windows.proxy.invalid:3128"));
+                VERIFY_IS_TRUE(fromFile.contains(L"HTTPS_PROXY=http://windows.proxy.invalid:3128"));
+                VERIFY_IS_TRUE(fromFile.contains(L"no_proxy=.windows.invalid"));
 
                 WriteTestFileContent(
                     envFile,
@@ -632,17 +629,16 @@ class WSLCE2ETlsRegistryTests
                 {
                     const auto environment =
                         RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} {} env", options, image.NameAndTag()));
-                    VERIFY_IS_TRUE(environment.contains(L"http_proxy=http://Manual.Proxy:8080"));
-                    VERIFY_IS_TRUE(environment.contains(L"https_proxy="));
-                    VERIFY_IS_TRUE(environment.contains(L"no_proxy=LocalHost,.Manual.Example"));
+                    VERIFY_IS_TRUE(environment.contains(L"Http_Proxy=http://Manual.Proxy:8080"));
+                    VERIFY_IS_TRUE(environment.contains(L"hTtPs_PrOxY="));
+                    VERIFY_IS_TRUE(environment.contains(L"No_PrOxY=LocalHost,.Manual.Example"));
                     VERIFY_IS_TRUE(environment.contains(L"Custom_Name=VaLuE"));
-                    for (const auto* name :
-                         {L"HTTP_PROXY", L"HTTPS_PROXY", L"NO_PROXY", L"Http_Proxy", L"hTtPs_PrOxY", L"No_PrOxY"})
+                    for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY"})
                     {
-                        const auto prefix = std::format(L"{}=", name);
-                        VERIFY_IS_FALSE(
-                            std::ranges::any_of(environment, [&](const auto& entry) { return entry.starts_with(prefix); }));
+                        VERIFY_IS_TRUE(environment.contains(std::format(L"{}=http://windows.proxy.invalid:3128", name)));
                     }
+                    VERIFY_IS_TRUE(environment.contains(L"no_proxy=.windows.invalid"));
+                    VERIFY_IS_TRUE(environment.contains(L"NO_PROXY=.windows.invalid"));
                 }
             },
             {{L"Http_Proxy", L"http://caller.proxy.invalid:8080"}, {L"HTTPS_PROXY", L""}, {L"NO_PROXY", L".caller.invalid"}});

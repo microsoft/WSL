@@ -57,37 +57,16 @@ namespace {
 
 bool IsProxyEnvironmentVariable(std::string_view Entry)
 {
-    return Entry.find('=') != std::string_view::npos && std::ranges::any_of(c_proxyNames, [&](const auto& names) {
-               return wsl::shared::string::IsEqual(EnvironmentName(Entry), names.first, true);
-           });
-}
-
-std::string CanonicalizeProxyEnvironmentVariable(std::string_view Entry)
-{
-    std::string result{Entry};
     const auto name = EnvironmentName(Entry);
-    // Preserve canonical casing so explicit upper/lowercase overrides remain distinct.
-    for (const auto& names : c_proxyNames)
-    {
-        if (name != names.second && wsl::shared::string::IsEqual(name, names.first, true))
-        {
-            result.replace(0, name.size(), names.first);
-            break;
-        }
-    }
-
-    return result;
+    return Entry.find('=') != std::string_view::npos &&
+           std::ranges::any_of(c_proxyNames, [&](const auto& names) { return name == names.first || name == names.second; });
 }
 
 void AddProxyEnvironmentDefaults(std::vector<std::string>& Environment, const std::vector<std::string>& Defaults)
 {
-    // Either explicit casing, including an empty value, suppresses both default casings.
-    const auto explicitEnvironment = Environment;
     for (const auto& entry : Defaults)
     {
-        if (std::ranges::none_of(explicitEnvironment, [&](const auto& value) {
-                return wsl::shared::string::IsEqual(EnvironmentName(value), EnvironmentName(entry), true);
-            }))
+        if (std::ranges::none_of(Environment, [&](const auto& value) { return EnvironmentName(value) == EnvironmentName(entry); }))
         {
             Environment.emplace_back(entry);
         }
@@ -99,7 +78,7 @@ void ResolveProxyEnvironmentLoopback(std::vector<std::string>& Environment, cons
     for (auto& entry : Environment)
     {
         const auto name = EnvironmentName(entry);
-        if (wsl::shared::string::IsEqual(name, "http_proxy", true) || wsl::shared::string::IsEqual(name, "https_proxy", true))
+        if (name == "http_proxy" || name == "HTTP_PROXY" || name == "https_proxy" || name == "HTTPS_PROXY")
         {
             const auto offset = entry.find('=') + 1;
             entry = entry.substr(0, offset) + ResolveProxyUrl(entry.substr(offset), HostLoopback);
