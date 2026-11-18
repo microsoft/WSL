@@ -127,6 +127,18 @@ VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind)
     THROW_HR(E_INVALIDARG);
 }
 
+void wsl::windows::common::vm::ConfigureMemoryBackingPages(
+    _Inout_ VmMemoryRequest& Memory, _In_ bool LargeMemoryBackingPages, _In_ const VmPlatformCapabilities& Capabilities)
+{
+    const bool smallPages = !LargeMemoryBackingPages && Capabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory));
+    Memory.SmallPageBacking = smallPages ? VmFeatureRequest::Required : VmFeatureRequest::Disabled;
+    Memory.LargePageBacking = LargeMemoryBackingPages ? VmFeatureRequest::Required : VmFeatureRequest::Disabled;
+    Memory.FaultClusterSizeShift = smallPages ? std::optional<std::uint32_t>{4} : std::nullopt;
+    Memory.DirectMapFaultClusterSizeShift = Memory.FaultClusterSizeShift;
+    // Page reporting order must be at least the fault cluster size shift.
+    Memory.PageReportingOrder = smallPages ? 5 : 9;
+}
+
 void wsl::windows::common::vm::validation::ValidateDiskPlacement(const VmDiskRequest& Request)
 {
     if (Request.Placement)

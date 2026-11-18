@@ -214,28 +214,6 @@ bool wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(_In_ ULONG bu
     return buildNumber >= WindowsBuildNumbers::Vibranium_22H2 && updateBuildRevision >= 3393;
 }
 
-int wsl::windows::common::hcs::ConfigureMemoryBackingPages(_Inout_ Memory& memory, _In_ bool largeMemoryBackingPages)
-{
-    // Page reporting order must be >= fault cluster size shift.
-    if (largeMemoryBackingPages)
-    {
-        memory.BackingPageSize = MemoryBackingPageSize::Large;
-        return 9; // 2MB
-    }
-
-    // Small backing pages require the fix for the VID deadlock on partition teardown.
-    const auto windowsVersion = helpers::GetWindowsVersion();
-    if (IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision))
-    {
-        memory.BackingPageSize = MemoryBackingPageSize::Small;
-        memory.FaultClusterSizeShift = 4;          // 64k
-        memory.DirectMapFaultClusterSizeShift = 4; // 64k
-        return 5;                                  // 128k
-    }
-
-    return 9; // 2MB
-}
-
 wsl::windows::common::hcs::unique_hcs_operation wsl::windows::common::hcs::CreateOperation()
 {
     unique_hcs_operation operation(::HcsCreateOperation(nullptr, nullptr));
@@ -645,9 +623,5 @@ bool wsl::windows::common::hcs::IsDisableVgpuSettingsSupported()
 bool wsl::windows::common::hcs::IsSmallPageMemorySupported()
 {
     const auto version = wsl::windows::common::helpers::GetWindowsVersion();
-    using wsl::windows::common::helpers::WindowsBuildNumbers;
-    return (version.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-           (version.BuildNumber >= WindowsBuildNumbers::Cobalt && version.UpdateBuildRevision >= 2360) ||
-           (version.BuildNumber >= WindowsBuildNumbers::Iron && version.UpdateBuildRevision >= 1970) ||
-           (version.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && version.UpdateBuildRevision >= 3393);
+    return IsSmallMemoryBackingPagesSupported(version.BuildNumber, version.UpdateBuildRevision);
 }
