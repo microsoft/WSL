@@ -526,8 +526,7 @@ BOOL LxsstuInitialize(__in BOOLEAN RunInstanceTests);
 
 BOOL LxsstuVmMode(VOID);
 
-std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(
-    _In_ const std::wstring& Cmd, _In_ int ExpectedExitCode = 0, _In_ bool LogCommand = true);
+std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode = 0);
 
 VOID LxsstuUninitialize(__in BOOLEAN RunInstanceTests);
 

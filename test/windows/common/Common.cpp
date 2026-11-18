@@ -480,7 +480,7 @@ Return Value:
 
 // LxsstuLaunchPowershellAndCaptureOutput
 
-std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode, _In_ bool LogCommand)
+std::pair<std::wstring, std::wstring> LxsstuLaunchPowershellAndCaptureOutput(_In_ const std::wstring& Cmd, _In_ int ExpectedExitCode)
 
 /*++
 
@@ -494,8 +494,6 @@ Arguments:
 
     ExpectedExitCode - The expected exit code from the child process.
 
-    LogCommand - Whether to log the command before running it.
-
 Return Value:
 s
     The command's stdout and stderr output.
@@ -504,10 +502,7 @@ s
 
 {
     auto CommandLine = L"Powershell -NoProfile -Command \"" + Cmd + L"\"";
-    if (LogCommand)
-    {
-        LogInfo("Running the command: %ls\n", CommandLine.c_str());
-    }
+    LogInfo("Running the command: %ls\n", CommandLine.c_str());
     return LxsstuLaunchCommandAndCaptureOutput(CommandLine.data(), ExpectedExitCode);
 }
 
