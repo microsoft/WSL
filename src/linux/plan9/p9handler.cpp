@@ -1139,7 +1139,6 @@ private:
         const auto oldTag = reader.U16();
         if (oldTag == currentRequest.Tag)
         {
-            // A self-flush cannot wait for its own completion.
             co_return 0;
         }
 

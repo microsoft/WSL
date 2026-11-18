@@ -1,1138 +1,124 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
-// Keep message layouts in sync with GetMessageSize in p9data.h and TraceLogMessage in p9log.h.
 #pragma once
 
 #include "p9protohelpers.h"
+#include "p9data.h"
 
 namespace p9fs {
 
-// Validates that a complete message can be read without crossing its declared boundary.
+// Keep variable-length layouts in sync with GetMessageSize and TraceLogMessage.
 inline bool ValidateMessageStructure(MessageType messageType, gsl::span<const gsl::byte> message)
 {
-    SpanReader reader{message};
-    if (!reader.TryRead(HeaderSize).Success)
+    const auto minimumSize = GetMessageSize(messageType);
+    if (minimumSize == 0 || message.size() < minimumSize)
     {
         return false;
     }
 
+    SpanReader reader{message};
+    reader.Read(HeaderSize);
+
     switch (messageType)
     {
     case MessageType::Tversion:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
     case MessageType::Rversion:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tflush:
-    {
-        if (!reader.TryRead(2).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rflush:
-    {
-        return true;
-    }
+        return reader.TryRead(4).Success && reader.TryString().Success;
 
     case MessageType::Twalk:
+    case MessageType::Twopen:
     {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        auto nwname = reader.TryU16();
-        if (!nwname.Success)
-        {
-            return false;
-        }
-        if (nwname.Result > (reader.Size() - reader.Offset()) / sizeof(UINT16))
+        const auto fixedSize = messageType == MessageType::Twalk ? 8 : 32;
+        if (!reader.TryRead(fixedSize).Success)
         {
             return false;
         }
 
-        for (decltype(nwname.Result) i{}; i < nwname.Result; ++i)
+        const auto count = reader.TryU16();
+        if (!count.Success || count.Result > (reader.Size() - reader.Offset()) / sizeof(UINT16))
+        {
+            return false;
+        }
+
+        for (UINT16 i = 0; i < count.Result; ++i)
         {
             if (!reader.TryString().Success)
             {
                 return false;
             }
         }
+
         return true;
     }
 
     case MessageType::Rwalk:
     {
-        auto nwqid = reader.TryU16();
-        if (!nwqid.Success)
-        {
-            return false;
-        }
-        if (nwqid.Result > (reader.Size() - reader.Offset()) / 13)
-        {
-            return false;
-        }
-
-        for (decltype(nwqid.Result) i{}; i < nwqid.Result; ++i)
-        {
-            if (!reader.TryRead(13).Success)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    case MessageType::Tread:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rread:
-    {
-        auto count = reader.TryU32();
-        if (!count.Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(count.Result).Success)
-        {
-            return false;
-        }
-        return true;
+        const auto count = reader.TryU16();
+        return count.Success && reader.TryRead(count.Result * QidSize).Success;
     }
 
     case MessageType::Twrite:
+    case MessageType::Rread:
+    case MessageType::Rreaddir:
+    case MessageType::Rwreaddir:
     {
-        if (!reader.TryRead(4).Success)
+        if (messageType == MessageType::Twrite && !reader.TryRead(12).Success)
         {
             return false;
         }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        auto count = reader.TryU32();
-        if (!count.Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(count.Result).Success)
-        {
-            return false;
-        }
-        return true;
-    }
 
-    case MessageType::Rwrite:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tclunk:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rclunk:
-    {
-        return true;
-    }
-
-    case MessageType::Tremove:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rremove:
-    {
-        return true;
+        const auto count = reader.TryU32();
+        return count.Success && reader.TryRead(count.Result).Success;
     }
 
     case MessageType::Tauth:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rauth:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
     case MessageType::Tattach:
     {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rattach:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rlerror:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tstatfs:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rstatfs:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tlopen:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rlopen:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
+        const auto fixedSize = messageType == MessageType::Tauth ? 4 : 8;
+        return reader.TryRead(fixedSize).Success && reader.TryString().Success && reader.TryString().Success && reader.TryRead(4).Success;
     }
 
     case MessageType::Tlcreate:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rlcreate:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+    case MessageType::Txattrcreate:
+        return reader.TryRead(4).Success && reader.TryString().Success && reader.TryRead(12).Success;
 
     case MessageType::Tsymlink:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rsymlink:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+        return reader.TryRead(4).Success && reader.TryString().Success && reader.TryString().Success && reader.TryRead(4).Success;
 
     case MessageType::Tmknod:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rmknod:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+        return reader.TryRead(4).Success && reader.TryString().Success && reader.TryRead(16).Success;
 
     case MessageType::Trename:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rrename:
-    {
-        return true;
-    }
-
-    case MessageType::Treadlink:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+    case MessageType::Txattrwalk:
+    case MessageType::Tlink:
+        return reader.TryRead(8).Success && reader.TryString().Success;
 
     case MessageType::Rreadlink:
-    {
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tgetattr:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rgetattr:
-    {
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tsetattr:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rsetattr:
-    {
-        return true;
-    }
-
-    case MessageType::Txattrwalk:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rxattrwalk:
-    {
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Txattrcreate:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rxattrcreate:
-    {
-        return true;
-    }
-
-    case MessageType::Treaddir:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rreaddir:
-    {
-        auto count = reader.TryU32();
-        if (!count.Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(count.Result).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tfsync:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rfsync:
-    {
-        return true;
-    }
+        return reader.TryString().Success;
 
     case MessageType::Tlock:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(1).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rlock:
-    {
-        if (!reader.TryRead(1).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+        return reader.TryRead(4 + 1 + 4 + 8 + 8 + 4).Success && reader.TryString().Success;
 
     case MessageType::Tgetlock:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(1).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
+        return reader.TryRead(4 + 1 + 8 + 8 + 4).Success && reader.TryString().Success;
 
     case MessageType::Rgetlock:
-    {
-        if (!reader.TryRead(1).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Tlink:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rlink:
-    {
-        return true;
-    }
+        return reader.TryRead(1 + 8 + 8 + 4).Success && reader.TryString().Success;
 
     case MessageType::Tmkdir:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rmkdir:
-    {
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+        return reader.TryRead(4).Success && reader.TryString().Success && reader.TryRead(8).Success;
 
     case MessageType::Trenameat:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rrenameat:
-    {
-        return true;
-    }
+        return reader.TryRead(4).Success && reader.TryString().Success && reader.TryRead(4).Success && reader.TryString().Success;
 
     case MessageType::Tunlinkat:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Runlinkat:
-    {
-        return true;
-    }
-
-    case MessageType::Taccess:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Raccess:
-    {
-        return true;
-    }
-
-    case MessageType::Twreaddir:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Rwreaddir:
-    {
-        auto count = reader.TryU32();
-        if (!count.Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(count.Result).Success)
-        {
-            return false;
-        }
-        return true;
-    }
-
-    case MessageType::Twopen:
-    {
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        auto nwname = reader.TryU16();
-        if (!nwname.Success)
-        {
-            return false;
-        }
-        if (nwname.Result > (reader.Size() - reader.Offset()) / sizeof(UINT16))
-        {
-            return false;
-        }
-
-        for (decltype(nwname.Result) i{}; i < nwname.Result; ++i)
-        {
-            if (!reader.TryString().Success)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
+        return reader.TryRead(4).Success && reader.TryString().Success && reader.TryRead(4).Success;
 
     case MessageType::Rwopen:
-    {
-        if (!reader.TryRead(1).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(2).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(13).Success)
-        {
-            return false;
-        }
-        if (!reader.TryString().Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(4).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        if (!reader.TryRead(8).Success)
-        {
-            return false;
-        }
-        return true;
-    }
+        return reader.TryRead(1 + 2 + QidSize).Success && reader.TryString().Success && reader.TryRead(4 * 4 + 15 * 8).Success;
 
     default:
-        return false;
+        // Fixed-size messages were checked above.
+        return true;
     }
 }
 
