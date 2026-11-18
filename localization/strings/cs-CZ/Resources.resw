@@ -2458,10 +2458,6 @@ Využití:
      <value>Byl zjištěn neplatný nadbytečný argument: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Možnosti aliasu s hodnotou musí být v řetězci aliasů poslední: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Všechna práva vyhrazena.
 Informace o ochraně osobních údajů k tomuto produktu najdete na stránce https://aka.ms/privacy.</value>

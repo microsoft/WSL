@@ -2464,10 +2464,6 @@ Uso:
      <value>Se encontró un argumento adicional no válido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Las opciones de alias con un valor deben ser las últimas en la cadena de alias: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Todos los derechos reservados.
 Para obtener información de privacidad sobre este producto, visita https://aka.ms/privacy.</value>

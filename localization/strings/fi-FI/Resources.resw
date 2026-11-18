@@ -2458,10 +2458,6 @@ Käyttö:
      <value>Virheellinen lisäargumentti: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Arvon sisältävien alias-asetusten on oltava viimeisinä alias-ketjussa: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Tekijänoikeus (c) Microsoft Corporation. Kaikki oikeudet pidätetään.
 Tuotteen tietosuojatiedot löytyvät osoitteesta https://aka.ms/privacy.</value>

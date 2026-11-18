@@ -2458,10 +2458,6 @@ Bruk:
      <value>Fant ugyldig ekstra argument: «{}»</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasalternativer med en verdi må være sist i aliaskjeden: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Med enerett.
 For personverninformasjon om dette produktet kan du gå til https://aka.ms/privacy.</value>

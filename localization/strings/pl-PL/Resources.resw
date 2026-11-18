@@ -2458,10 +2458,6 @@ Użycie:
      <value>Napotkano nieprawidłowy dodatkowy argument: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasy opcji z wartością muszą znajdować się na końcu łańcucha aliasów: „{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Wszelkie prawa zastrzeżone.
 Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stronę HTTP://aka.ms/privacy.</value>

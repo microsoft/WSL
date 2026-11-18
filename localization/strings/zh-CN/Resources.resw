@@ -2458,10 +2458,6 @@ Windows 版本: {}</value>
      <value>遇到无效的额外参数:“{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>带有值的别名选项必须位于别名链末尾:“{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>版权所有 (c) Microsoft Corporation。保留所有权利。
 有关此产品的隐私信息，请访问 https://aka.ms/privacy。</value>
