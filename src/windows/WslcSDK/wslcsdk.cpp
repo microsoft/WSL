@@ -1058,6 +1058,12 @@ try
 
         if (!exited)
         {
+            // A running container still delivers IO through the callback it owns, so releasing an alias must leave it alone.
+            if (!internalType->ownsIOCallbacks)
+            {
+                return S_OK;
+            }
+
             internalType->ioCallbacks->Cancel();
         }
 
@@ -1561,6 +1567,7 @@ try
         {
             ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
             result->ioCallbacks = ioCallbacks;
+            result->ownsIOCallbacks = true;
         }
 
         // Hand out the process handle before any callback can run.

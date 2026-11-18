@@ -2983,6 +2983,45 @@ class WslcSdkTests
         VERIFY_IS_FALSE(ctx.exitFired.load());
     }
 
+    WSLC_TEST_METHOD(ReleaseInitProcessHandleKeepsContainerIOCallbacks)
+    {
+        // Init process handles share the container's IO callback. Releasing one while the container is running must not
+        // stop the container's callbacks.
+        struct Context
+        {
+            std::atomic<int> callbackCount{0};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
+            static_cast<Context*>(c)->callbackCount.fetch_add(1);
+        };
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "while true; do echo LINE; sleep 0.05; done"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        WslcProcess initProcess{};
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &initProcess));
+        VERIFY_SUCCEEDED(WslcReleaseProcess(initProcess));
+
+        const int countAtRelease = ctx.callbackCount.load();
+        Sleep(500);
+        VERIFY_IS_TRUE(ctx.callbackCount.load() > countAtRelease);
+    }
+
     WSLC_TEST_METHOD(ProcessIoCallbackLargeOutput)
     {
         // Generate ~1 MiB of stdout via: dd if=/dev/zero bs=1024 count=1024 | base64

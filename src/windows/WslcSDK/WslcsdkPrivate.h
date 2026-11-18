@@ -167,6 +167,8 @@ struct WslcProcessImpl
 {
     wil::com_ptr<IWSLCCompatProcess> process;
     std::shared_ptr<IOCallback> ioCallbacks;
+    // False when ioCallbacks belongs to the container, as for handles returned by WslcGetContainerInitProcess.
+    bool ownsIOCallbacks = false;
 };
 
 WslcProcessImpl* GetInternalType(WslcProcess handle);
