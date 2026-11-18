@@ -711,10 +711,10 @@ Argumentumok:
     <value>Frissítések keresése.</value>
   </data>
   <data name="MessageGitHubRateLimited" xml:space="preserve">
-    <value>The GitHub API rate limit was reached. Try again later.</value>
+    <value>Elérte a GitHub API sebességkorlátját. Próbálkozzon újra később.</value>
   </data>
   <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
-    <value>The GitHub API rate limit was reached. Checking for updates using Windows Update.</value>
+    <value>Elérte a GitHub API sebességkorlátját. Frissítések keresése a Windows Update használatával.</value>
   </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Ez a terjesztés csak a Microsoft Store áruházban érhető el.</value>
@@ -2456,10 +2456,6 @@ Usage:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Érvénytelen extra argumentum észlelve: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Az értékekkel rendelkező aliasopcióknak az aliaslánc végén kell szerepelniük: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

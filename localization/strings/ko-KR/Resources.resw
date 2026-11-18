@@ -2464,10 +2464,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
      <value>잘못된 추가 인수가 발견됨: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>값이 있는 별칭 옵션은 별칭 체인의 마지막에 있어야 합니다. '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. All rights reserved.
 이 제품의 개인 정보 보호에 관한 정보는 https://aka.ms/privacy에서 확인하세요.</value>

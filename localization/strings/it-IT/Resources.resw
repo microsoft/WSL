@@ -2464,10 +2464,6 @@ Utilizzo:
      <value>È stato rilevato un argomento aggiuntivo non valido: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Le opzioni di alias con un valore devono essere le ultime nella catena di alias: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Tutti i diritti sono riservati.
 Per informazioni sulla privacy di questo prodotto, visita https://aka.ms/privacy.</value>
