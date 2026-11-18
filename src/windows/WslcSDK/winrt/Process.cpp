@@ -30,6 +30,12 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& setti
     if (m_settings)
     {
         m_outputMode = GetImplementation(m_settings)->OutputMode();
+
+        // Materialize the settings now so they can no longer be changed once an Event mode process is created from them.
+        if (m_outputMode == ProcessOutputMode::Event)
+        {
+            GetStructPointer(m_settings);
+        }
     }
 }
 

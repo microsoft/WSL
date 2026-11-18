@@ -2340,13 +2340,15 @@ class WslcSdkWinRtTests
             winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo EXEC_OUT && echo EXEC_ERR >&2"}));
         execProcSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
 
+        // Declared before the processes so the buffers outlive the IO callbacks on every exit path.
+        std::string stdoutData, stderrData;
+
         auto process1 = container.CreateProcess(execProcSettings);
         auto process2 = container.CreateProcess(execProcSettings);
 
         // Releasing the last reference to the unstarted second process must not affect the first one.
         process2 = nullptr;
 
-        std::string stdoutData, stderrData;
         process1.OutputReceived([&](winrt::array_view<uint8_t const> data) {
             stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
         });
