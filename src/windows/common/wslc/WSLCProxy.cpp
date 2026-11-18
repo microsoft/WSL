@@ -35,19 +35,13 @@ namespace {
         URL_COMPONENTS components{};
         components.dwStructSize = sizeof(components);
         components.dwHostNameLength = -1;
-        if (!WinHttpCrackUrl(normalizedUrl.c_str(), 0, 0, &components) || components.dwHostNameLength == 0 || components.nPort == 0)
+        if (!WinHttpCrackUrl(normalizedUrl.c_str(), 0, 0, &components) || components.dwHostNameLength == 0)
         {
             return std::nullopt;
         }
 
         const auto* hostBegin = components.lpszHostName;
         const auto* hostEnd = hostBegin + components.dwHostNameLength;
-        // WinHTTP treats an empty port as the default port.
-        if (*hostEnd == L':' && (hostEnd[1] < L'0' || hostEnd[1] > L'9'))
-        {
-            return std::nullopt;
-        }
-
         const auto prefix = wsl::shared::string::WideToMultiByte(std::wstring{normalizedUrl.c_str() + c_scheme.size(), hostBegin});
         const auto host = wsl::shared::string::WideToMultiByte(std::wstring{hostBegin, hostEnd});
         return std::make_pair(authorityOffset + prefix.size(), host.size());
