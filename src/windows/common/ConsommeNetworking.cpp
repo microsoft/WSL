@@ -485,13 +485,17 @@ void ConsommeNetworking::RefreshGuestConnection()
     m_virtioNetNameservers = std::move(nameservers);
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
+    UpdateDefaultRoute(AF_INET, defaultRouteIpv4, m_trackedDefaultRouteIpv4);
+
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
-        UpdateIpv6Address(networkSettings->PreferredIpv6Address);
-        UpdateDefaultRoute(AF_INET6, defaultRouteIpv6, m_trackedDefaultRouteIpv6);
+        try
+        {
+            UpdateIpv6Address(networkSettings->PreferredIpv6Address);
+            UpdateDefaultRoute(AF_INET6, defaultRouteIpv6, m_trackedDefaultRouteIpv6);
+        }
+        CATCH_LOG()
     }
-
-    UpdateDefaultRoute(AF_INET, defaultRouteIpv4, m_trackedDefaultRouteIpv4);
 
     UpdateDnsSettings(currentDns);
     UpdateMtu(minMtu);
@@ -582,14 +586,19 @@ void ConsommeNetworking::UpdateDefaultRoute(ADDRESS_FAMILY family, const std::ws
 {
     WI_ASSERT(family == AF_INET || family == AF_INET6);
 
-    if (gateway == trackedGateway || !m_adapterId.has_value())
+    if (!m_adapterId.has_value())
     {
         return;
     }
 
-    SendDefaultRoute(family, trackedGateway, hns::ModifyRequestType::Remove);
-    trackedGateway = gateway;
+    if (gateway != trackedGateway)
+    {
+        SendDefaultRoute(family, trackedGateway, hns::ModifyRequestType::Remove);
+        trackedGateway.clear();
+    }
+
     SendDefaultRoute(family, gateway, hns::ModifyRequestType::Add);
+    trackedGateway = gateway;
 }
 
 void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
@@ -615,8 +624,6 @@ void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& 
         return;
     }
 
-    m_trackedIpv4Address = ipAddress;
-
     // N.B. SendEndpointState triggers SetAdapterConfiguration on the Linux side
     // which brings the interface UP and configures the full adapter state.
     hns::HNSEndpoint endpointProperties;
@@ -624,6 +631,8 @@ void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& 
     endpointProperties.IPAddress = ipAddress.AddressString;
     endpointProperties.PrefixLength = ipAddress.PrefixLength;
     m_gnsChannel.SendEndpointState(endpointProperties);
+
+    m_trackedIpv4Address = ipAddress;
 }
 
 void ConsommeNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAddress, hns::ModifyRequestType requestType)
