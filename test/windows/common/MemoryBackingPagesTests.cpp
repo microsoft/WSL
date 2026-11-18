@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "IVirtualMachineBackend.h"
 #include "hcs.hpp"
 
 namespace MemoryBackingPagesTests {
@@ -51,36 +52,35 @@ class MemoryBackingPagesTests
 
     TEST_METHOD(LargePages)
     {
-        wsl::windows::common::hcs::Memory memory{};
-        VERIFY_ARE_EQUAL(9, wsl::windows::common::hcs::ConfigureMemoryBackingPages(memory, true));
-
-        const nlohmann::json settings = memory;
-        VERIFY_ARE_EQUAL(std::string("Large"), settings.at("BackingPageSize").get<std::string>());
-        VERIFY_IS_FALSE(settings.contains("FaultClusterSizeShift"));
-        VERIFY_IS_FALSE(settings.contains("DirectMapFaultClusterSizeShift"));
+        VmPlatformCapabilities capabilities{};
+        capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory));
+        VmMemoryRequest memory{};
+        wsl::windows::common::vm::ConfigureMemoryBackingPages(memory, true, capabilities);
+        VERIFY_ARE_EQUAL(VmFeatureRequest::Required, memory.LargePageBacking);
+        VERIFY_ARE_EQUAL(VmFeatureRequest::Disabled, memory.SmallPageBacking);
+        VERIFY_ARE_EQUAL(9u, memory.PageReportingOrder.value());
+        VERIFY_IS_FALSE(memory.FaultClusterSizeShift.has_value());
+        VERIFY_IS_FALSE(memory.DirectMapFaultClusterSizeShift.has_value());
     }
 
     TEST_METHOD(DefaultPages)
     {
-        const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
-        const bool smallPagesSupported =
-            wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision);
-
-        wsl::windows::common::hcs::Memory memory{};
-        VERIFY_ARE_EQUAL(smallPagesSupported ? 5 : 9, wsl::windows::common::hcs::ConfigureMemoryBackingPages(memory, false));
-
-        const nlohmann::json settings = memory;
-        if (smallPagesSupported)
+        for (const bool smallPagesSupported : {false, true})
         {
-            VERIFY_ARE_EQUAL(std::string("Small"), settings.at("BackingPageSize").get<std::string>());
-            VERIFY_ARE_EQUAL(4u, settings.at("FaultClusterSizeShift").get<uint32_t>());
-            VERIFY_ARE_EQUAL(4u, settings.at("DirectMapFaultClusterSizeShift").get<uint32_t>());
-        }
-        else
-        {
-            VERIFY_IS_FALSE(settings.contains("BackingPageSize"));
-            VERIFY_IS_FALSE(settings.contains("FaultClusterSizeShift"));
-            VERIFY_IS_FALSE(settings.contains("DirectMapFaultClusterSizeShift"));
+            VmPlatformCapabilities capabilities{};
+            capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), smallPagesSupported);
+            VmMemoryRequest memory{};
+            wsl::windows::common::vm::ConfigureMemoryBackingPages(memory, false, capabilities);
+            VERIFY_ARE_EQUAL(VmFeatureRequest::Disabled, memory.LargePageBacking);
+            VERIFY_ARE_EQUAL(smallPagesSupported ? VmFeatureRequest::Required : VmFeatureRequest::Disabled, memory.SmallPageBacking);
+            VERIFY_ARE_EQUAL(smallPagesSupported ? 5u : 9u, memory.PageReportingOrder.value());
+            VERIFY_ARE_EQUAL(smallPagesSupported, memory.FaultClusterSizeShift.has_value());
+            VERIFY_ARE_EQUAL(smallPagesSupported, memory.DirectMapFaultClusterSizeShift.has_value());
+            if (smallPagesSupported)
+            {
+                VERIFY_ARE_EQUAL(4u, memory.FaultClusterSizeShift.value());
+                VERIFY_ARE_EQUAL(4u, memory.DirectMapFaultClusterSizeShift.value());
+            }
         }
     }
 

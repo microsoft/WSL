@@ -222,6 +222,37 @@ class HcsVirtualMachineBackendTests
         VerifyBootsAndTerminates(HcsVirtualMachineBackend::Create(CreateRunnableRequest()));
     }
 
+    TEST_METHOD(LargePageBacking)
+    {
+        auto request = CreateRequest();
+        request.Boot.Method = VmBootMethod::Uefi;
+        request.Boot.InitrdPath.clear();
+        request.Memory.AllowOvercommit = VmFeatureRequest::Required;
+        wsl::windows::common::vm::ConfigureMemoryBackingPages(request.Memory, true, QueryVirtualMachineBackendCapabilities(BackendKind::Hcs));
+        HcsVirtualMachineBackend backend;
+        backend.m_configuration.Description.Identity = request.Identity;
+        const auto configuration = backend.BuildConfiguration(request);
+        const auto& memory = configuration.Description.Memory;
+        VERIFY_IS_TRUE(memory.LargePageBacking);
+        VERIFY_IS_FALSE(memory.SmallPageBacking);
+        VERIFY_ARE_EQUAL(UINT32{9}, memory.PageReportingOrder.value());
+        const nlohmann::json settings = configuration.Settings.VirtualMachine.ComputeTopology.Memory;
+        VERIFY_ARE_EQUAL(std::string("Large"), settings.at("BackingPageSize").get<std::string>());
+        VERIFY_IS_FALSE(settings.contains("FaultClusterSizeShift"));
+        VERIFY_IS_FALSE(settings.contains("DirectMapFaultClusterSizeShift"));
+    }
+
+    TEST_METHOD(RejectsConflictingBackingPages)
+    {
+        auto request = CreateRequest();
+        request.Memory.AllowOvercommit = VmFeatureRequest::Required;
+        request.Memory.SmallPageBacking = VmFeatureRequest::Required;
+        request.Memory.LargePageBacking = VmFeatureRequest::Required;
+        HcsVirtualMachineBackend backend;
+        backend.m_configuration.Description.Identity = request.Identity;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend.BuildConfiguration(request); }));
+    }
+
     WSL2_TEST_METHOD(SignalsTerminationOnlyAfterVmExit)
     {
         SKIP_TEST_ARM64();

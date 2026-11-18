@@ -105,15 +105,8 @@ WSLCVirtualMachineHost::WSLCVirtualMachineHost(_In_ const WSLCSessionSettings* S
     request.Memory.AllowOvercommit = VmFeatureRequest::Required;
     request.Memory.DeferredCommit = VmFeatureRequest::Required;
     request.Memory.ColdDiscard = VmFeatureRequest::Required;
-    const bool densityMemorySupported = helpers::GetWindowsVersion().BuildNumber >= WindowsBuildNumbers::Germanium;
-    if (densityMemorySupported)
-    {
-        request.Memory.SmallPageBacking = VmFeatureRequest::Preferred;
-        request.Memory.FaultClusterSizeShift = 4;
-        request.Memory.DirectMapFaultClusterSizeShift = 4;
-    }
-
-    request.Memory.PageReportingOrder = densityMemorySupported ? 5 : 9;
+    vm::ConfigureMemoryBackingPages(
+        request.Memory, FeatureEnabled(WslcFeatureFlagsLargeMemoryBackingPages), QueryVirtualMachineBackendCapabilities(BackendKind::Hcs));
     request.Memory.HostingProcessNameSuffix =
         Settings->DisplayName ? std::optional{SanitizeHostingProcessNameSuffix(Settings->DisplayName)} : std::nullopt;
 

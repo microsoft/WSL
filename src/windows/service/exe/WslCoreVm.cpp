@@ -1400,18 +1400,8 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     request.Memory.DeferredCommit = VmFeatureRequest::Required;
     request.Memory.ColdDiscard = VmFeatureRequest::Required;
     const auto backendCapabilities = QueryVirtualMachineBackendCapabilities(BackendKind::Hcs);
-    if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory)))
-    {
-        request.Memory.SmallPageBacking = VmFeatureRequest::Required;
-        request.Memory.FaultClusterSizeShift = 4;
-        request.Memory.DirectMapFaultClusterSizeShift = 4;
-        request.Memory.PageReportingOrder = 5;
-        m_pageReportingOrder = 5;
-    }
-    else
-    {
-        m_pageReportingOrder = 9;
-    }
+    vm::ConfigureMemoryBackingPages(request.Memory, m_vmConfig.EnableLargeMemoryBackingPages, backendCapabilities);
+    m_pageReportingOrder = request.Memory.PageReportingOrder.value();
 
     if (helpers::IsVmemmSuffixSupported())
     {
