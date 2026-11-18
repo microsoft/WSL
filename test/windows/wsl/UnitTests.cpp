@@ -2608,21 +2608,22 @@ Usage:
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
-    WSL2_TEST_METHOD(MemoryProfile)
+    WSL2_TEST_METHOD(MemoryPageSize)
     {
         const auto windowsVersion = wsl::windows::common::helpers::GetWindowsVersion();
         const bool smallPagesSupported =
             wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(windowsVersion.BuildNumber, windowsVersion.UpdateBuildRevision);
 
-        for (const auto& setting : {L"", L"memoryProfile=density", L"memoryProfile=performance", L"memoryProfile=invalid"})
+        for (const auto& setting :
+             {L"", L"memoryPageSize=small", L"memoryPageSize=medium", L"memoryPageSize=large", L"memoryPageSize=invalid"})
         {
             WslConfigChange config(LxssGenerateTestConfig() + L"\n[experimental]\n" + setting);
             const auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/cmdline");
-            const int expectedOrder = std::wstring_view(setting) == L"memoryProfile=performance" || !smallPagesSupported ? 9 : 5;
+            const int expectedOrder = std::wstring_view(setting) == L"memoryPageSize=medium" || !smallPagesSupported ? 9 : 5;
             VERIFY_IS_TRUE(output.find(std::format(L"page_reporting.page_reporting_order={}", expectedOrder)) != std::wstring::npos);
-            if (std::wstring_view(setting) == L"memoryProfile=invalid")
+            if (std::wstring_view(setting) == L"memoryPageSize=large" || std::wstring_view(setting) == L"memoryPageSize=invalid")
             {
-                VERIFY_IS_TRUE(warnings.find(L"memoryProfile") != std::wstring::npos);
+                VERIFY_IS_TRUE(warnings.find(L"memoryPageSize") != std::wstring::npos);
             }
             else
             {

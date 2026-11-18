@@ -283,7 +283,7 @@ namespace ConfigSetting {
     namespace Experimental {
         static constexpr auto NetworkingMode = "experimental.networkingMode";
         static constexpr auto AutoMemoryReclaim = "experimental.autoMemoryReclaim";
-        static constexpr auto MemoryProfile = "experimental.memoryProfile";
+        static constexpr auto MemoryPageSize = "experimental.memoryPageSize";
         static constexpr auto SparseVhd = "experimental.sparseVhd";
         static constexpr auto DnsTunneling = "experimental.dnsTunneling";
         static constexpr auto BestEffortDnsParsing = "experimental.bestEffortDnsParsing";
