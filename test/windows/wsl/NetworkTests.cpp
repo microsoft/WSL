@@ -6097,6 +6097,26 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    WSL2_TEST_METHOD(LoopbackBindAfterWildcardClose)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        // Close and rebind in one process because BindGuestPort doesn't wait for the guest socket to close.
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(
+                L"perl -MIO::Socket::INET -e '"
+                L"my $port = 12345;"
+                L"for my $address (qw(0.0.0.0 127.0.0.1)) {"
+                L"  my $listener = IO::Socket::INET->new(LocalAddr => $address, LocalPort => $port, Listen => 1)"
+                L"    or die \"listen on $address:$port: $!\";"
+                L"  $listener->sockhost eq $address && $listener->sockport == $port or die \"wrong endpoint for $address:$port\";"
+                L"  close($listener) or die \"close: $!\";"
+                L"}'"),
+            0L);
+    }
+
     WSL2_TEST_METHOD(GuestOnlyAddressBind)
     {
         CONSOMME_TEST_ONLY();

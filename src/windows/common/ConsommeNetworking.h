@@ -2,6 +2,12 @@
 
 #pragma once
 
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <set>
+#include <string>
 #include "INetworkingEngine.h"
 #include "GnsChannel.h"
 #include "WslCoreHostDnsInfo.h"
@@ -50,9 +56,40 @@ public:
     HRESULT UnmapPort(_In_ const SOCKADDR_INET& ListenAddress, _In_ USHORT GuestPort, _In_ int Protocol) const;
 
 private:
+    struct PortTrackerState
+    {
+        struct LoopbackPort
+        {
+            ADDRESS_FAMILY Family;
+            int Protocol;
+            uint16_t Port;
+
+            auto operator<=>(const LoopbackPort&) const = default;
+        };
+
+        struct GuestOnlyPort
+        {
+            std::string Address;
+            uint16_t Port;
+            int Protocol;
+
+            auto operator<=>(const GuestOnlyPort&) const = default;
+        };
+
+        struct LoopbackOwners
+        {
+            size_t Wildcard = 0;
+            size_t Loopback = 0;
+        };
+
+        std::map<LoopbackPort, LoopbackOwners> LoopbackPorts;
+        std::set<GuestOnlyPort> GuestOnlyPorts;
+    };
+
     static void NETIOAPI_API_ OnNetworkConnectivityChange(PVOID context, NL_NETWORK_CONNECTIVITY_HINT hint);
 
-    uint16_t HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate) const;
+    uint16_t HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate, PortTrackerState* trackerState = nullptr) const;
+    uint16_t ModifyDevicePorts(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate, bool mapLoopback, bool mapEth0) const;
     uint16_t ModifyOpenPorts(
         _In_ PCWSTR tag, _In_ const SOCKADDR_INET& hostAddress, _In_ uint16_t HostPort, _In_ uint16_t GuestPort, _In_ int protocol, _In_ bool isOpen) const;
     void RefreshGuestConnection();

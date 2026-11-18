@@ -208,16 +208,18 @@ void ConsommeNetworking::StartPortTracker(wil::unique_socket&& socket)
 
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
-        [&, guestOnlyPorts = std::set<std::tuple<std::string, uint16_t, int>>{}](const SOCKADDR_INET& addr, int protocol, bool allocate) mutable {
+        [&, trackerState = PortTrackerState{}](const SOCKADDR_INET& addr, int protocol, bool allocate) mutable {
             const auto result = wil::ResultFromException([&]() {
                 const auto port = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
-                const auto key = std::tuple(wsl::windows::common::string::SockAddrInetToString(addr), port, protocol);
-                if (!allocate && guestOnlyPorts.erase(key) != 0)
+                const PortTrackerState::GuestOnlyPort key{
+                    .Address = wsl::windows::common::string::SockAddrInetToString(addr), .Port = port, .Protocol = protocol};
+                if (!allocate && trackerState.GuestOnlyPorts.erase(key) != 0)
                 {
                     return;
                 }
 
-                const auto result = wil::ResultFromException([&]() { HandlePortNotification(addr, protocol, port, allocate); });
+                const auto result =
+                    wil::ResultFromException([&]() { HandlePortNotification(addr, protocol, port, allocate, &trackerState); });
 
                 // If the bind address is not available on the host, let the bind flow through so the kernel can decide if it is
                 // valid. Keep track of bind requests that are not available on the host so we don't try to unbind them later.
@@ -236,7 +238,7 @@ void ConsommeNetworking::StartPortTracker(wil::unique_socket&& socket)
                     if (!INET_IS_ADDR_UNSPECIFIED(family, ipAddress) && !INET_IS_ADDR_LOOPBACK(family, ipAddress))
                     {
                         // Guest-only addresses need no host forwarding. Let Linux validate the bind.
-                        guestOnlyPorts.insert(key);
+                        trackerState.GuestOnlyPorts.insert(key);
                         return;
                     }
                 }
@@ -275,7 +277,7 @@ try
 }
 CATCH_LOG()
 
-uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate) const
+uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate, PortTrackerState* trackerState) const
 {
     if (addr.si_family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&addr.Ipv6.sin6_addr))
     {
@@ -305,6 +307,48 @@ uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int prot
             return 0;
         }
     }
+
+    const bool mapLoopback = WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay) && (unspecified || loopback);
+    // Only guest tracker requests can share the loopback relay.
+    if (!mapLoopback || !trackerState)
+    {
+        return ModifyDevicePorts(addr, protocol, guestPort, allocate, mapLoopback, !loopback);
+    }
+
+    // Count wildcard and loopback owners of the same relay endpoint separately.
+    const PortTrackerState::LoopbackPort key{.Family = addr.si_family, .Protocol = protocol, .Port = guestPort};
+    auto& ports = trackerState->LoopbackPorts;
+    const auto entry = allocate ? ports.try_emplace(key).first : ports.find(key);
+    THROW_HR_IF(E_UNEXPECTED, entry == ports.end());
+    auto& [wildcardOwners, loopbackOwners] = entry->second;
+    auto& owners = unspecified ? wildcardOwners : loopbackOwners;
+    THROW_HR_IF(E_UNEXPECTED, !allocate && owners == 0);
+    // A failed first bind must not leave an empty entry.
+    auto removeEmpty = wil::scope_exit([&]() {
+        if (wildcardOwners == 0 && loopbackOwners == 0)
+        {
+            ports.erase(entry);
+        }
+    });
+
+    // Loopback can reuse a wildcard bind; only the last owner unbinds it.
+    const bool modifyLoopback = allocate ? (unspecified || wildcardOwners == 0) : (wildcardOwners + loopbackOwners == 1);
+    const auto result = ModifyDevicePorts(addr, protocol, guestPort, allocate, modifyLoopback, !loopback);
+    // Change ownership only after the device operation succeeds.
+    if (allocate)
+    {
+        ++owners;
+    }
+    else
+    {
+        --owners;
+    }
+
+    return result;
+}
+
+uint16_t ConsommeNetworking::ModifyDevicePorts(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate, bool mapLoopback, bool mapEth0) const
+{
     SOCKADDR_INET localAddr = addr;
     std::function<void()> removePort;
 
@@ -316,9 +360,9 @@ uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int prot
         }
     });
 
-    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
+    if (mapLoopback)
     {
-        if (!loopback)
+        if (mapEth0)
         {
             INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&localAddr));
             if (addr.si_family == AF_INET)
@@ -337,7 +381,7 @@ uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int prot
         removePort = [&]() { ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, !allocate); };
     }
 
-    if (!loopback)
+    if (mapEth0)
     {
         hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
     }
