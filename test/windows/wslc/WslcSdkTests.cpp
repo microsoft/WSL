@@ -3094,6 +3094,60 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(ctx.releaseContainerHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
     }
 
+    WSLC_TEST_METHOD(ReleaseContainerFromIOCallbackDuringStart)
+    {
+        // The callback releases the container on the first output, which can happen while WslcStartContainer is still
+        // running. The release must be rejected no matter how far startup has progressed.
+        struct Context
+        {
+            WslcContainer container{nullptr};
+            std::atomic<HRESULT> releaseContainerHr{S_OK};
+            std::atomic<bool> captured{false};
+            wil::unique_event done{wil::EventOptions::ManualReset};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE*, uint32_t, PVOID c) {
+            auto* cx = static_cast<Context*>(c);
+
+            bool expected = false;
+            if (!cx->captured.compare_exchange_strong(expected, true))
+            {
+                return;
+            }
+
+            cx->releaseContainerHr.store(WslcReleaseContainer(cx->container));
+            cx->done.SetEvent();
+        };
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "echo OUT && sleep 99"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+
+        // The handle is available to the callback before the container starts.
+        ctx.container = container.get();
+        VERIFY_SUCCEEDED(WslcStartContainer(container.get(), WSLC_CONTAINER_START_FLAG_ATTACH, nullptr));
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.done.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+        VERIFY_ARE_EQUAL(ctx.releaseContainerHr.load(), HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+
+        // The rejected release must not have consumed the handle.
+        WslcContainerState state{};
+        VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
+        VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_RUNNING);
+    }
+
     // -----------------------------------------------------------------------
     // Storage tests
     // -----------------------------------------------------------------------

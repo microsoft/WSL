@@ -15,6 +15,7 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
+#include "WslcsdkInternal.h"
 #include "Defaults.h"
 #include "ProgressCallback.h"
 #include "CrashDumpCallback.h"
@@ -1281,6 +1282,11 @@ try
 CATCH_RETURN();
 
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
+{
+    return WslcStartContainerInternal(container, flags, errorMessage, TRUE);
+}
+
+STDAPI WslcStartContainerInternal(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage, _In_ BOOL activateIOCallbacks)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
@@ -1299,11 +1305,33 @@ try
             wil::com_ptr<IWSLCCompatProcess> process;
             RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
             wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
-            internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+
+            // Publish ownership before any callback can run, so that a release from within a callback is rejected.
+            auto ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+            internalType->ioCallbacks = ioCallbacks;
+
+            if (activateIOCallbacks)
+            {
+                ioCallbacks->Activate();
+            }
         }
     }
 
     return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcActivateContainerIOCallbacks(_In_ WslcContainer container)
+try
+{
+    auto internalType = CheckAndGetInternalType(container);
+
+    if (auto ioCallbacks = internalType->ioCallbacks.load())
+    {
+        ioCallbacks->Activate();
+    }
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1508,12 +1536,20 @@ try
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
 
+        std::shared_ptr<IOCallback> ioCallbacks;
         if (IOCallback::HasIOCallback(internalProcessSettings))
         {
-            result->ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+            ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+            result->ioCallbacks = ioCallbacks;
         }
 
+        // Hand out the process handle before any callback can run.
         *newProcess = reinterpret_cast<WslcProcess>(result.release());
+
+        if (ioCallbacks)
+        {
+            ioCallbacks->Activate();
+        }
     }
 
     return errorInfoWrapper;

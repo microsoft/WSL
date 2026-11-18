@@ -11,6 +11,7 @@ set(HEADERS
     ProgressCallback.h
     CrashDumpCallback.h
     wslcsdk.h
+    WslcsdkInternal.h
     WslcsdkPrivate.h
 )
 

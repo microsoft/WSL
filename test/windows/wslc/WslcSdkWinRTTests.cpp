@@ -3050,4 +3050,49 @@ class WslcSdkWinRtTests
         opened = nullptr;
         VERIFY_IS_TRUE(processDestroyed.wait(30 * 1000));
     }
+
+    WSLC_TEST_METHOD(EventModeInitProcessAttachedBeforeOutputCallback)
+    {
+        // The first output can arrive while Start() is still running. The init process is the callback context,
+        // so its handle must already be attached when the handler runs.
+        std::atomic<HRESULT> stateHr{E_UNEXPECTED};
+        std::atomic<bool> captured{false};
+        wil::unique_event outputReceived{wil::EventOptions::ManualReset};
+
+        auto procSettings = WSLCSDK::ProcessSettings();
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo OUT && sleep 99"}));
+        procSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(procSettings);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto process = container.InitProcess();
+        process.OutputReceived([&](winrt::array_view<const uint8_t>) {
+            bool expected = false;
+            if (!captured.compare_exchange_strong(expected, true))
+            {
+                return;
+            }
+
+            try
+            {
+                std::ignore = process.State();
+                stateHr.store(S_OK);
+            }
+            catch (const winrt::hresult_error& e)
+            {
+                stateHr.store(e.code());
+            }
+
+            outputReceived.SetEvent();
+        });
+
+        container.Start();
+
+        VERIFY_IS_TRUE(outputReceived.wait(30 * 1000));
+        VERIFY_ARE_EQUAL(stateHr.load(), S_OK);
+    }
 };

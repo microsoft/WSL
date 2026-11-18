@@ -19,6 +19,7 @@ Abstract:
 #include "ContainerNetwork.h"
 #include "Process.h"
 #include "ProcessSettings.h"
+#include "WslcsdkInternal.h"
 
 using namespace winrt::Windows::Foundation;
 
@@ -69,7 +70,7 @@ void Container::Start()
     }
 
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcStartContainer(ToHandle(), startFlags, errorMessage.put());
+    auto hr = WslcStartContainerInternal(ToHandle(), startFlags, errorMessage.put(), FALSE);
     THROW_MSG_IF_FAILED(hr, errorMessage);
 
     if (m_initProcess)
@@ -82,6 +83,9 @@ void Container::Start()
             m_initProcess->AttachHandle(initHandle);
         }
     }
+
+    // The init process IO callbacks use m_initProcess as their context, so they are only delivered once its handle is attached.
+    winrt::check_hresult(WslcActivateContainerIOCallbacks(ToHandle()));
 }
 
 void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, TimeSpan timeout)
