@@ -32,29 +32,25 @@ struct UxdReservationIdentity
     GUID Id{};
 };
 
-std::wstring GetUxdPortRegistryValueName(uint32_t Port);
-Reservation MakeReservation(const GUID& Owner);
-Reservation DecodeReservation(std::span<const BYTE> Bytes);
-bool OwnsReservation(const GUID& Owner, const Reservation& Value) noexcept;
+namespace uxd {
 
-class UxdRegistry
-{
-public:
-    bool HasReservation(const UxdReservationIdentity& Value) const;
-    std::optional<Reservation> ReadReservation(const UxdReservationIdentity& Value) const;
+    std::wstring GetUxdPortRegistryValueName(uint32_t Port);
+    Reservation MakeReservation(const GUID& Owner);
+    Reservation DecodeReservation(std::span<const BYTE> Bytes);
+    bool OwnsReservation(const GUID& Owner, const Reservation& Value) noexcept;
+
+    bool HasReservation(const UxdReservationIdentity& Value);
+    std::optional<Reservation> ReadReservation(const UxdReservationIdentity& Value);
     void CreateMapping(const UxdReservationIdentity& Value);
     // Missing or nonmatching values return false; registry access errors still throw.
-    bool MappingMatches(const UxdReservationIdentity& Value) const;
+    bool MappingMatches(const UxdReservationIdentity& Value);
     void PublishReservation(const UxdReservationIdentity& Value);
     bool RemoveReservation(const UxdReservationIdentity& Value);
-    bool MappingReferenced(const UxdReservationIdentity& Value) const;
+    bool MappingReferenced(const UxdReservationIdentity& Value);
     void RemoveMapping(const UxdReservationIdentity& Value);
-    void Flush() const;
-    static bool IsSupported();
+    void Flush();
+    bool IsSupported();
 
-private:
-    std::wstring GetReservationRegistryPath(const UxdReservationIdentity& Value) const;
-    static HRESULT QuerySupport() noexcept;
-};
+} // namespace uxd
 
 } // namespace wsl::windows::common::usb

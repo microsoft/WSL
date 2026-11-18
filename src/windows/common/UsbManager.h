@@ -11,6 +11,7 @@
 #include <functional>
 #include <list>
 #include <thread>
+#include <utility>
 
 namespace wsl::windows::common::usb {
 
@@ -69,7 +70,8 @@ private:
     UxdReservationIdentity ResolvePortId(const Inventory& Current, const PortId& Port) const;
     std::list<Record>::iterator FindReservationRecord(const UxdReservationIdentity& Value);
     bool MatchesRecordedReservation(const Record& Value) const;
-    Device WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::wstring& Path);
+    // Returns {device instance ID, WinUSB interface path}.
+    std::pair<std::wstring, std::wstring> WaitForWinUsbDevice(const UxdReservationIdentity& Value);
     void WaitForDeviceReappearance(const UxdReservationIdentity& Value) noexcept;
     void PersistReservationRecord(const Record& Value);
     void QueueDeviceRemoval(std::wstring Identifier, bool Instance);
@@ -81,7 +83,6 @@ private:
 
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::list<Record> m_records;
-    UxdRegistry m_registry;
     wil::unique_hkey m_journal;
     wil::unique_event m_stop;
     wil::unique_event m_changed;

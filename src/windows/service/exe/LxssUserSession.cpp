@@ -584,9 +584,6 @@ try
         HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
-    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
     return session->EnumerateUsbDevices(DeviceCount, Devices);
 }
 CATCH_RETURN()
@@ -600,13 +597,6 @@ try
         HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
-    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
-        wsl::shared::Localization::MessageUsbElevationRequired(),
-        !wsl::windows::common::security::IsTokenElevated(token.get()));
     return session->AttachUsbDevice(Port);
 }
 CATCH_RETURN()
@@ -620,13 +610,6 @@ try
         HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY), wsl::shared::Localization::MessageUsbDisabledByPolicy(), g_usbDisabledByPolicy);
     const auto session = m_session.lock();
     RETURN_HR_IF(RPC_E_DISCONNECTED, !session);
-    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
-    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
-    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, session->GetUserSid()));
-    THROW_HR_WITH_USER_ERROR_IF(
-        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
-        wsl::shared::Localization::MessageUsbElevationRequired(),
-        !wsl::windows::common::security::IsTokenElevated(token.get()));
     return session->DetachUsbDevice(Port);
 }
 CATCH_RETURN()
@@ -2678,10 +2661,14 @@ HRESULT LxssUserSessionImpl::UnregisterDistribution(_In_ LPCGUID DistroGuid)
 
 HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices)
 {
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, GetUserSid()));
+
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
         wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
-        !wsl::windows::common::usb::UxdRegistry::IsSupported());
+        !wsl::windows::common::usb::uxd::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     m_usbManager.Start();
@@ -2710,10 +2697,18 @@ HRESULT LxssUserSessionImpl::EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_
 
 HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
 {
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, GetUserSid()));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        wsl::shared::Localization::MessageUsbElevationRequired(),
+        !wsl::windows::common::security::IsTokenElevated(token.get()));
+
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
         wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
-        !wsl::windows::common::usb::UxdRegistry::IsSupported());
+        !wsl::windows::common::usb::uxd::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     m_usbManager.Start();
@@ -2755,10 +2750,18 @@ HRESULT LxssUserSessionImpl::AttachUsbDevice(_In_ LPCWSTR Port)
 
 HRESULT LxssUserSessionImpl::DetachUsbDevice(_In_ LPCWSTR Port)
 {
+    const auto token = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+    const auto user = wil::get_token_information<TOKEN_USER>(token.get());
+    RETURN_HR_IF(E_ACCESSDENIED, !EqualSid(user->User.Sid, GetUserSid()));
+    THROW_HR_WITH_USER_ERROR_IF(
+        HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED),
+        wsl::shared::Localization::MessageUsbElevationRequired(),
+        !wsl::windows::common::security::IsTokenElevated(token.get()));
+
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
         wsl::shared::Localization::MessageUsbWindowsUpdateRequired(),
-        !wsl::windows::common::usb::UxdRegistry::IsSupported());
+        !wsl::windows::common::usb::uxd::IsSupported());
     std::lock_guard lock(m_instanceLock);
     THROW_HR_IF(CO_E_SERVER_STOPPING, m_disableNewInstanceCreation);
     m_usbManager.Start();

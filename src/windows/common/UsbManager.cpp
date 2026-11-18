@@ -4,6 +4,7 @@
 #include "UsbManager.h"
 #include "stringshared.h"
 #include <nlohmann/json.hpp>
+#include <tuple>
 #include <usbiodef.h>
 
 namespace wsl::windows::common::usb {
@@ -111,8 +112,8 @@ std::optional<Device> Manager::FindDeviceAtPort(const Inventory& Current, const 
 
 bool Manager::MatchesRecordedReservation(const Record& Value) const
 {
-    const auto reservation = m_registry.ReadReservation(Value.Reservation);
-    return reservation && OwnsReservation(Value.Reservation.Id, *reservation) && m_registry.MappingMatches(Value.Reservation);
+    const auto reservation = uxd::ReadReservation(Value.Reservation);
+    return reservation && uxd::OwnsReservation(Value.Reservation.Id, *reservation) && uxd::MappingMatches(Value.Reservation);
 }
 
 void Manager::Start()
@@ -210,7 +211,7 @@ std::vector<ListedDevice> Manager::List(PSID UserSid)
     {
         const UxdReservationIdentity identity{device.HubInstanceId, device.Port, {}};
         const auto record = FindReservationRecord(identity);
-        const bool reserved = record != m_records.end() || m_registry.HasReservation(identity) || device.IsRedirected();
+        const bool reserved = record != m_records.end() || uxd::HasReservation(identity) || device.IsRedirected();
 
         // Revalidate ownership before reporting a device as attached.
         std::wstring owner;
@@ -249,7 +250,7 @@ std::vector<ListedDevice> Manager::List(PSID UserSid)
     return result;
 }
 
-Device Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::wstring& Path)
+std::pair<std::wstring, std::wstring> Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value)
 {
     const auto deadline = GetTickCount64() + c_readyTimeoutMs;
     for (;;)
@@ -257,16 +258,15 @@ Device Manager::WaitForWinUsbDevice(const UxdReservationIdentity& Value, std::ws
         ThrowIfStopping();
 
         // Revalidate ownership before probing the redirected interface.
-        const auto reservation = m_registry.ReadReservation(Value);
-        THROW_HR_IF(E_CHANGED_STATE, !reservation || !OwnsReservation(Value.Id, *reservation));
+        const auto reservation = uxd::ReadReservation(Value);
+        THROW_HR_IF(E_CHANGED_STATE, !reservation || !uxd::OwnsReservation(Value.Id, *reservation));
 
-        const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value);
+        auto current = FindDeviceAtPort(Inventory::Enumerate(), Value);
         if (current)
         {
             if (auto path = current->ProbeWinUsb())
             {
-                Path = std::move(*path);
-                return *current;
+                return {std::move(current->InstanceId), std::move(*path)};
             }
         }
 
@@ -342,14 +342,7 @@ void Manager::PersistReservationRecord(const Record& Value)
         {"OwnerSid", WideToMultiByte(Value.OwnerSid)}};
 
     const auto text = MultiByteToWide(record.dump());
-    THROW_IF_WIN32_ERROR(RegSetValueExW(
-        m_journal.get(),
-        GetJournalRecordName(Value.Reservation).c_str(),
-        0,
-        REG_SZ,
-        reinterpret_cast<const BYTE*>(text.c_str()),
-        gsl::narrow_cast<DWORD>((text.size() + 1) * sizeof(wchar_t))));
-
+    registry::WriteString(m_journal.get(), nullptr, GetJournalRecordName(Value.Reservation).c_str(), text.c_str());
     THROW_IF_WIN32_ERROR(RegFlushKey(m_journal.get()));
 }
 
@@ -360,12 +353,11 @@ bool Manager::ReleaseReservation(Record& Value, HKEY Journal)
 
     // Leave reservations belonging to other owners untouched.
     bool cycled = false;
-    UxdRegistry uxdRegistry;
-    const auto reservation = uxdRegistry.ReadReservation(Value.Reservation);
-    if (!reservation || OwnsReservation(Value.Reservation.Id, *reservation))
+    const auto reservation = uxd::ReadReservation(Value.Reservation);
+    if (!reservation || uxd::OwnsReservation(Value.Reservation.Id, *reservation))
     {
         const auto current = FindDeviceAtPort(Inventory::Enumerate(), Value.Reservation);
-        const bool removed = uxdRegistry.RemoveReservation(Value.Reservation);
+        const bool removed = uxd::RemoveReservation(Value.Reservation);
         if (current && (removed || current->IsRedirected()))
         {
             CyclePort(Value.Reservation.HubInstanceId, Value.Reservation.Port);
@@ -374,8 +366,8 @@ bool Manager::ReleaseReservation(Record& Value, HKEY Journal)
     }
 
     // Make SYSTEM cleanup durable before deleting the SOFTWARE ownership record.
-    uxdRegistry.RemoveMapping(Value.Reservation);
-    uxdRegistry.Flush();
+    uxd::RemoveMapping(Value.Reservation);
+    uxd::Flush();
 
     const auto error = RegDeleteValueW(Journal, GetJournalRecordName(Value.Reservation).c_str());
     THROW_IF_WIN32_ERROR(error == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : error);
@@ -540,7 +532,7 @@ DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCall
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_BUSY),
         wsl::shared::Localization::MessageUsbUnavailable(),
-        m_registry.HasReservation(identity) || source->IsRedirected());
+        uxd::HasReservation(identity) || source->IsRedirected());
     THROW_HR_WITH_USER_ERROR_IF(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), wsl::shared::Localization::MessageUsbAudioVideoNotSupported(), source->HasUnsupportedClass());
 
@@ -559,12 +551,11 @@ DeviceReservation Manager::Reserve(PSID UserSid, const PortId& Port, RemovalCall
     {
         PersistReservationRecord(*record);
         persisted = true;
-        m_registry.CreateMapping(identity);
-        m_registry.PublishReservation(identity);
+        uxd::CreateMapping(identity);
+        uxd::PublishReservation(identity);
 
         CyclePort(identity.HubInstanceId, identity.Port);
-        const auto redirected = WaitForWinUsbDevice(identity, record->InterfacePath);
-        record->InstanceId = redirected.InstanceId;
+        std::tie(record->InstanceId, record->InterfacePath) = WaitForWinUsbDevice(identity);
         GrantDeviceAccess(record->InterfacePath, UserSid);
         return {identity.Id, Port, record->InstanceId};
     }

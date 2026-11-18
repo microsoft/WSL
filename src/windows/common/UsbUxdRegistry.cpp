@@ -9,7 +9,7 @@
 #include <setupapi.h>
 #include <type_traits>
 
-namespace wsl::windows::common::usb {
+namespace wsl::windows::common::usb::uxd {
 
 namespace {
 
@@ -100,6 +100,86 @@ namespace {
         THROW_IF_WIN32_ERROR(error == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : error);
     }
 
+    std::wstring GetReservationRegistryPath(const UxdReservationIdentity& Value)
+    {
+        // Validate the recorded USB instance ID before using it as a registry path.
+        const auto separator = Value.HubInstanceId.find(L'\\', 4);
+        THROW_HR_IF(
+            E_INVALIDARG,
+            !wsl::shared::string::StartsWith(Value.HubInstanceId, L"USB\\", true) || separator == std::wstring::npos ||
+                separator == 4 || separator + 1 == Value.HubInstanceId.size() ||
+                Value.HubInstanceId.find(L'\\', separator + 1) != std::wstring::npos || Value.HubInstanceId.size() >= MAX_DEVICE_ID_LEN);
+        return c_enumPath + Value.HubInstanceId + L"\\Device Parameters\\uxd";
+    }
+
+    HRESULT QuerySupport() noexcept
+    try
+    {
+        const auto infPath = wil::GetWindowsDirectoryW<std::wstring>() + L"\\INF\\winusb.inf";
+        const auto rawInf = SetupOpenInfFileW(infPath.c_str(), nullptr, INF_STYLE_WIN4, nullptr);
+        THROW_LAST_ERROR_IF(rawInf == INVALID_HANDLE_VALUE);
+        wil::unique_any<HINF, decltype(&SetupCloseInfFile), SetupCloseInfFile> inf(rawInf);
+
+        const auto rawDevices = SetupDiCreateDeviceInfoList(nullptr, nullptr);
+        THROW_LAST_ERROR_IF(rawDevices == INVALID_HANDLE_VALUE);
+        wil::unique_any<HDEVINFO, decltype(&SetupDiDestroyDeviceInfoList), SetupDiDestroyDeviceInfoList> devices(rawDevices);
+
+        SP_DEVINSTALL_PARAMS_W parameters{sizeof(parameters)};
+        THROW_IF_WIN32_BOOL_FALSE(SetupDiGetDeviceInstallParamsW(devices.get(), nullptr, &parameters));
+        WI_SetFlag(parameters.Flags, DI_ENUMSINGLEINF);
+        WI_SetFlag(parameters.FlagsEx, DI_FLAGSEX_ALLOWEXCLUDEDDRVS);
+        THROW_IF_FAILED(StringCchCopyW(parameters.DriverPath, ARRAYSIZE(parameters.DriverPath), infPath.c_str()));
+        THROW_IF_WIN32_BOOL_FALSE(SetupDiSetDeviceInstallParamsW(devices.get(), nullptr, &parameters));
+        THROW_IF_WIN32_BOOL_FALSE(SetupDiBuildDriverInfoList(devices.get(), nullptr, SPDIT_CLASSDRIVER));
+
+        for (DWORD index = 0;; ++index)
+        {
+            SP_DRVINFO_DATA_W driver{sizeof(driver)};
+            if (!SetupDiEnumDriverInfoW(devices.get(), nullptr, SPDIT_CLASSDRIVER, index, &driver))
+            {
+                const auto error = GetLastError();
+                THROW_WIN32_IF(error, error != ERROR_NO_MORE_ITEMS);
+                return S_FALSE;
+            }
+
+            DWORD size = 0;
+            if (!SetupDiGetDriverInfoDetailW(devices.get(), nullptr, &driver, nullptr, 0, &size))
+            {
+                const auto error = GetLastError();
+                THROW_WIN32_IF(error, error != ERROR_INSUFFICIENT_BUFFER);
+            }
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), size < sizeof(SP_DRVINFO_DETAIL_DATA_W));
+            std::vector<BYTE> buffer(size);
+            auto* details = reinterpret_cast<SP_DRVINFO_DETAIL_DATA_W*>(buffer.data());
+            details->cbSize = sizeof(*details);
+            THROW_IF_WIN32_BOOL_FALSE(SetupDiGetDriverInfoDetailW(devices.get(), nullptr, &driver, details, size, nullptr));
+
+            const auto capacity = (buffer.size() - offsetof(SP_DRVINFO_DETAIL_DATA_W, HardwareID)) / sizeof(wchar_t);
+            THROW_HR_IF(
+                HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
+                details->CompatIDsOffset > capacity || details->CompatIDsLength > capacity - details->CompatIDsOffset);
+            const std::wstring_view ids(details->HardwareID, static_cast<size_t>(details->CompatIDsOffset) + details->CompatIDsLength);
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), !ids.empty() && ids.back() != L'\0');
+            if (!std::ranges::any_of(ids | std::views::split(L'\0'), [](const auto& id) {
+                    return wsl::shared::string::IsEqual(std::wstring_view(id.begin(), id.end()), c_winusbHardwareId, true);
+                }))
+            {
+                continue;
+            }
+
+            wchar_t section[LINE_LEN]{};
+            THROW_IF_WIN32_BOOL_FALSE(
+                SetupDiGetActualSectionToInstallW(inf.get(), details->SectionName, section, ARRAYSIZE(section), nullptr, nullptr));
+            if (SetupGetLineCountW(inf.get(), section) >= 0)
+            {
+                return S_OK;
+            }
+            const auto error = GetLastError();
+            THROW_WIN32_IF(error, error != ERROR_SECTION_NOT_FOUND);
+        }
+    }
+    CATCH_RETURN()
+
 } // namespace
 
 static_assert(std::is_standard_layout_v<Reservation>);
@@ -142,31 +222,19 @@ bool OwnsReservation(const GUID& Owner, const Reservation& Value) noexcept
            std::ranges::all_of(Value.Reserved, [](uint32_t value) { return value == 0; });
 }
 
-std::wstring UxdRegistry::GetReservationRegistryPath(const UxdReservationIdentity& Value) const
-{
-    // Validate the recorded USB instance ID before using it as a registry path.
-    const auto separator = Value.HubInstanceId.find(L'\\', 4);
-    THROW_HR_IF(
-        E_INVALIDARG,
-        !wsl::shared::string::StartsWith(Value.HubInstanceId, L"USB\\", true) || separator == std::wstring::npos || separator == 4 ||
-            separator + 1 == Value.HubInstanceId.size() || Value.HubInstanceId.find(L'\\', separator + 1) != std::wstring::npos ||
-            Value.HubInstanceId.size() >= MAX_DEVICE_ID_LEN);
-    return c_enumPath + Value.HubInstanceId + L"\\Device Parameters\\uxd";
-}
-
-bool UxdRegistry::HasReservation(const UxdReservationIdentity& Value) const
+bool HasReservation(const UxdReservationIdentity& Value)
 {
     const auto key = OpenRegistryKeyIfExists(HKEY_LOCAL_MACHINE, GetReservationRegistryPath(Value));
     return RegistryValueExists(key.get(), GetUxdPortRegistryValueName(Value.Port));
 }
 
-std::optional<Reservation> UxdRegistry::ReadReservation(const UxdReservationIdentity& Value) const
+std::optional<Reservation> ReadReservation(const UxdReservationIdentity& Value)
 {
     const auto key = OpenRegistryKeyIfExists(HKEY_LOCAL_MACHINE, GetReservationRegistryPath(Value));
     return ReadReservationRegistryValue(key.get(), GetUxdPortRegistryValueName(Value.Port));
 }
 
-void UxdRegistry::CreateMapping(const UxdReservationIdentity& Value)
+void CreateMapping(const UxdReservationIdentity& Value)
 {
     // Enable shared UXD support, then publish our GUID-to-WinUSB mapping.
     const auto policy = registry::CreateKey(HKEY_LOCAL_MACHINE, c_policyPath);
@@ -181,13 +249,13 @@ void UxdRegistry::CreateMapping(const UxdReservationIdentity& Value)
     registry::WriteString(key.get(), nullptr, name.c_str(), c_winusbHardwareId);
 }
 
-bool UxdRegistry::MappingMatches(const UxdReservationIdentity& Value) const
+bool MappingMatches(const UxdReservationIdentity& Value)
 {
     const auto key = OpenRegistryKeyIfExists(HKEY_LOCAL_MACHINE, c_mappingPath);
     return IsWinUsbMapping(key.get(), GetMappingRegistryValueName(Value.Id));
 }
 
-void UxdRegistry::PublishReservation(const UxdReservationIdentity& Value)
+void PublishReservation(const UxdReservationIdentity& Value)
 {
     // Check and publish the port reservation in one registry transaction.
     const auto handle = CreateTransaction(nullptr, nullptr, 0, 0, 0, 0, nullptr);
@@ -215,7 +283,7 @@ void UxdRegistry::PublishReservation(const UxdReservationIdentity& Value)
     THROW_IF_WIN32_BOOL_FALSE(CommitTransaction(transaction.get()));
 }
 
-bool UxdRegistry::RemoveReservation(const UxdReservationIdentity& Value)
+bool RemoveReservation(const UxdReservationIdentity& Value)
 {
     // Check ownership and delete the reservation in one registry transaction.
     const auto handle = CreateTransaction(nullptr, nullptr, 0, 0, 0, 0, nullptr);
@@ -244,7 +312,7 @@ bool UxdRegistry::RemoveReservation(const UxdReservationIdentity& Value)
     return true;
 }
 
-bool UxdRegistry::MappingReferenced(const UxdReservationIdentity& Value) const
+bool MappingReferenced(const UxdReservationIdentity& Value)
 {
     // Check all USB instances, including non-present devices, before allowing mapping deletion.
     const auto root = OpenRegistryKeyIfExists(HKEY_LOCAL_MACHINE, std::wstring(c_enumPath) + L"USB");
@@ -288,7 +356,7 @@ bool UxdRegistry::MappingReferenced(const UxdReservationIdentity& Value) const
     return false;
 }
 
-void UxdRegistry::RemoveMapping(const UxdReservationIdentity& Value)
+void RemoveMapping(const UxdReservationIdentity& Value)
 {
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_BUSY), MappingReferenced(Value));
 
@@ -300,85 +368,17 @@ void UxdRegistry::RemoveMapping(const UxdReservationIdentity& Value)
     }
 }
 
-void UxdRegistry::Flush() const
+void Flush()
 {
     // Flush SYSTEM before the manager deletes ownership records from the SOFTWARE journal.
     const auto key = registry::OpenKey(HKEY_LOCAL_MACHINE, L"SYSTEM", KEY_QUERY_VALUE);
     THROW_IF_WIN32_ERROR(RegFlushKey(key.get()));
 }
 
-bool UxdRegistry::IsSupported()
+bool IsSupported()
 {
     static const bool supported = QuerySupport() == S_OK;
     return supported;
 }
 
-HRESULT UxdRegistry::QuerySupport() noexcept
-try
-{
-    const auto infPath = wil::GetWindowsDirectoryW<std::wstring>() + L"\\INF\\winusb.inf";
-    const auto rawInf = SetupOpenInfFileW(infPath.c_str(), nullptr, INF_STYLE_WIN4, nullptr);
-    THROW_LAST_ERROR_IF(rawInf == INVALID_HANDLE_VALUE);
-    wil::unique_any<HINF, decltype(&SetupCloseInfFile), SetupCloseInfFile> inf(rawInf);
-
-    const auto rawDevices = SetupDiCreateDeviceInfoList(nullptr, nullptr);
-    THROW_LAST_ERROR_IF(rawDevices == INVALID_HANDLE_VALUE);
-    wil::unique_any<HDEVINFO, decltype(&SetupDiDestroyDeviceInfoList), SetupDiDestroyDeviceInfoList> devices(rawDevices);
-
-    SP_DEVINSTALL_PARAMS_W parameters{sizeof(parameters)};
-    THROW_IF_WIN32_BOOL_FALSE(SetupDiGetDeviceInstallParamsW(devices.get(), nullptr, &parameters));
-    WI_SetFlag(parameters.Flags, DI_ENUMSINGLEINF);
-    WI_SetFlag(parameters.FlagsEx, DI_FLAGSEX_ALLOWEXCLUDEDDRVS);
-    THROW_IF_FAILED(StringCchCopyW(parameters.DriverPath, ARRAYSIZE(parameters.DriverPath), infPath.c_str()));
-    THROW_IF_WIN32_BOOL_FALSE(SetupDiSetDeviceInstallParamsW(devices.get(), nullptr, &parameters));
-    THROW_IF_WIN32_BOOL_FALSE(SetupDiBuildDriverInfoList(devices.get(), nullptr, SPDIT_CLASSDRIVER));
-
-    for (DWORD index = 0;; ++index)
-    {
-        SP_DRVINFO_DATA_W driver{sizeof(driver)};
-        if (!SetupDiEnumDriverInfoW(devices.get(), nullptr, SPDIT_CLASSDRIVER, index, &driver))
-        {
-            const auto error = GetLastError();
-            THROW_WIN32_IF(error, error != ERROR_NO_MORE_ITEMS);
-            return S_FALSE;
-        }
-
-        DWORD size = 0;
-        if (!SetupDiGetDriverInfoDetailW(devices.get(), nullptr, &driver, nullptr, 0, &size))
-        {
-            const auto error = GetLastError();
-            THROW_WIN32_IF(error, error != ERROR_INSUFFICIENT_BUFFER);
-        }
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), size < sizeof(SP_DRVINFO_DETAIL_DATA_W));
-        std::vector<BYTE> buffer(size);
-        auto* details = reinterpret_cast<SP_DRVINFO_DETAIL_DATA_W*>(buffer.data());
-        details->cbSize = sizeof(*details);
-        THROW_IF_WIN32_BOOL_FALSE(SetupDiGetDriverInfoDetailW(devices.get(), nullptr, &driver, details, size, nullptr));
-
-        const auto capacity = (buffer.size() - offsetof(SP_DRVINFO_DETAIL_DATA_W, HardwareID)) / sizeof(wchar_t);
-        THROW_HR_IF(
-            HRESULT_FROM_WIN32(ERROR_INVALID_DATA),
-            details->CompatIDsOffset > capacity || details->CompatIDsLength > capacity - details->CompatIDsOffset);
-        const std::wstring_view ids(details->HardwareID, static_cast<size_t>(details->CompatIDsOffset) + details->CompatIDsLength);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), !ids.empty() && ids.back() != L'\0');
-        if (!std::ranges::any_of(ids | std::views::split(L'\0'), [](const auto& id) {
-                return wsl::shared::string::IsEqual(std::wstring_view(id.begin(), id.end()), c_winusbHardwareId, true);
-            }))
-        {
-            continue;
-        }
-
-        wchar_t section[LINE_LEN]{};
-        THROW_IF_WIN32_BOOL_FALSE(
-            SetupDiGetActualSectionToInstallW(inf.get(), details->SectionName, section, ARRAYSIZE(section), nullptr, nullptr));
-        if (SetupGetLineCountW(inf.get(), section) >= 0)
-        {
-            return S_OK;
-        }
-        const auto error = GetLastError();
-        THROW_WIN32_IF(error, error != ERROR_SECTION_NOT_FOUND);
-    }
-}
-CATCH_RETURN()
-
-} // namespace wsl::windows::common::usb
+} // namespace wsl::windows::common::usb::uxd
