@@ -1044,19 +1044,28 @@ try
     auto internalType = CheckAndGetInternalTypeUniquePointer(process);
     if (internalType->ioCallbacks)
     {
-        // If the process has an IO callback registered, and the process is exited, wait until the IO callback has processed all IO.
-        // If the process is released while still running, cancel the IO callback so we don't get stuck since the process might still be emitting IO.
-
+        // If the process has exited, wait until the IO callback has processed all IO. Otherwise cancel it so a running
+        // process that might still be emitting IO can't block the release.
+        bool exited = false;
         try
         {
             WSLCProcessState state{};
             int exitCode{};
             THROW_IF_FAILED(internalType->process->GetState(&state, &exitCode));
+            exited = state == WslcProcessStateExited || state == WslcProcessStateSignalled;
+        }
+        CATCH_LOG();
 
-            if (state == WslcProcessStateExited || state == WslcProcessStateSignalled)
-            {
-                internalType->ioCallbacks->Complete();
-            }
+        if (!exited)
+        {
+            internalType->ioCallbacks->Cancel();
+        }
+
+        // Another thread can briefly hold a reference to the IO callback (for example while activating it), so its
+        // destructor is not guaranteed to run here. Join explicitly so that no callback runs after the release returns.
+        try
+        {
+            internalType->ioCallbacks->Complete();
         }
         CATCH_LOG();
     }
