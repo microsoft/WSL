@@ -380,8 +380,7 @@ class Plan9Tests
         const auto parentId = GetFileId({});
         wil::unique_hfile file;
         IO_STATUS_BLOCK ioStatus{};
-        VERIFY_NT_SUCCESS(CreateFileNt(
-            &file, LXSST_P9_TEST_DIR L"\\createdirtest", FILE_GENERIC_READ, ioStatus, FILE_CREATE, 0, FILE_DIRECTORY_FILE));
+        VERIFY_NT_SUCCESS(CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\createdirtest", FILE_GENERIC_READ, ioStatus, FILE_CREATE, 0, FILE_DIRECTORY_FILE));
         VERIFY_ARE_EQUAL(static_cast<ULONG_PTR>(FILE_CREATED), ioStatus.Information);
 
         BY_HANDLE_FILE_INFORMATION info{};
