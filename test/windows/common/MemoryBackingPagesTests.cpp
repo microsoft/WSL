@@ -9,18 +9,21 @@ class MemoryBackingPagesTests
 {
     WSL_TEST_CLASS(MemoryBackingPagesTests)
 
-    TEST_METHOD(MemoryProfile)
+    TEST_METHOD(MemoryPageSize)
     {
         const struct
         {
             std::string_view setting;
             bool largePages;
+            bool warning;
         } cases[] = {
-            {"", false},
-            {"memoryProfile=density", false},
-            {"memoryProfile=performance", true},
-            {"memoryProfile=invalid", false},
-            {"memoryProfile=true", false},
+            {"", false, false},
+            {"memoryPageSize=small", false, false},
+            {"memoryPageSize=medium", true, false},
+            {"memoryPageSize=large", false, true},
+            {"memoryPageSize=invalid", false, true},
+            {"memoryPageSize=true", false, true},
+            {"memoryPageSize=performance", false, true},
         };
 
         for (const auto& test : cases)
@@ -29,8 +32,20 @@ class MemoryBackingPagesTests
             const auto content = std::format("[experimental]\n{}\n", test.setting);
             auto file = wsl::windows::common::filesystem::TempFile(GENERIC_WRITE, FILE_SHARE_READ, OPEN_EXISTING);
             VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(file.Handle.get(), content.data(), static_cast<DWORD>(content.size()), nullptr, nullptr));
-            const wsl::core::Config config(file.Path.c_str());
-            VERIFY_ARE_EQUAL(test.largePages, config.EnableLargeMemoryBackingPages);
+            LXSS_ERROR_INFO error{};
+            error.Flags = LxssExecutionContextFlagsEnableContextualizedErrors | LxssExecutionContextFlagsEnableUserWarnings;
+            {
+                wsl::windows::common::ServiceExecutionContext context(&error);
+                const wsl::core::Config config(file.Path.c_str());
+                VERIFY_ARE_EQUAL(test.largePages, config.EnableLargeMemoryBackingPages);
+            }
+
+            wil::unique_cotaskmem_string warnings(error.Warnings);
+            VERIFY_ARE_EQUAL(test.warning, warnings && *warnings.get() != L'\0');
+            if (test.warning)
+            {
+                VERIFY_IS_TRUE(std::wstring_view(warnings.get()).find(L"memoryPageSize") != std::wstring_view::npos);
+            }
         }
     }
 
