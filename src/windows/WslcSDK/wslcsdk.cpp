@@ -1000,16 +1000,27 @@ try
     auto ioCallback = internalType->ioCallbacks.load();
     if (ioCallback)
     {
-        // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
+        // If the container has exited, wait until the IO callback has processed all IO. Otherwise cancel it so a running
+        // container can't block the release.
+        bool exited = false;
         try
         {
             WSLCContainerState state{};
             THROW_IF_FAILED(internalType->container->GetState(&state));
+            exited = state == WslcContainerStateExited || state == WslcContainerStateDeleted;
+        }
+        CATCH_LOG();
 
-            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
-            {
-                ioCallback->Complete();
-            }
+        if (!exited)
+        {
+            ioCallback->Cancel();
+        }
+
+        // Another thread can briefly hold a reference to the IO callback (for example while activating it), so its
+        // destructor is not guaranteed to run here. Join explicitly so that no callback runs after the release returns.
+        try
+        {
+            ioCallback->Complete();
         }
         CATCH_LOG();
     }
