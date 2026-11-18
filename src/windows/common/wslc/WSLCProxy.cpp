@@ -20,7 +20,7 @@ namespace {
         return Entry.substr(0, Entry.find('='));
     }
 
-    std::optional<std::pair<size_t, size_t>> FindProxyHost(std::string_view url)
+    std::optional<std::string_view> FindProxyHost(std::string_view url)
     {
         const auto schemeEnd = url.find("://");
         if (schemeEnd == 0)
@@ -44,7 +44,7 @@ namespace {
         const auto* hostEnd = hostBegin + components.dwHostNameLength;
         const auto prefix = wsl::shared::string::WideToMultiByte(std::wstring{normalizedUrl.c_str() + c_scheme.size(), hostBegin});
         const auto host = wsl::shared::string::WideToMultiByte(std::wstring{hostBegin, hostEnd});
-        return std::make_pair(authorityOffset + prefix.size(), host.size());
+        return url.substr(authorityOffset + prefix.size(), host.size());
     }
 
 } // namespace
@@ -101,7 +101,7 @@ std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopb
         return Url;
     }
 
-    const auto name = std::string_view{Url}.substr(host->first, host->second);
+    const auto name = *host;
     if (!wsl::shared::string::IsEqual(name, "localhost", true) && name != "127.0.0.1")
     {
         return Url;
@@ -114,7 +114,8 @@ std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopb
     }
 
     auto resolved = Url;
-    resolved.replace(host->first, host->second, HostLoopback);
+    const auto hostOffset = static_cast<size_t>(host->data() - Url.data());
+    resolved.replace(hostOffset, host->size(), HostLoopback);
     return resolved;
 }
 
@@ -126,7 +127,7 @@ bool IsLoopbackProxyUrl(const std::string& Url)
         return false;
     }
 
-    const auto name = Url.substr(host->first, host->second);
+    const auto name = *host;
     if (wsl::shared::string::IsEqual(name, "localhost", true))
     {
         return true;
@@ -136,7 +137,8 @@ bool IsLoopbackProxyUrl(const std::string& Url)
     if (name.front() == '[')
     {
         address.si_family = AF_INET6;
-        if (inet_pton(AF_INET6, name.substr(1, name.size() - 2).c_str(), &address.Ipv6.sin6_addr) != 1)
+        const auto addressString = std::string{name.substr(1, name.size() - 2)};
+        if (inet_pton(AF_INET6, addressString.c_str(), &address.Ipv6.sin6_addr) != 1)
         {
             return false;
         }
@@ -150,7 +152,8 @@ bool IsLoopbackProxyUrl(const std::string& Url)
     }
 
     address.si_family = AF_INET;
-    return inet_pton(AF_INET, name.c_str(), &address.Ipv4.sin_addr) == 1 && wsl::core::networking::IsLoopbackIpAddress(address);
+    const auto addressString = std::string{name};
+    return inet_pton(AF_INET, addressString.c_str(), &address.Ipv4.sin_addr) == 1 && wsl::core::networking::IsLoopbackIpAddress(address);
 }
 
 } // namespace wsl::windows::wslc

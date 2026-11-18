@@ -786,11 +786,13 @@ class WSLCCLISettingsUnitTests
         const std::vector<std::pair<std::string, std::string>> cases{
             {"socks5h://user:p%40ss@localhost:1080/path?next=localhost#fragment",
              "socks5h://user:p%40ss@host.wslc.internal:1080/path?next=localhost#fragment"},
+            {"http://localhost:secret@localhost:3128/", "http://localhost:secret@host.wslc.internal:3128/"},
             {"http://user:p\xc3\xa4ss@127.0.0.1:3128/", "http://user:p\xc3\xa4ss@host.wslc.internal:3128/"}};
         for (const auto& [url, expected] : cases)
         {
             VERIFY_ARE_EQUAL(expected, ResolveProxyUrl(url, loopback));
         }
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl("http://localhost:secret@localhost:3128/"));
 
         const std::string invalidAuthority = "http://user:pass@proxy.example.com@localhost:3128";
         VERIFY_ARE_EQUAL(invalidAuthority, ResolveProxyUrl(invalidAuthority, loopback));
