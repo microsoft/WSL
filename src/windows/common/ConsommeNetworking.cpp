@@ -331,8 +331,9 @@ uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int prot
         }
     });
 
-    // Loopback can reuse a wildcard bind; only the last owner unbinds it.
-    const bool modifyLoopback = allocate ? (unspecified || wildcardOwners == 0) : (wildcardOwners + loopbackOwners == 1);
+    // Both bind orders share the relay: the first owner binds it and the last unbinds it.
+    const auto totalOwners = wildcardOwners + loopbackOwners;
+    const bool modifyLoopback = allocate ? totalOwners == 0 : totalOwners == 1;
     const auto result = ModifyDevicePorts(addr, protocol, guestPort, allocate, modifyLoopback, !loopback);
     // Change ownership only after the device operation succeeds.
     if (allocate)

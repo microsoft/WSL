@@ -2830,7 +2830,7 @@ class NetworkTests
         VerifyNotBoundLoopback(port, false);
     }
 
-    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily, HANDLE read)
+    static void ValidateLocalhostRelayTraffic(ADDRESS_FAMILY addressFamily, HANDLE read, uint16_t port = 1234)
     {
         THROW_HR_IF(E_INVALIDARG, addressFamily != AF_INET && addressFamily != AF_INET6);
 
@@ -2839,7 +2839,7 @@ class NetworkTests
         SOCKADDR_INET addr{};
         addr.si_family = addressFamily;
         INETADDR_SETLOOPBACK((PSOCKADDR)&addr);
-        SS_PORT(&addr) = htons(1234);
+        SS_PORT(&addr) = htons(port);
 
         auto pred = [&]() {
             hostSocket.reset(socket(addressFamily, SOCK_STREAM, IPPROTO_TCP));
@@ -6097,24 +6097,48 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
-    WSL2_TEST_METHOD(LoopbackBindAfterWildcardClose)
+    WSL2_TEST_METHOD(WildcardAndLoopbackRebindAfterClose)
     {
         CONSOMME_TEST_ONLY();
 
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        WslKeepAlive keepAlive;
 
-        // Close and rebind in one process because BindGuestPort doesn't wait for the guest socket to close.
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(
-                L"perl -MIO::Socket::INET -e '"
-                L"my $port = 12345;"
-                L"for my $address (qw(0.0.0.0 127.0.0.1)) {"
-                L"  my $listener = IO::Socket::INET->new(LocalAddr => $address, LocalPort => $port, Listen => 1)"
-                L"    or die \"listen on $address:$port: $!\";"
-                L"  $listener->sockhost eq $address && $listener->sockport == $port or die \"wrong endpoint for $address:$port\";"
-                L"  close($listener) or die \"close: $!\";"
-                L"}'"),
-            0L);
+        for (const bool wildcardFirst : {true, false})
+        {
+            const uint16_t port = wildcardFirst ? 12345 : 12346;
+            const auto* probeAddress = wildcardFirst ? L"0.0.0.0" : L"127.0.0.1";
+            const auto* listenerAddress = wildcardFirst ? L"127.0.0.1" : L"0.0.0.0";
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(
+                    L"perl -MIO::Socket::INET -e 'my ($address, $port) = @ARGV;"
+                    L"my $probe = IO::Socket::INET->new(LocalAddr => $address, LocalPort => $port, Listen => 1) or die $!;"
+                    L"$probe->sockhost eq $address && $probe->sockport == $port or die \"wrong probe endpoint\";"
+                    L"close($probe) or die $!' {} {}",
+                    probeAddress,
+                    port)),
+                0L);
+
+            auto [listener, read] = NetworkTests::BindGuestPort(std::format(L"-u TCP4-LISTEN:{},bind={}", port, listenerAddress), true);
+            // When the guest wildcard is bound second, both Windows listeners (0.0.0.0 and 127.0.0.1) must stay open.
+            if (wildcardFirst)
+            {
+                // Wait for the wildcard relay to close while the loopback listener stays alive.
+                const auto query = std::format(
+                    L"Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object LocalAddress -eq '0.0.0.0' "
+                    L"| Where-Object LocalPort -eq {} | Select-Object -ExpandProperty LocalPort",
+                    port);
+                VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                    [&] { THROW_HR_IF(E_PENDING, !LxsstuLaunchPowershellAndCaptureOutput(query, 0, false).first.empty()); },
+                    std::chrono::seconds(1),
+                    std::chrono::minutes(2)));
+            }
+
+            NetworkTests::ValidateLocalhostRelayTraffic(AF_INET, read.get(), port);
+            VERIFY_ARE_EQUAL(WaitForSingleObject(listener.m_process.get(), 30000), WAIT_OBJECT_0);
+            NetworkTests::VerifyNotBoundLoopback(port, false);
+        }
     }
 
     WSL2_TEST_METHOD(GuestOnlyAddressBind)
