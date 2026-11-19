@@ -133,8 +133,7 @@ std::vector<std::string> wsl::core::networking::HostDnsInfo::GetDnsServerStrings
             if (IN6_IS_ADDR_LINKLOCAL(&ipv6->sin6_addr))
             {
                 const auto zone = ipv6->sin6_scope_struct.Zone;
-                ifIndex =
-                    (zone == NET_IFINDEX_UNSPECIFIED || zone == adapter->ZoneIndices[ScopeLevelLink]) ? adapter->Ipv6IfIndex : zone;
+                ifIndex = (zone == NET_IFINDEX_UNSPECIFIED || zone == adapter->ZoneIndices[ScopeLevelLink]) ? adapter->Ipv6IfIndex : zone;
                 if (ipv6LinkLocalScopeFilter && !ipv6LinkLocalScopeFilter(ifIndex))
                 {
                     continue;
