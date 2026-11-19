@@ -18,6 +18,13 @@ Abstract:
 using wsl::windows::service::wslc::DockerEventTracker;
 using wsl::windows::service::wslc::DockerHTTPClient;
 
+namespace {
+
+// Larger than dockerd's event buffer, so every buffered event the stream delivered is still recorded.
+constexpr size_t c_deliveryHistorySize = 1024;
+
+} // namespace
+
 DockerEventTracker::EventTrackingReference::EventTrackingReference(std::shared_ptr<RegistryState> state, size_t id) noexcept :
     m_id(id), m_state(std::move(state))
 {
@@ -80,20 +87,22 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
         }
     };
 
-    auto socket = dockerClient.MonitorEvents();
-
-    // Start the stream position at dockerd's current time so WaitForPendingEvents doesn't wait for events this stream
-    // was never going to deliver because dockerd emitted them before it subscribed.
-    std::optional<StreamPosition> position;
+    // Subscribe from dockerd's current time so the stream replays anything emitted while the subscription is set up, and
+    // WaitForPendingEvents can list exactly the events this stream delivers.
+    std::optional<std::int64_t> since;
     try
     {
-        position = StreamPosition{dockerClient.GetSystemTimeNano(), 0};
+        since = dockerClient.GetSystemTimeNano();
     }
     CATCH_LOG();
 
+    auto socket = dockerClient.MonitorEvents(since);
+
     {
-        std::lock_guard lock{m_positionLock};
-        m_position = position;
+        std::lock_guard lock{m_deliveryLock};
+        m_streamSince = since;
+        m_delivered.clear();
+        m_deliveryOrder.clear();
     }
 
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
@@ -101,71 +110,90 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
 
 void DockerEventTracker::WaitForPendingEvents(DockerHTTPClient& dockerClient, std::chrono::milliseconds Timeout)
 {
-    std::optional<StreamPosition> position;
+    const auto deadline = std::chrono::steady_clock::now() + Timeout;
+    auto remaining = [&]() {
+        return std::max(
+            std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()),
+            std::chrono::milliseconds{0});
+    };
+
+    std::optional<std::int64_t> since;
     {
-        std::lock_guard lock{m_positionLock};
-        position = m_position;
+        std::lock_guard lock{m_deliveryLock};
+        since = m_streamSince;
     }
 
-    if (!position.has_value())
+    if (!since.has_value())
     {
         return;
     }
 
-    const auto now = dockerClient.GetSystemTimeNano();
-    if (now < position->TimeNano)
+    const auto now = dockerClient.GetSystemTimeNano(remaining());
+
+    // If dockerd's clock moved back past the subscription time, list every buffered event. That includes events emitted
+    // before the subscription, which the stream never delivers and so can cost the full timeout.
+    const std::int64_t listSince = now < since.value() ? 1 : since.value();
+
+    std::set<EventKey> pending;
+    for (const auto& event : dockerClient.ListEvents(listSince, now, remaining()))
     {
-        return;
+        pending.emplace(ParseEventKey(nlohmann::json::parse(event), event));
     }
 
-    // Find the newest event dockerd emitted so far. Docker includes events stamped exactly at 'since', so events at the
-    // current position are counted again here and compared against the delivered count.
-    StreamPosition target{position->TimeNano, 0};
-    for (const auto& event : dockerClient.ListEvents(position->TimeNano, now))
-    {
-        const auto eventTimeNano = nlohmann::json::parse(event).at("timeNano").get<std::int64_t>();
-        if (eventTimeNano > target.TimeNano)
-        {
-            target = StreamPosition{eventTimeNano, 1};
-        }
-        else if (eventTimeNano == target.TimeNano)
-        {
-            target.Count++;
-        }
-    }
-
-    std::unique_lock lock{m_positionLock};
-    const bool delivered = m_positionUpdated.wait_for(lock, Timeout, [&]() {
-        return m_position.has_value() && (m_position->TimeNano > target.TimeNano ||
-                                          (m_position->TimeNano == target.TimeNano && m_position->Count >= target.Count));
+    std::unique_lock lock{m_deliveryLock};
+    const bool delivered = m_deliveryUpdated.wait_until(lock, deadline, [&]() {
+        std::erase_if(pending, [&](const EventKey& key) { return m_delivered.contains(key); });
+        return pending.empty();
     });
 
     if (!delivered)
     {
         WSL_LOG(
             "DockerEventsPendingTimeout",
-            TraceLoggingValue(target.TimeNano, "PendingTimeNano"),
-            TraceLoggingValue(m_position.has_value() ? m_position->TimeNano : 0, "DeliveredTimeNano"),
+            TraceLoggingValue(pending.size(), "PendingCount"),
+            TraceLoggingValue(pending.begin()->TimeNano, "OldestPendingTimeNano"),
             TraceLoggingValue(m_sessionId, "SessionId"));
     }
 }
 
-void DockerEventTracker::OnEventDelivered(std::int64_t eventTimeNano) noexcept
+DockerEventTracker::EventKey DockerEventTracker::ParseEventKey(const nlohmann::json& parsed, const std::string_view& event)
+{
+    auto timeNano = parsed.find("timeNano");
+    THROW_HR_IF_MSG(
+        E_INVALIDARG,
+        timeNano == parsed.end(),
+        "Failed to parse timeNano from event: %.*hs",
+        static_cast<int>(event.size()),
+        event.data());
+
+    return EventKey{.TimeNano = timeNano->get<std::int64_t>(), .ContentHash = std::hash<nlohmann::json>{}(parsed)};
+}
+
+bool DockerEventTracker::WasDelivered(const EventKey& key)
+{
+    std::lock_guard lock{m_deliveryLock};
+    return m_delivered.contains(key);
+}
+
+void DockerEventTracker::OnEventDelivered(const EventKey& key) noexcept
+try
 {
     {
-        std::lock_guard lock{m_positionLock};
-        if (!m_position.has_value() || eventTimeNano > m_position->TimeNano)
+        std::lock_guard lock{m_deliveryLock};
+        if (m_delivered.insert(key).second)
         {
-            m_position = StreamPosition{eventTimeNano, 1};
-        }
-        else if (eventTimeNano == m_position->TimeNano)
-        {
-            m_position->Count++;
+            m_deliveryOrder.push_back(key);
+            if (m_deliveryOrder.size() > c_deliveryHistorySize)
+            {
+                m_delivered.erase(m_deliveryOrder.front());
+                m_deliveryOrder.pop_front();
+            }
         }
     }
 
-    m_positionUpdated.notify_all();
+    m_deliveryUpdated.notify_all();
 }
+CATCH_LOG();
 
 DockerEventTracker::RegistryState::~RegistryState()
 {
@@ -191,23 +219,24 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     auto action = parsed.find("Action");
     THROW_HR_IF_MSG(E_INVALIDARG, action == parsed.end(), "Failed to parse json: %.*hs", static_cast<int>(event.size()), event.data());
 
-    auto timeNanoEntry = parsed.find("timeNano");
-    THROW_HR_IF_MSG(
-        E_INVALIDARG,
-        timeNanoEntry == parsed.end(),
-        "Failed to parse timeNano from event: %.*hs",
-        static_cast<int>(event.size()),
-        event.data());
-    std::int64_t eventTimeNano = timeNanoEntry->get<std::int64_t>();
+    const auto key = ParseEventKey(parsed, event);
 
-    // Advance the stream position once the callbacks have run, even if one failed, since the event was consumed.
-    auto delivered = wil::scope_exit([&]() { OnEventDelivered(eventTimeNano); });
+    // A subscription replays buffered events, so an event emitted while it's set up can also arrive live.
+    if (WasDelivered(key))
+    {
+        WSL_LOG("DockerEventDuplicate", TraceLoggingValue(key.TimeNano, "TimeNano"), TraceLoggingValue(m_sessionId, "SessionId"));
+        return;
+    }
 
-    auto actionStr = action->get<std::string>();
+    // Record the delivery once the callbacks have run, even if one failed, since the event was consumed.
+    auto delivered = wil::scope_exit([&]() { OnEventDelivered(key); });
+
+    const auto actionStr = action->get<std::string>();
+    const auto eventTimeNano = key.TimeNano;
 
     // Route events by Type field. Docker uses "container", "volume", "network", "image", etc.
     auto type = parsed.find("Type");
-    std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
+    const std::string typeStr = (type != parsed.end()) ? type->get<std::string>() : "container";
 
     if (typeStr == "container")
     {

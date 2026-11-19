@@ -704,9 +704,16 @@ void DockerHTTPClient::ResizeExecTty(const std::string& Id, ULONG Rows, ULONG Co
     Transaction(verb::post, url);
 }
 
-wil::unique_socket DockerHTTPClient::MonitorEvents()
+wil::unique_socket DockerHTTPClient::MonitorEvents(std::optional<std::int64_t> SinceNano)
 {
     auto url = URL::Create("/events");
+
+    // With a since time, dockerd first replays its buffered events stamped at or after it, then streams new events.
+    if (SinceNano.has_value())
+    {
+        url.SetParameter("since", timestamp::EpochToUnixTimestamp(SinceNano.value()));
+    }
+
     auto [response, socket] = SendRequest(verb::get, url, {});
 
     if (response.result_int() != 200)
@@ -717,18 +724,14 @@ wil::unique_socket DockerHTTPClient::MonitorEvents()
     return std::move(socket);
 }
 
-std::vector<std::string> DockerHTTPClient::ListEvents(std::int64_t SinceNano, std::int64_t UntilNano)
+std::vector<std::string> DockerHTTPClient::ListEvents(std::int64_t SinceNano, std::int64_t UntilNano, std::optional<std::chrono::milliseconds> Timeout)
 {
-    auto formatEventTime = [](std::int64_t TimeNano) {
-        return std::format("{}.{:09}", TimeNano / std::nano::den, TimeNano % std::nano::den);
-    };
-
     auto url = URL::Create("/events");
-    url.SetParameter("since", formatEventTime(SinceNano));
-    url.SetParameter("until", formatEventTime(UntilNano));
+    url.SetParameter("since", timestamp::EpochToUnixTimestamp(SinceNano));
+    url.SetParameter("until", timestamp::EpochToUnixTimestamp(UntilNano));
 
     // An until time that has already passed makes dockerd return its buffered events and end the response.
-    auto [response, body] = SendRequestAndReadResponse(verb::get, url, {});
+    auto [response, body] = SendRequestAndReadResponse(verb::get, url, {}, Timeout);
     if (response.result_int() != 200)
     {
         throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", std::move(body));
@@ -746,9 +749,9 @@ std::vector<std::string> DockerHTTPClient::ListEvents(std::int64_t SinceNano, st
     return events;
 }
 
-std::int64_t DockerHTTPClient::GetSystemTimeNano()
+std::int64_t DockerHTTPClient::GetSystemTimeNano(std::optional<std::chrono::milliseconds> Timeout)
 {
-    const auto info = Transaction<EmptyRequest, docker_schema::SystemInfo>(verb::get, URL::Create("/info"));
+    const auto info = Transaction<EmptyRequest, docker_schema::SystemInfo>(verb::get, URL::Create("/info"), {}, Timeout);
     const auto [seconds, nanoseconds] = timestamp::ParseTimestamp(info.SystemTime);
 
     return seconds * std::nano::den + nanoseconds;
@@ -782,7 +785,8 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
     return newChannel.Release();
 }
 
-std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendRequestAndReadResponse(verb Method, const URL& Url, const std::string& Body)
+std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendRequestAndReadResponse(
+    verb Method, const URL& Url, const std::string& Body, std::optional<std::chrono::milliseconds> Timeout)
 {
     // Send the request.
     auto context = SendRequestImpl(Method, Url, Body, {});
@@ -816,7 +820,7 @@ std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendReq
 
     io.AddHandle(std::make_unique<DockerHttpResponseHandle>(*context, std::move(onHttpResponse), std::move(OnResponse)), MultiHandleWait::CancelOnCompleted);
 
-    io.Run({});
+    io.Run(Timeout);
 
     THROW_HR_IF(E_UNEXPECTED, !responseHeader.has_value());
 

@@ -81,9 +81,9 @@ public:
     // Rebinds the tracker on VM start without replacing callback registrations.
     void Connect(DockerHTTPClient& dockerClient, IORelay& relay);
 
-    // Blocks until the event stream has delivered every event dockerd emitted before this call, or Timeout elapses.
-    // Operations complete once dockerd responds, while their events arrive later on the stream, so this lets teardown
-    // wait for them before stopping dockerd discards them. Must not be called from the relay thread.
+    // Blocks until the event stream has delivered every event dockerd emitted since Connect and before this call, or
+    // Timeout elapses. Operations complete once dockerd responds, while their events arrive later on the stream, so this
+    // lets teardown wait for them before stopping dockerd discards them. Must not be called from the relay thread.
     void WaitForPendingEvents(DockerHTTPClient& dockerClient, std::chrono::milliseconds Timeout);
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
@@ -102,15 +102,20 @@ public:
     EventTrackingReference RegisterContainerActions(ContainerActionCallback&& Callback) noexcept;
 
 private:
-    // How far the event stream has been delivered: the newest event timestamp, and how many delivered events carry it.
-    struct StreamPosition
+    // Identifies an event regardless of the order the stream delivers it in, which can differ from timestamp order.
+    struct EventKey
     {
         std::int64_t TimeNano{};
-        size_t Count{};
+        size_t ContentHash{};
+
+        auto operator<=>(const EventKey&) const = default;
     };
 
+    static EventKey ParseEventKey(const nlohmann::json& parsed, const std::string_view& event);
+
     void OnEvent(const std::string_view& event);
-    void OnEventDelivered(std::int64_t eventTimeNano) noexcept;
+    bool WasDelivered(const EventKey& key);
+    void OnEventDelivered(const EventKey& key) noexcept;
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnContainerAction(const std::string& containerId, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
@@ -237,8 +242,14 @@ private:
     ULONG m_sessionId{};
     std::shared_ptr<RegistryState> m_state = std::make_shared<RegistryState>();
 
-    std::mutex m_positionLock;
-    std::condition_variable m_positionUpdated;
-    _Guarded_by_(m_positionLock) std::optional<StreamPosition> m_position;
+    std::mutex m_deliveryLock;
+    std::condition_variable m_deliveryUpdated;
+
+    // The dockerd time the event stream subscribed from, or nullopt if it couldn't be read.
+    _Guarded_by_(m_deliveryLock) std::optional<std::int64_t> m_streamSince;
+
+    // The most recently delivered events, oldest first in m_deliveryOrder.
+    _Guarded_by_(m_deliveryLock) std::set<EventKey> m_delivered;
+    _Guarded_by_(m_deliveryLock) std::deque<EventKey> m_deliveryOrder;
 };
 } // namespace wsl::windows::service::wslc

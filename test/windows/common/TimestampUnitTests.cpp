@@ -64,6 +64,19 @@ class WSLCCLIRelativeTimeUnitTests
             [](const wil::ResultException& e) { return e.GetErrorCode() == E_INVALIDARG; });
     }
 
+    TEST_METHOD(EpochToUnixTimestamp_RoundTripsThroughParseTimestamp)
+    {
+        VERIFY_ARE_EQUAL(std::string{"1705314600.123456789"}, EpochToUnixTimestamp(1705314600123456789LL));
+        VERIFY_ARE_EQUAL(std::string{"0.000000001"}, EpochToUnixTimestamp(1));
+        VERIFY_ARE_EQUAL(std::string{"-1.500000000"}, EpochToUnixTimestamp(-1500000000LL));
+
+        for (const auto value : {0LL, 1LL, 1705314600123456789LL, -1500000000LL, -500000000LL})
+        {
+            const auto [seconds, nanoseconds] = ParseTimestamp(EpochToUnixTimestamp(value));
+            VERIFY_ARE_EQUAL(value, seconds * std::nano::den + nanoseconds);
+        }
+    }
+
     TEST_METHOD(ParseTimestamp_LargeNegativeDurationIsInTheFuture)
     {
         const auto before = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
