@@ -144,7 +144,6 @@ void wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(const std::files
     std::vector<std::pair<std::filesystem::file_time_type, std::filesystem::path>> dumps;
     for (const auto& entry : std::filesystem::directory_iterator{DumpPath.parent_path()})
     {
-        // HCS-backed VMs share this folder and mark their saved-state files temporary; leave those to HCS retention.
         const auto attributes = GetFileAttributesW(entry.path().c_str());
         if (entry.is_regular_file() && entry.path().extension() == c_savedStateExtension &&
             entry.path().filename().wstring().starts_with(c_savedStatePrefix) && attributes != INVALID_FILE_ATTRIBUTES &&
