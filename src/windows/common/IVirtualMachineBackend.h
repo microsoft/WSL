@@ -128,9 +128,16 @@ enum class VmFeature
 
 static_assert(static_cast<size_t>(VmFeature::Count) == 18);
 
+enum class VmDiskTransport
+{
+    Scsi,
+    VirtioBlk
+};
+
 struct VmPlatformCapabilities
 {
     BackendKind Backend;
+    VmDiskTransport DiskTransport = VmDiskTransport::Scsi;
     std::bitset<static_cast<size_t>(VmFeature::Count)> Features;
 };
 
@@ -249,13 +256,21 @@ struct VmScsiAddress
     std::uint32_t Lun = 0;
 };
 
-using VmGuestDiskAddress = VmScsiAddress;
-
-enum class VmDiskTransport
+// Each virtio-blk disk is its own PCI device, so it has no controller or LUN. WSL numbers the disks
+// itself and the guest locates a disk by the slot embedded in its device serial.
+struct VmVirtioBlkAddress
 {
-    Scsi,
-    VirtioBlk
+    std::uint32_t Slot = 0;
 };
+
+using VmGuestDiskAddress = std::variant<VmScsiAddress, VmVirtioBlkAddress>;
+
+VmDiskTransport GetDiskTransport(const VmGuestDiskAddress& Address) noexcept;
+
+// Returns the transport-specific number that the guest uses to locate the disk: the LUN for SCSI, the slot for virtio-blk.
+std::uint32_t GetGuestDiskDeviceId(const VmGuestDiskAddress& Address) noexcept;
+
+VmGuestDiskAddress MakeGuestDiskAddress(VmDiskTransport Transport, std::uint32_t DeviceId);
 
 // The path is passed to the backend as-is; its filename is not validated.
 struct VmVirtualDiskSource
@@ -268,16 +283,17 @@ struct VmPhysicalDiskSource
     std::wstring DevicePath;
 };
 
-struct VmScsiPlacement
+struct VmDiskPlacement
 {
-    VmScsiAddress Address;
+    VmGuestDiskAddress Address;
 };
 
 struct VmDiskRequest
 {
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
-    std::optional<VmScsiPlacement> Placement;
+    // Must use the backend's disk transport (VmPlatformCapabilities::DiskTransport).
+    std::optional<VmDiskPlacement> Placement;
     // VHD access uses this token, falling back to the VM identity when unset. Physical disk
     // requests require an elevated token; an unset token is reserved for service-authorized restore.
     std::optional<wil::shared_handle> UserToken;
@@ -301,7 +317,6 @@ struct VmDiskAttachment
 {
     VmDiskId Id;
     VmGuestDiskAddress GuestAddress;
-    VmDiskTransport Transport = VmDiskTransport::Scsi;
     bool ReadOnly = true;
     bool UserDisk = false;
     // Host path backing the disk: a virtual disk image, or a physical disk for pass-through.
@@ -754,8 +769,6 @@ private:
     _Guarded_by_(m_terminationCallbackLock) GUID m_terminatedVmId {};
     _Guarded_by_(m_terminationCallbackLock) TerminationCallback m_terminationCallback;
 };
-
-BackendKind SelectVirtualMachineBackendKind(bool EnableOpenVmm) noexcept;
 
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 

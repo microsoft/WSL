@@ -165,7 +165,9 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         DnsTunnelingIpAddress = address.S_un.S_addr;
     }
 
-    if (macAddressPresent == ConfigKeyPresence::Absent && NetworkingMode == NetworkingMode::Bridged)
+    // OpenVMM's user-mode NAT takes the guest MAC from the configuration, unlike HNS which assigns one.
+    if (macAddressPresent == ConfigKeyPresence::Absent &&
+        (NetworkingMode == NetworkingMode::Bridged || (EnableOpenVmm && NetworkingMode == NetworkingMode::Nat)))
     {
         // Generate a random mac address if unspecified, so that the VM retains the same if restarted
         const std::independent_bits_engine<std::default_random_engine, 16, unsigned short> random;

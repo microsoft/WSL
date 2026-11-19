@@ -1448,6 +1448,15 @@ std::wstring ReadFileContent(const std::wstring& Path)
     return std::wstring{std::istreambuf_iterator<wchar_t>(configRead), {}};
 }
 
+void WriteFileContent(const std::filesystem::path& Path, std::string_view Content)
+{
+    std::ofstream file(Path, std::ios::binary);
+    VERIFY_IS_TRUE(file.is_open());
+    file << Content;
+    file.close();
+    VERIFY_IS_FALSE(file.fail());
+}
+
 // writes global WSL 2 config settings at %userprofile%/.wslconfig
 std::wstring LxssWriteWslConfig(const std::wstring& Content)
 {

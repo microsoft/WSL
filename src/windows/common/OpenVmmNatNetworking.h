@@ -14,7 +14,8 @@ namespace networking {
     struct DnsInfo;
 }
 
-VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling);
+// ClientMac should come from wsl::core::Config::MacAddress, which is generated when not configured.
+VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac);
 VmNetworkAdapterRequest CreateOpenVmmLoopbackNetworkAdapterRequest();
 void MapHostLoopbackDnsServers(networking::DnsInfo& Dns, IVirtualMachineBackend& Backend, VmDeviceId Adapter);
 

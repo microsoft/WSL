@@ -43,17 +43,6 @@ constexpr std::wstring_view c_vsockServiceIdSuffix = L"-facb-11e6-bd58-64006a798
 
 using validation::ValidateResourceId;
 
-std::optional<ExecutionContext> CreateExecutionContext(Context Context) noexcept
-{
-    const auto* current = ExecutionContext::Current();
-    if (current != nullptr && current->CurrentContext() >= static_cast<ULONGLONG>(Context))
-    {
-        return {};
-    }
-
-    return std::optional<ExecutionContext>{std::in_place, Context};
-}
-
 void DestroyConfig(WslOpenVmmConfig* Config) noexcept
 {
     WslOpenVmmDestroyConfig(&Config);
@@ -111,14 +100,33 @@ std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPat
 // else would hand the VM process access that its identity does not have.
 void ValidateFileSystemToken(HANDLE Token, HANDLE Identity)
 {
-    const auto tokenUser = wil::get_token_information<TOKEN_USER>(Token);
-    const auto identityUser = wil::get_token_information<TOKEN_USER>(Identity);
-    THROW_HR_IF_MSG(
-        E_ACCESSDENIED, !EqualSid(tokenUser->User.Sid, identityUser->User.Sid), "OpenVMM serves virtio-fs only for the VM owner");
+    // Each user session owns its own VM, so a share token always belongs to the VM owner.
+    WI_ASSERT(
+        EqualSid(wil::get_token_information<TOKEN_USER>(Token)->User.Sid, wil::get_token_information<TOKEN_USER>(Identity)->User.Sid));
+
     THROW_HR_IF_MSG(
         E_ACCESSDENIED,
         wsl::windows::common::security::GetUserBasicIntegrityLevel(Token) > wsl::windows::common::security::GetUserBasicIntegrityLevel(Identity),
         "OpenVMM cannot serve virtio-fs at a higher integrity level than the VM");
+}
+
+// OpenVMM attaches every disk as its own virtio-blk device.
+std::uint32_t GetVirtioBlkSlot(const VmDiskAttachment& Disk)
+{
+    return std::get<VmVirtioBlkAddress>(Disk.GuestAddress).Slot;
+}
+
+const VmVirtioBlkAddress* GetVirtioBlkPlacement(const std::optional<VmDiskPlacement>& Placement)
+{
+    if (!Placement)
+    {
+        return nullptr;
+    }
+
+    const auto* address = std::get_if<VmVirtioBlkAddress>(&Placement->Address);
+    THROW_HR_IF_MSG(c_notSupported, address == nullptr, "OpenVMM attaches disks only over virtio-blk");
+    THROW_HR_IF(E_BOUNDS, address->Slot >= c_maximumDisks);
+    return address;
 }
 
 } // namespace
@@ -136,7 +144,7 @@ void wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(const std::files
     std::vector<std::pair<std::filesystem::file_time_type, std::filesystem::path>> dumps;
     for (const auto& entry : std::filesystem::directory_iterator{DumpPath.parent_path()})
     {
-        // HCS creates temporary saved-state files before writing them; they may still be in use.
+        // HCS-backed VMs share this folder and mark their saved-state files temporary; leave those to HCS retention.
         const auto attributes = GetFileAttributesW(entry.path().c_str());
         if (entry.is_regular_file() && entry.path().extension() == c_savedStateExtension &&
             entry.path().filename().wstring().starts_with(c_savedStatePrefix) && attributes != INVALID_FILE_ATTRIBUTES &&
@@ -155,7 +163,6 @@ void wsl::windows::common::vm::openvmm::ApplyCrashDumpRetention(const std::files
 
 VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmCreateRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
     THROW_HR_IF(E_INVALIDARG, IsEqualGUID(Request.Identity.VmId, GUID_NULL));
     THROW_HR_IF_MSG(c_notSupported, wsl::shared::Arm64, "OpenVMM direct boot is currently supported only on x64");
     THROW_HR_IF(c_notSupported, Request.Boot.Method == VmBootMethod::Uefi);
@@ -165,17 +172,20 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
     description.Identity = Request.Identity;
     description.Backend = BackendKind::OpenVmm;
     description.Processor.Count = Request.Processor.Count;
+
     // Nested virtualization isn't available: WHP provides no SynIC, which the VMBus devices require.
     THROW_HR_WITH_USER_ERROR_IF(
         c_notSupported,
         wsl::shared::Localization::MessageOpenVmmNestedVirtualizationConflict(),
         Request.Processor.NestedVirtualization != VmFeatureRequest::Disabled);
     description.Processor.NestedVirtualization = false;
-    description.Memory.SizeBytes = (Request.Memory.SizeBytes / c_mib) * c_mib;
+
     THROW_HR_IF_MSG(
         c_notSupported,
         Request.Processor.PerfmonPmu != VmFeatureRequest::Disabled || Request.Processor.PerfmonLbr != VmFeatureRequest::Disabled,
         "OpenVMM does not support hardware performance counters");
+
+    description.Memory.SizeBytes = (Request.Memory.SizeBytes / c_mib) * c_mib;
     validation::ValidateFeature(Request.Memory.AllowOvercommit, L"memory overcommit");
     validation::ValidateFeature(Request.Memory.DeferredCommit, L"deferred memory commit");
     validation::ValidateFeature(Request.Memory.ColdDiscard, L"cold discard");
@@ -184,6 +194,7 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         c_notSupported,
         Request.Memory.FaultClusterSizeShift.has_value() || Request.Memory.DirectMapFaultClusterSizeShift.has_value() ||
             Request.Memory.PageReportingOrder.has_value() || Request.Memory.HostingProcessNameSuffix.has_value());
+
     THROW_HR_IF(E_INVALIDARG, (Request.Mmio.HighWindowSizeBytes % c_mib) != 0);
     if (Request.Mmio.MaximumGuestAddressBits)
     {
@@ -225,37 +236,33 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         description.BootDisks.emplace(disk.Key, VmDiskAttachment{});
         validation::ValidateDiskRequest(disk.Disk);
         ValidateOwnerToken(disk.Disk.UserToken, Request.Identity.UserToken.get());
-        if (disk.Disk.Placement)
+        if (const auto* placement = GetVirtioBlkPlacement(disk.Disk.Placement))
         {
-            const auto& placement = *disk.Disk.Placement;
-            THROW_HR_IF(c_notSupported, placement.Address.Controller != 0);
-            THROW_HR_IF(E_BOUNDS, placement.Address.Lun >= c_maximumDisks);
-            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.test(placement.Address.Lun));
-            allocated.set(placement.Address.Lun);
+            THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.test(placement->Slot));
+            allocated.set(placement->Slot);
         }
     }
 
     std::uint64_t nextId = 1;
     for (const auto& disk : Request.BootDisks)
     {
-        std::uint32_t lun = 0;
+        std::uint32_t slot = 0;
         if (disk.Disk.Placement)
         {
-            lun = disk.Disk.Placement->Address.Lun;
+            slot = std::get<VmVirtioBlkAddress>(disk.Disk.Placement->Address).Slot;
         }
         else
         {
-            while (lun < c_maximumDisks && allocated.test(lun))
+            while (slot < c_maximumDisks && allocated.test(slot))
             {
-                ++lun;
+                ++slot;
             }
-            THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
-            allocated.set(lun);
+            THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, slot == c_maximumDisks);
+            allocated.set(slot);
         }
         description.BootDisks.at(disk.Key) = {
             {description.Identity, nextId++},
-            {0, lun},
-            VmDiskTransport::VirtioBlk,
+            VmVirtioBlkAddress{slot},
             disk.Disk.ReadOnly,
             disk.Disk.UserDisk,
             std::get<VmVirtualDiskSource>(disk.Disk.Source).Path.native(),
@@ -293,7 +300,6 @@ OpenVmmVirtualMachineBackend::OpenVmmVirtualMachineBackend() = default;
 
 OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmDestroyVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     Terminate();
@@ -328,8 +334,7 @@ OpenVmmVirtualMachineBackend::~OpenVmmVirtualMachineBackend() noexcept
 
 std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Create(const VmCreateRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::CreateVm);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmCreateVmBegin",
@@ -531,7 +536,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         const auto instanceIdString =
             wsl::shared::string::GuidToString<wchar_t>(attachment.Backend, wsl::shared::string::GuidToStringFlags::None);
         THROW_IF_FAILED(WslOpenVmmVmAttachVirtioBlk(
-            m_vm.get(), instanceIdString.c_str(), attachment.GuestAddress.Lun, attachment.Path.c_str(), attachment.ReadOnly));
+            m_vm.get(), instanceIdString.c_str(), GetVirtioBlkSlot(attachment), attachment.Path.c_str(), attachment.ReadOnly));
     }
     {
         auto lock = m_lock.lock_exclusive();
@@ -543,7 +548,6 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
 void OpenVmmVirtualMachineBackend::ReadProcessLog(wil::unique_hfile Pipe) noexcept
 try
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
     wsl::windows::common::io::MultiHandleWait io;
     io.AddHandle(std::make_unique<wsl::windows::common::io::LineBasedReadHandle>(
         std::move(Pipe),
@@ -573,7 +577,6 @@ CATCH_LOG()
 
 void OpenVmmVirtualMachineBackend::OnProcessExit(std::optional<DWORD> ExitCode) noexcept
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmProcessExited",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -606,6 +609,7 @@ VmPlatformCapabilities OpenVmmVirtualMachineBackend::QueryCapabilities()
 {
     VmPlatformCapabilities capabilities;
     capabilities.Backend = BackendKind::OpenVmm;
+    capabilities.DiskTransport = VmDiskTransport::VirtioBlk;
     for (const auto feature :
          {VmFeature::SerialConsole,
           VmFeature::VirtioFsFileBacked,
@@ -638,7 +642,7 @@ VmState OpenVmmVirtualMachineBackend::GetState() const
 
 VmTerminationInformation OpenVmmVirtualMachineBackend::GetTerminationReason() const
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_exitEvent.is_signaled());
     auto lock = m_lock.lock_shared();
     return m_terminationInformation;
@@ -661,7 +665,7 @@ std::optional<std::filesystem::path> OpenVmmVirtualMachineBackend::GetCrashLogPa
 
 void OpenVmmVirtualMachineBackend::Start()
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmStartVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     auto lock = m_lock.lock_exclusive();
@@ -684,7 +688,6 @@ void OpenVmmVirtualMachineBackend::Terminate() noexcept
         return;
     }
 
-    const auto context = CreateExecutionContext(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG("OpenVmmTerminateVmBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"));
     {
@@ -734,7 +737,7 @@ void OpenVmmVirtualMachineBackend::Terminate() noexcept
 
 VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePort Port)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
     WSL_LOG(
@@ -779,7 +782,7 @@ VmGuestListener OpenVmmVirtualMachineBackend::CreateGuestListener(GuestServicePo
 
 wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     const auto startTimeMs = GetTickCount64();
     WSL_LOG(
         "OpenVmmConnectGuestBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(Port.Value, "port"));
@@ -803,7 +806,7 @@ wil::unique_socket OpenVmmVirtualMachineBackend::ConnectGuest(GuestServicePort P
 
 std::optional<VmHostSocket> OpenVmmVirtualMachineBackend::CreateHostSocket(GuestServicePort Port)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmCreateHostSocketBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -839,7 +842,7 @@ std::optional<VmHostSocket> OpenVmmVirtualMachineBackend::CreateHostSocket(Guest
 
 void OpenVmmVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmCloseHostSocketBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -864,7 +867,7 @@ void OpenVmmVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
 
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     ValidateOwnerToken(Request.UserToken, m_description.Identity.UserToken.get());
     const auto& path = validation::ValidateDiskSource(Request);
     THROW_HR_IF_MSG(
@@ -904,14 +907,14 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
             "OpenVmmAttachDiskReused",
             TraceLoggingValue(m_description.Identity.VmId, "vmId"),
             TraceLoggingValue(existing->second.Id.Value, "diskId"),
-            TraceLoggingValue(existing->second.GuestAddress.Lun, "lun"));
+            TraceLoggingValue(GetVirtioBlkSlot(existing->second), "slot"));
         return existing->second;
     }
 
-    const auto lunInUse = [this](std::uint32_t Lun) {
+    const auto slotInUse = [this](std::uint32_t Slot) {
         for (const auto& entry : m_attachedDisks)
         {
-            if (entry.second.GuestAddress.Lun == Lun)
+            if (GetVirtioBlkSlot(entry.second) == Slot)
             {
                 return true;
             }
@@ -919,27 +922,24 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         return false;
     };
 
-    std::uint32_t lun = 0;
-    if (Request.Placement)
+    std::uint32_t slot = 0;
+    if (const auto* address = GetVirtioBlkPlacement(Request.Placement))
     {
-        const auto& address = Request.Placement->Address;
-        THROW_HR_IF(c_notSupported, address.Controller != 0);
-        THROW_HR_IF(E_BOUNDS, address.Lun >= c_maximumDisks);
-        lun = address.Lun;
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), lunInUse(lun));
+        slot = address->Slot;
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), slotInUse(slot));
     }
     else
     {
-        while (lun < c_maximumDisks && lunInUse(lun))
+        while (slot < c_maximumDisks && slotInUse(slot))
         {
-            ++lun;
+            ++slot;
         }
-        THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, lun == c_maximumDisks);
+        THROW_HR_IF(WSL_E_TOO_MANY_DISKS_ATTACHED, slot == c_maximumDisks);
     }
 
     THROW_HR_IF(E_BOUNDS, m_nextDiskId == UINT64_MAX);
     const VmDiskAttachment attachment{
-        {m_description.Identity, m_nextDiskId}, {0, lun}, VmDiskTransport::VirtioBlk, Request.ReadOnly, Request.UserDisk, path, false};
+        {m_description.Identity, m_nextDiskId}, VmVirtioBlkAddress{slot}, Request.ReadOnly, Request.UserDisk, path, false};
 
     GUID instanceId{};
     THROW_IF_FAILED(CoCreateGuid(&instanceId));
@@ -947,14 +947,12 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     const auto [disk, inserted] = m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, instanceId});
     WI_ASSERT(inserted);
     auto rollback = wil::scope_exit([&] { m_attachedDisks.erase(disk); });
-    const auto result =
-        WslOpenVmmVmAttachVirtioBlk(m_vm.get(), instanceIdString.c_str(), attachment.GuestAddress.Lun, path.c_str(), Request.ReadOnly);
+    const auto result = WslOpenVmmVmAttachVirtioBlk(m_vm.get(), instanceIdString.c_str(), slot, path.c_str(), Request.ReadOnly);
     WSL_LOG(
         "OpenVmmAttachDiskEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(attachment.Id.Value, "diskId"),
-        TraceLoggingValue(attachment.GuestAddress.Controller, "controller"),
-        TraceLoggingValue(attachment.GuestAddress.Lun, "lun"),
+        TraceLoggingValue(slot, "slot"),
         TraceLoggingValue(Request.ReadOnly, "readOnly"),
         TraceLoggingHResult(result, "result"));
     THROW_IF_FAILED(result);
@@ -977,7 +975,7 @@ std::vector<VmDiskAttachment> OpenVmmVirtualMachineBackend::GetAttachedDisks() c
 
 void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmDetachDiskBegin", TraceLoggingValue(m_description.Identity.VmId, "vmId"), TraceLoggingValue(Disk.Value, "diskId"));
     ValidateResourceId(Disk, m_description.Identity);
@@ -991,14 +989,13 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         "OpenVmmDetachDiskEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
         TraceLoggingValue(Disk.Value, "diskId"),
-        TraceLoggingValue(disk->second.GuestAddress.Controller, "controller"),
-        TraceLoggingValue(disk->second.GuestAddress.Lun, "lun"));
+        TraceLoggingValue(GetVirtioBlkSlot(disk->second), "slot"));
     m_attachedDisks.erase(disk);
 }
 
 VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     ValidateOwnerToken(Request.UserToken, m_description.Identity.UserToken.get());
 
     auto lock = m_lock.lock_exclusive();
@@ -1034,13 +1031,13 @@ VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const
 
 VmGpuAttachment OpenVmmVirtualMachineBackend::AddGpu(const VmGpuRequest&)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support GPU assignment");
 }
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::CreateFileSystemDevice(const VmFileSystemDeviceRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     const auto* transport = std::get_if<VmVirtioFsDevice>(&Request.Transport);
     WSL_LOG(
         "OpenVmmCreateFileSystemDeviceBegin",
@@ -1102,7 +1099,7 @@ std::optional<VmFileSystemDevice> OpenVmmVirtualMachineBackend::GetFileSystemDev
 
 VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDeviceId Device)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
@@ -1113,7 +1110,7 @@ VmFileSystemDevice OpenVmmVirtualMachineBackend::GetFileSystemDeviceStatus(VmDev
 
 VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId Device, const VmFileSystemShareRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmAddFileSystemShareBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1233,7 +1230,7 @@ std::optional<VmFileSystemShare> OpenVmmVirtualMachineBackend::GetFileSystemShar
 
 void OpenVmmVirtualMachineBackend::RemoveFileSystemShare(VmShareId Share)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmRemoveFileSystemShareBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1269,19 +1266,19 @@ void OpenVmmVirtualMachineBackend::RemoveFileSystemShareLocked(VmShareId Share)
 
 VmSharedMemoryDevice OpenVmmVirtualMachineBackend::AddSharedMemory(const VmSharedMemoryRequest&)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support section-backed shared memory");
 }
 
 void OpenVmmVirtualMachineBackend::ConfigureGuestDma(const VmGuestDmaRequest&)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM does not support configuring a guest DMA window");
 }
 
 void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 {
-    const auto context = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
@@ -1293,31 +1290,27 @@ void OpenVmmVirtualMachineBackend::RemoveDevice(VmDeviceId Device)
 
 VmNetworkAttachment OpenVmmVirtualMachineBackend::AddNetworkAdapter(const VmNetworkAdapterRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapter '%ls' must be configured at VM creation time", Request.Tag.c_str());
 }
 
 void OpenVmmVirtualMachineBackend::UpdateNetworkAdapter(VmDeviceId Device, const VmNetworkConfiguration&)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be updated after VM creation");
 }
 
 void OpenVmmVirtualMachineBackend::RemoveNetworkAdapter(VmDeviceId Device)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_MSG(c_notSupported, "OpenVMM network adapters cannot be removed after VM creation");
 }
 
 VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const VmPortBindingRequest& Request)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmBindPortBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1377,8 +1370,7 @@ VmPortBinding OpenVmmVirtualMachineBackend::BindPort(VmDeviceId Device, const Vm
 
 void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     WSL_LOG(
         "OpenVmmUnbindPortBegin",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1408,8 +1400,7 @@ void OpenVmmVirtualMachineBackend::UnbindPort(VmPortBindingId Binding)
 
 IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, const IpAddress& Destination)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_IF(E_INVALIDARG, Destination.family != IpAddressFamily_V4 && Destination.family != IpAddressFamily_V6);
     const auto destination = wsl::windows::common::string::IpAddressToWstring(Destination);
@@ -1455,8 +1446,7 @@ IpAddress OpenVmmVirtualMachineBackend::CreateVirtualAddress(VmDeviceId Device, 
 
 void OpenVmmVirtualMachineBackend::CreateDnsRecord(VmDeviceId Device, const VmDnsRecord& Record)
 {
-    const auto context = CreateExecutionContext(Context::ConfigureNetworking);
-    const auto backendContext = CreateExecutionContext(Context::OpenVmm);
+    ExecutionContext context(Context::OpenVmm);
     validation::ValidateResourceId(Device, m_description.Identity);
     THROW_HR_IF_MSG(E_INVALIDARG, Record.Name.empty(), "A DNS record requires a name");
     THROW_HR_IF_MSG(c_notSupported, Record.Type != DnsRecordType_A, "Only A records are supported");

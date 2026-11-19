@@ -3515,7 +3515,7 @@ wsl::core::Config LxssUserSessionImpl::_GetResultantConfig(_In_ const HANDLE use
     return config;
 }
 
-void LxssUserSessionImpl::_LoadDiskMount(_In_ HKEY Key, _In_ const std::wstring& LunStr) const
+void LxssUserSessionImpl::_LoadDiskMount(_In_ HKEY Key, _In_ const std::wstring& DeviceIdStr) const
 try
 {
     // Get the disk path
@@ -3527,7 +3527,7 @@ try
 
     THROW_HR_IF(E_UNEXPECTED, (diskType != WslCoreVm::DiskType::VHD && diskType != WslCoreVm::DiskType::PassThrough));
 
-    // Attach the disk to the VM, reusing the same LUN if possible.
+    // Attach the disk to the VM, reusing the same guest device ID (SCSI LUN or virtio-blk slot) if possible.
     //
     // N.B. The disk-mount state is stored under the user's SID in a volatile (per-boot)
     // registry key, so the disk being restored here was mounted earlier in this same boot
@@ -3540,9 +3540,9 @@ try
     // may no longer be elevated, so it is restored as SYSTEM (no token). Block-device paths
     // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
     // against.
-    auto lun = std::stoul(LunStr);
+    const auto deviceId = std::stoul(DeviceIdStr);
     const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
-    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
+    m_utilityVm->AttachDisk(path.c_str(), diskType, deviceId, true, userToken);
 
     // Restore each mount point.
     for (const auto& e : wsl::windows::common::registry::EnumKeys(Key, KEY_READ))

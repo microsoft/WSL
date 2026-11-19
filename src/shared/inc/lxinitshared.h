@@ -1327,7 +1327,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
     static inline auto Type = LxMiniInitMessageEarlyConfig;
 
     MESSAGE_HEADER Header;
-    unsigned int SwapLun;
+    unsigned int SwapDeviceId;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE SwapDeviceType;
     LX_MINI_INIT_MOUNT_DEVICE_TYPE SystemDistroDeviceType;
     unsigned int SystemDistroDeviceId;
@@ -1347,7 +1347,7 @@ typedef struct _LX_MINI_INIT_EARLY_CONFIG_MESSAGE
 
     PRETTY_PRINT(
         FIELD(Header),
-        FIELD(SwapLun),
+        FIELD(SwapDeviceId),
         FIELD(SwapDeviceType),
         FIELD(SystemDistroDeviceType),
         FIELD(SystemDistroDeviceId),

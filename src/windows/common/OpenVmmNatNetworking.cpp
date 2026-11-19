@@ -16,12 +16,11 @@ constexpr auto c_gatewayIpv4Address = L"10.0.0.1";
 
 } // namespace
 
-VmNetworkAdapterRequest wsl::core::CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling)
+VmNetworkAdapterRequest wsl::core::CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac)
 {
     VmUserModeNatNetwork network;
     network.InternalDns = EnableDnsTunneling;
-    constexpr std::array<BYTE, 6> clientMac{0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
-    std::copy(clientMac.begin(), clientMac.end(), std::begin(network.Configuration.clientMac.bytes));
+    std::copy(ClientMac.begin(), ClientMac.end(), std::begin(network.Configuration.clientMac.bytes));
     return {L"eth0", std::move(network)};
 }
 
@@ -263,13 +262,15 @@ void OpenVmmNatNetworking::HandlePortNotification(SOCKADDR_INET addr, int protoc
     const bool ipv4 = addr.si_family == AF_INET;
     const bool loopback = ipv4 ? IN4_IS_ADDR_LOOPBACK(&addr.Ipv4.sin_addr) : IN6_IS_ADDR_LOOPBACK(&addr.Ipv6.sin6_addr);
     const bool unspecified = ipv4 ? IN4_IS_ADDR_UNSPECIFIED(&addr.Ipv4.sin_addr) : IN6_IS_ADDR_UNSPECIFIED(&addr.Ipv6.sin6_addr);
+
+    // Only 127.0.0.1 and 0.0.0.0 are forwarded, and only to host 127.0.0.1 through loopback0; no other bind ever
+    // reserves a host port. Returning success for everything else lets Linux validate guest-only binds itself.
     if (!loopback && !unspecified)
     {
-        // A bind to a specific guest address isn't a valid host address.
         return;
     }
 
-    // Linux drops inbound packets addressed to ::1 on non-loopback interfaces.
+    // Linux drops inbound packets addressed to ::1 on non-loopback interfaces, so IPv6 binds stay in the guest.
     if (!m_enableLocalhostRelay || !ipv4 || (loopback && addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK)))
     {
         return;

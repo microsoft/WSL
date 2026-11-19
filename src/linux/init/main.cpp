@@ -184,7 +184,7 @@ std::string GetScsiDeviceName(unsigned int Lun);
 
 std::string GetScsiDevicePath(unsigned int Lun);
 
-std::string GetVirtioBlkDeviceName(unsigned int DeviceId);
+std::string GetVirtioBlkDeviceName(unsigned int Slot);
 
 int GetDiskPartitionIndex(const char* DiskPath, const char* PartitionName);
 
@@ -892,9 +892,30 @@ Return Value:
         c_defaultRetryTimeout);
 }
 
-std::string GetVirtioBlkDeviceName(unsigned int DeviceId)
+std::string GetVirtioBlkDeviceName(unsigned int Slot)
+
+/*++
+
+Routine Description:
+
+    This routine returns the device name (vdX) for the specified virtio-blk disk.
+
+    N.B. The kernel names virtio-blk disks in probe order and reuses names after hot-removal,
+         so the name says nothing about which disk it is. The host stamps each disk's serial
+         with its slot, which is what identifies the disk.
+
+Arguments:
+
+    Slot - Supplies the slot the host assigned to the disk.
+
+Return Value:
+
+    The device name.
+
+--*/
+
 {
-    const auto expectedSerial = std::format("wsl-{}", DeviceId);
+    const auto expectedSerial = std::format("wsl-{}", Slot);
     return wsl::shared::retry::RetryWithTimeout<std::string>(
         [&]() {
             for (const auto& entry : std::filesystem::directory_iterator("/sys/block"))
@@ -2760,7 +2781,7 @@ Return Value:
         return -1;
     }
 
-    int Result;
+    int Result{};
     if (Message->VirtioFs)
     {
         const unsigned long flags = Message->ReadOnly ? MS_RDONLY : 0;
@@ -3338,9 +3359,9 @@ try
             // Configure swap space.
             //
 
-            if (EarlyConfig->SwapLun != UINT_MAX)
+            if (EarlyConfig->SwapDeviceId != UINT_MAX)
             {
-                CreateSwap(EarlyConfig->SwapDeviceType, EarlyConfig->SwapLun);
+                CreateSwap(EarlyConfig->SwapDeviceType, EarlyConfig->SwapDeviceId);
             }
 
             //

@@ -67,7 +67,7 @@ public:
         PassThrough = 0x2
     };
 
-    VmDiskAttachment AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
+    VmDiskAttachment AttachDisk(_In_ PCWSTR Disk, _In_ DiskType Type, _In_ std::optional<ULONG> DeviceId, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
 
     std::shared_ptr<LxssRunningInstance> CreateInstance(
         _In_ const GUID& InstanceId,
@@ -161,7 +161,7 @@ private:
 
     _Requires_lock_held_(m_lock)
     VmDiskAttachment AttachDiskLockHeld(
-        _In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> Lun, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
+        _In_ PCWSTR Disk, _In_ DiskType Type, _In_ MountFlags Flags, _In_ std::optional<ULONG> DeviceId, _In_ bool IsUserDisk, _In_ HANDLE UserToken);
 
     void CollectCrashDumps(VmGuestListener Listener) const;
 

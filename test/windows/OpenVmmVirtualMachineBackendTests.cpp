@@ -14,6 +14,11 @@ using namespace VirtualMachineBackendTestHelpers;
 
 namespace {
 
+UINT32 GetSlot(const VmDiskAttachment& Disk)
+{
+    return std::get<VmVirtioBlkAddress>(Disk.GuestAddress).Slot;
+}
+
 VmBootDiskRequest CreateDisk(std::wstring Key)
 {
     VmBootDiskRequest disk;
@@ -120,27 +125,32 @@ class OpenVmmVirtualMachineBackendTests
             "virtioFsAggregateShares=false\n";
 
         auto token = GetNonElevatedToken(TokenImpersonation);
-        const auto configure = [&](std::string_view Override, bool* OpenVmmEnabled = nullptr) {
+        const auto configure = [&](std::string_view Override, const std::function<void(const wsl::core::Config&)>& Inspect = {}) {
             TempFile file{GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS};
-            const auto content = std::string{Override} + std::string{validConfig};
-            DWORD written = 0;
-            THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.Handle.get(), content.data(), static_cast<DWORD>(content.size()), &written, nullptr));
-            VERIFY_ARE_EQUAL(content.size(), static_cast<size_t>(written));
             file.Handle.reset();
+            WriteFileContent(file.Path, std::string{Override} + std::string{validConfig});
             return OperationResult([&] {
                 wsl::core::Config config{file.Path.c_str(), token.get()};
-                if (OpenVmmEnabled)
+                if (Inspect)
                 {
-                    *OpenVmmEnabled = config.EnableOpenVmm;
+                    Inspect(config);
                 }
             });
         };
 
-        VERIFY_ARE_EQUAL(S_OK, configure(""));
+        wsl::shared::string::MacAddress generatedMac{};
+        VERIFY_ARE_EQUAL(S_OK, configure("", [&](const auto& Config) { generatedMac = Config.MacAddress; }));
+        VERIFY_IS_TRUE(generatedMac != wsl::shared::string::MacAddress{});
+        VERIFY_ARE_EQUAL(0, generatedMac[0] & 1);
+        VERIFY_ARE_EQUAL(2, generatedMac[0] & 2);
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nmacAddress=02:11:22:33:44:56\n", [&](const auto& Config) {
+                             VERIFY_IS_TRUE((wsl::shared::string::MacAddress{0x02, 0x11, 0x22, 0x33, 0x44, 0x56}) == Config.MacAddress);
+                         }));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nnetworkingMode=none\nfirewall=true\ndnsTunneling=true\nipv6=true\n"));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[experimental]\nopenVmm=false\n[wsl2]\ngpuSupport=true\n"));
         bool openVmmEnabled = true;
-        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nsafeMode=true\n", &openVmmEnabled));
+        VERIFY_ARE_EQUAL(
+            S_OK, configure("\n[wsl2]\nsafeMode=true\n", [&](const auto& Config) { openVmmEnabled = Config.EnableOpenVmm; }));
         VERIFY_IS_FALSE(openVmmEnabled);
         for (const auto* setting : {
                  "\n[wsl2]\ngpuSupport=true\n",
@@ -214,7 +224,7 @@ class OpenVmmVirtualMachineBackendTests
         const auto& disk = description.BootDisks.at(L"arbitrary-key");
         VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, disk.Id.Owner.VmId));
         VERIFY_ARE_EQUAL(UINT64{1}, disk.Id.Value);
-        VERIFY_ARE_EQUAL(UINT32{0}, disk.GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{0}, GetSlot(disk));
         VERIFY_IS_FALSE(disk.ReadOnly);
 
         for (const auto* path : {L"C:\\images\\disk.img", L"C:\\images\\disk"})
@@ -349,33 +359,34 @@ class OpenVmmVirtualMachineBackendTests
         auto request = CreateRequest();
         request.BootDisks.push_back(CreateDisk(L"exact"));
         auto& disk = request.BootDisks[0].Disk;
-        disk.Placement = VmScsiPlacement{{0, 253}};
-        VERIFY_ARE_EQUAL(UINT32{253}, ValidateCreateRequest(request).BootDisks.at(L"exact").GuestAddress.Lun);
+        disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{253}};
+        VERIFY_ARE_EQUAL(UINT32{253}, GetSlot(ValidateCreateRequest(request).BootDisks.at(L"exact")));
 
-        for (const UINT32 lun : {UINT32{254}, UINT32_MAX})
+        for (const UINT32 slot : {UINT32{254}, UINT32_MAX})
         {
-            disk.Placement = VmScsiPlacement{{0, lun}};
+            disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{slot}};
             VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
         }
 
-        for (const UINT32 lun : {UINT32{0}, UINT32{254}, UINT32_MAX})
+        // OpenVMM attaches disks over virtio-blk, so SCSI placements are rejected.
+        for (const UINT32 lun : {UINT32{0}, UINT32{253}})
         {
-            disk.Placement = VmScsiPlacement{{1, lun}};
+            disk.Placement = VmDiskPlacement{VmScsiAddress{0, lun}};
             VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
         }
 
-        disk.Placement = VmScsiPlacement{{0, 253}};
+        disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{253}};
         auto duplicate = CreateDisk(L"duplicate");
         duplicate.Disk.Placement = disk.Placement;
         request.BootDisks.push_back(std::move(duplicate));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), DescribeResult(request));
 
         request.BootDisks = {CreateDisk(L"automatic-1"), CreateDisk(L"automatic-2"), CreateDisk(L"exact")};
-        request.BootDisks[2].Disk.Placement = VmScsiPlacement{{0, 0}};
+        request.BootDisks[2].Disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{0}};
         const auto description = ValidateCreateRequest(request);
-        VERIFY_ARE_EQUAL(UINT32{1}, description.BootDisks.at(L"automatic-1").GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(UINT32{2}, description.BootDisks.at(L"automatic-2").GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(UINT32{0}, description.BootDisks.at(L"exact").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{1}, GetSlot(description.BootDisks.at(L"automatic-1")));
+        VERIFY_ARE_EQUAL(UINT32{2}, GetSlot(description.BootDisks.at(L"automatic-2")));
+        VERIFY_ARE_EQUAL(UINT32{0}, GetSlot(description.BootDisks.at(L"exact")));
 
         request.BootDisks.clear();
         for (UINT32 index = 0; index < 254; ++index)
@@ -383,7 +394,7 @@ class OpenVmmVirtualMachineBackendTests
             request.BootDisks.push_back(CreateDisk(std::to_wstring(index)));
         }
         const auto first = ValidateCreateRequest(request);
-        VERIFY_ARE_EQUAL(UINT32{253}, first.BootDisks.at(L"253").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{253}, GetSlot(first.BootDisks.at(L"253")));
         THROW_IF_FAILED(CoCreateGuid(&request.Identity.VmId));
         const auto second = ValidateCreateRequest(request);
         VERIFY_ARE_EQUAL(first.BootDisks.at(L"0").Id.Value, second.BootDisks.at(L"0").Id.Value);
@@ -616,7 +627,7 @@ class OpenVmmVirtualMachineBackendTests
         for (const bool readOnly : {false, true})
         {
             disk.ReadOnly = readOnly;
-            disk.Placement = VmScsiPlacement{{0, 3}};
+            disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{3}};
             VERIFY_ARE_EQUAL(WSL_E_DISK_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(disk); }));
         }
         backend->DetachDisk(managed.Id);
@@ -626,7 +637,7 @@ class OpenVmmVirtualMachineBackendTests
         for (const bool readOnly : {false, true})
         {
             disk.ReadOnly = readOnly;
-            disk.Placement = VmScsiPlacement{{0, 3}};
+            disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{3}};
             VERIFY_ARE_EQUAL(WSL_E_USER_VHD_ALREADY_ATTACHED, OperationResult([&] { backend->AttachDisk(disk); }));
         }
         disk.Placement.reset();
@@ -649,7 +660,7 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
         request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         auto guest = StartGuest(*backend);
@@ -669,6 +680,9 @@ class OpenVmmVirtualMachineBackendTests
             {AF_INET6, "::1", false},
             {AF_INET, "127.0.0.2", false},
             {AF_INET, "10.0.0.2", false},
+            {AF_INET, "192.0.2.1", false},
+            {AF_INET6, "::ffff:192.0.2.1", false},
+            {AF_INET6, "2001:db8::1", false},
         };
         for (const bool enabled : {false, true})
         {
@@ -717,7 +731,7 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         auto guest = StartGuest(*backend);
         const auto description = backend->GetDescription();
@@ -792,6 +806,7 @@ class OpenVmmVirtualMachineBackendTests
     {
         const auto capabilities = OpenVmmVirtualMachineBackend::QueryCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::OpenVmm, capabilities.Backend);
+        VERIFY_ARE_EQUAL(VmDiskTransport::VirtioBlk, capabilities.DiskTransport);
 
         decltype(capabilities.Features) expectedFeatures;
         for (const auto feature :
