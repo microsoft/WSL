@@ -84,7 +84,7 @@ public:
     // Blocks until the event stream has delivered every event dockerd emitted since Connect and before this call, or
     // Timeout elapses. Operations complete once dockerd responds, while their events arrive later on the stream, so this
     // lets teardown wait for them before stopping dockerd discards them. Must not be called from the relay thread.
-    void WaitForPendingEvents(DockerHTTPClient& dockerClient, std::chrono::milliseconds Timeout);
+    void WaitForPendingEvents(DockerHTTPClient& DockerClient, std::chrono::milliseconds Timeout);
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;

@@ -108,7 +108,7 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
-void DockerEventTracker::WaitForPendingEvents(DockerHTTPClient& dockerClient, std::chrono::milliseconds Timeout)
+void DockerEventTracker::WaitForPendingEvents(DockerHTTPClient& DockerClient, std::chrono::milliseconds Timeout)
 {
     const auto deadline = std::chrono::steady_clock::now() + Timeout;
     auto remaining = [&]() {
@@ -128,14 +128,14 @@ void DockerEventTracker::WaitForPendingEvents(DockerHTTPClient& dockerClient, st
         return;
     }
 
-    const auto now = dockerClient.GetSystemTimeNano(remaining());
+    const auto now = DockerClient.GetSystemTimeNano(remaining());
 
     // If dockerd's clock moved back past the subscription time, list every buffered event. That includes events emitted
     // before the subscription, which the stream never delivers and so can cost the full timeout.
     const std::int64_t listSince = now < since.value() ? 1 : since.value();
 
     std::set<EventKey> pending;
-    for (const auto& event : dockerClient.ListEvents(listSince, now, remaining()))
+    for (const auto& event : DockerClient.ListEvents(listSince, now, remaining()))
     {
         pending.emplace(ParseEventKey(nlohmann::json::parse(event), event));
     }
