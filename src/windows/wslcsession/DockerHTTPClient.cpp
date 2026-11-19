@@ -717,6 +717,43 @@ wil::unique_socket DockerHTTPClient::MonitorEvents()
     return std::move(socket);
 }
 
+std::vector<std::string> DockerHTTPClient::ListEvents(std::int64_t SinceNano, std::int64_t UntilNano)
+{
+    auto formatEventTime = [](std::int64_t TimeNano) {
+        return std::format("{}.{:09}", TimeNano / std::nano::den, TimeNano % std::nano::den);
+    };
+
+    auto url = URL::Create("/events");
+    url.SetParameter("since", formatEventTime(SinceNano));
+    url.SetParameter("until", formatEventTime(UntilNano));
+
+    // An until time that has already passed makes dockerd return its buffered events and end the response.
+    auto [response, body] = SendRequestAndReadResponse(verb::get, url, {});
+    if (response.result_int() != 200)
+    {
+        throw DockerHTTPException(std::move(response), verb::get, url.Get(), "", std::move(body));
+    }
+
+    std::vector<std::string> events;
+    for (const auto line : std::views::split(body, '\n'))
+    {
+        if (!line.empty())
+        {
+            events.emplace_back(line.begin(), line.end());
+        }
+    }
+
+    return events;
+}
+
+std::int64_t DockerHTTPClient::GetSystemTimeNano()
+{
+    const auto info = Transaction<EmptyRequest, docker_schema::SystemInfo>(verb::get, URL::Create("/info"));
+    const auto [seconds, nanoseconds] = timestamp::ParseTimestamp(info.SystemTime);
+
+    return seconds * std::nano::den + nanoseconds;
+}
+
 wil::unique_socket DockerHTTPClient::ConnectSocket()
 {
     auto lock = m_lock.lock_exclusive();

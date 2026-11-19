@@ -55,6 +55,13 @@ struct ErrorResponse
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ErrorResponse, message);
 };
 
+struct SystemInfo
+{
+    std::string SystemTime;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(SystemInfo, SystemTime);
+};
+
 // Payload of the X-Docker-Container-Path-Stat response header on /containers/{id}/archive.
 struct ContainerPathStat
 {

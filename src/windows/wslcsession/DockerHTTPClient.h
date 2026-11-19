@@ -188,6 +188,12 @@ public:
 
     wil::unique_socket MonitorEvents();
 
+    // Returns the events dockerd still buffers whose timestamps fall within [SinceNano, UntilNano], one JSON object per entry.
+    std::vector<std::string> ListEvents(std::int64_t SinceNano, std::int64_t UntilNano);
+
+    // Returns dockerd's current time in nanoseconds since the epoch. This is the clock that timestamps its events.
+    std::int64_t GetSystemTimeNano();
+
     struct DockerHttpResponseHandle : public common::io::ReadHandle
     {
         NON_COPYABLE(DockerHttpResponseHandle);

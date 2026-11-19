@@ -82,7 +82,89 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
 
     auto socket = dockerClient.MonitorEvents();
 
+    // Start the stream position at dockerd's current time so WaitForPendingEvents doesn't wait for events this stream
+    // was never going to deliver because dockerd emitted them before it subscribed.
+    std::optional<StreamPosition> position;
+    try
+    {
+        position = StreamPosition{dockerClient.GetSystemTimeNano(), 0};
+    }
+    CATCH_LOG();
+
+    {
+        std::lock_guard lock{m_positionLock};
+        m_position = position;
+    }
+
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
+}
+
+void DockerEventTracker::WaitForPendingEvents(DockerHTTPClient& dockerClient, std::chrono::milliseconds Timeout)
+{
+    std::optional<StreamPosition> position;
+    {
+        std::lock_guard lock{m_positionLock};
+        position = m_position;
+    }
+
+    if (!position.has_value())
+    {
+        return;
+    }
+
+    const auto now = dockerClient.GetSystemTimeNano();
+    if (now < position->TimeNano)
+    {
+        return;
+    }
+
+    // Find the newest event dockerd emitted so far. Docker includes events stamped exactly at 'since', so events at the
+    // current position are counted again here and compared against the delivered count.
+    StreamPosition target{position->TimeNano, 0};
+    for (const auto& event : dockerClient.ListEvents(position->TimeNano, now))
+    {
+        const auto eventTimeNano = nlohmann::json::parse(event).at("timeNano").get<std::int64_t>();
+        if (eventTimeNano > target.TimeNano)
+        {
+            target = StreamPosition{eventTimeNano, 1};
+        }
+        else if (eventTimeNano == target.TimeNano)
+        {
+            target.Count++;
+        }
+    }
+
+    std::unique_lock lock{m_positionLock};
+    const bool delivered = m_positionUpdated.wait_for(lock, Timeout, [&]() {
+        return m_position.has_value() && (m_position->TimeNano > target.TimeNano ||
+                                          (m_position->TimeNano == target.TimeNano && m_position->Count >= target.Count));
+    });
+
+    if (!delivered)
+    {
+        WSL_LOG(
+            "DockerEventsPendingTimeout",
+            TraceLoggingValue(target.TimeNano, "PendingTimeNano"),
+            TraceLoggingValue(m_position.has_value() ? m_position->TimeNano : 0, "DeliveredTimeNano"),
+            TraceLoggingValue(m_sessionId, "SessionId"));
+    }
+}
+
+void DockerEventTracker::OnEventDelivered(std::int64_t eventTimeNano) noexcept
+{
+    {
+        std::lock_guard lock{m_positionLock};
+        if (!m_position.has_value() || eventTimeNano > m_position->TimeNano)
+        {
+            m_position = StreamPosition{eventTimeNano, 1};
+        }
+        else if (eventTimeNano == m_position->TimeNano)
+        {
+            m_position->Count++;
+        }
+    }
+
+    m_positionUpdated.notify_all();
 }
 
 DockerEventTracker::RegistryState::~RegistryState()
@@ -117,6 +199,9 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
         static_cast<int>(event.size()),
         event.data());
     std::int64_t eventTimeNano = timeNanoEntry->get<std::int64_t>();
+
+    // Advance the stream position once the callbacks have run, even if one failed, since the event was consumed.
+    auto delivered = wil::scope_exit([&]() { OnEventDelivered(eventTimeNano); });
 
     auto actionStr = action->get<std::string>();
 
