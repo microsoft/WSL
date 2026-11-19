@@ -319,10 +319,18 @@ uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int prot
     const PortTrackerState::LoopbackPort key{.Family = addr.si_family, .Protocol = protocol, .Port = guestPort};
     auto& ports = trackerState->LoopbackPorts;
     const auto entry = allocate ? ports.try_emplace(key).first : ports.find(key);
-    THROW_HR_IF(E_UNEXPECTED, entry == ports.end());
+    THROW_HR_IF_MSG(
+        E_UNEXPECTED, entry == ports.end(), "Untracked loopback relay port: family=%hu protocol=%d port=%hu", key.Family, key.Protocol, key.Port);
     auto& [wildcardOwners, loopbackOwners] = entry->second;
     auto& owners = unspecified ? wildcardOwners : loopbackOwners;
-    THROW_HR_IF(E_UNEXPECTED, !allocate && owners == 0);
+    THROW_HR_IF_MSG(
+        E_UNEXPECTED,
+        !allocate && owners == 0,
+        "No %hs owner for loopback relay port: family=%hu protocol=%d port=%hu",
+        unspecified ? "wildcard" : "loopback",
+        key.Family,
+        key.Protocol,
+        key.Port);
     // A failed first bind must not leave an empty entry.
     auto removeEmpty = wil::scope_exit([&]() {
         if (wildcardOwners == 0 && loopbackOwners == 0)
