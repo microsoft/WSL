@@ -505,6 +505,68 @@ public:
         }
     }
 
+    static void DrvfsMountOwnerOptions(DrvFsMode Mode)
+    {
+        if (Mode == DrvFsMode::VirtioFs)
+        {
+            WINDOWS_11_TEST_ONLY();
+        }
+
+        const auto testDir = std::filesystem::current_path() / "drvfs-owner-options-test";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(testDir));
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(testDir, ec);
+        });
+
+        struct TestCase
+        {
+            std::wstring_view Options;
+            std::wstring_view Owner;
+        };
+
+        // Automount places the distribution's default uid/gid before user-specified options.
+        // The last value must win, including an explicit override back to root.
+        constexpr TestCase testCases[] = {
+            {L"uid=0,gid=0,uid=991,gid=992", L"991:992\n"},
+            {L"uid=991,gid=992,uid=0,gid=0", L"0:0\n"},
+            {L"uid=1,gid=2,uid=3,gid=4,uid=991,gid=992", L"991:992\n"},
+            {L"uid=991,gid=992,uid=991,gid=992", L"991:992\n"},
+            {L"uid=0,gid=0,metadata,uid=991,gid=992", L"991:992\n"},
+            {L"uid=991,gid=992,metadata,uid=0,gid=0", L"0:0\n"},
+        };
+
+        const std::wstring expectedFileSystem = Mode == DrvFsMode::VirtioFs ? L"virtiofs\n" : L"9p\n";
+        for (size_t index = 0; index < std::size(testCases); ++index)
+        {
+            const auto& testCase = testCases[index];
+            const auto sourceDir = testDir / std::to_string(index);
+            const auto mountPoint = std::format(L"/tmp/drvfs-owner-options-test-{}", index);
+            std::filesystem::create_directory(sourceDir);
+            {
+                // Windows-created files have no Linux ownership metadata.
+                std::ofstream markerFile(sourceDir / "marker");
+                markerFile << "mount owner options";
+            }
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"mkdir '{}'", mountPoint)), 0);
+            auto unmountCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                LxsstuLaunchWsl(std::format(L"umount '{}'", mountPoint));
+                LxsstuLaunchWsl(std::format(L"rmdir '{}'", mountPoint));
+            });
+
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(std::format(L"mount -t drvfs -o '{}' '{}' '{}'", testCase.Options, sourceDir.string(), mountPoint)), 0);
+
+            // VirtioFs can silently fall back to Plan9; that must not satisfy this test.
+            auto [out, err] = LxsstuLaunchWslAndCaptureOutput(std::format(L"findmnt -n -o FSTYPE --mountpoint '{}'", mountPoint));
+            VERIFY_ARE_EQUAL(expectedFileSystem, out);
+
+            std::tie(out, err) = LxsstuLaunchWslAndCaptureOutput(std::format(L"stat -c '%u:%g' '{}/marker'", mountPoint));
+            VERIFY_ARE_EQUAL(std::wstring(testCase.Owner), out);
+        }
+    }
+
     static void DrvfsMountReadOnly()
     {
         const auto testDir = std::filesystem::current_path() / "drvfs-read-only-test";
@@ -1466,6 +1528,11 @@ class WSL1 : public DrvFsTests
         WSL2_TEST_METHOD(DrvfsMountManyVirtioFsSharesLegacy) \
         { \
             DrvFsTests::DrvfsMountManyVirtioFsShares(DrvFsMode::##_mode##, false); \
+        } \
+\
+        WSL2_TEST_METHOD(DrvfsMountOwnerOptions) \
+        { \
+            DrvFsTests::DrvfsMountOwnerOptions(DrvFsMode::##_mode##); \
         } \
 \
         WSL2_TEST_METHOD(DrvfsMountReadOnly) \
