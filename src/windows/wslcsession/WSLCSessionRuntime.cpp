@@ -33,7 +33,6 @@ constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
 // How often an ExistingOnly lease retries the runtime lock while another thread holds it exclusively.
 constexpr DWORD c_existingOnlyLockRetryMs = 10;
 
-// How long VM teardown waits for the relay to deliver the events dockerd has already emitted.
 constexpr auto c_pendingEventsTimeout = std::chrono::seconds(5);
 
 } // namespace
@@ -523,8 +522,6 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         m_vmExited.store(true);
     }
 
-    // Operations complete once dockerd responds, but their events reach the relay later, and dockerd's event buffer
-    // dies with it. Wait for those events while the relay and every session callback can still receive them.
     if (m_dockerClient && !m_vmExited.load() && !m_terminating->load() && m_ioRelay && !m_ioRelay->IsRelayThread())
     {
         try
