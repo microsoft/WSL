@@ -306,8 +306,19 @@ void GnsEngine::ProcessDNSChange(Interface& interface, const wsl::shared::hns::D
         content << payload.Options; // The Options field is used to pass the file header
     }
 
-    for (const auto& server : wsl::shared::string::Split(payload.ServerList, L','))
+    for (auto& server : wsl::shared::string::Split(payload.ServerList, L','))
     {
+        if (const auto zone = server.find(L"%{"); zone != std::wstring::npos)
+        {
+            const auto adapterId = wsl::shared::string::ToGuid(std::wstring_view(server).substr(zone + 1));
+            if (!adapterId)
+            {
+                THROW_ERRNO(EINVAL);
+            }
+
+            server.replace(zone + 1, std::wstring::npos, std::to_wstring(OpenAdapterImpl(*adapterId).Index()));
+        }
+
         content << L"nameserver " << server << L"\n";
     }
 
