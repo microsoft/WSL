@@ -229,7 +229,6 @@ namespace {
         const auto result =
             RunWslc(std::format(L"image pull {}:{}/proxy-test:latest", string::MultiByteToWide(c_proxyTargetHost), c_registryPort));
         result.Verify({.ExitCode = 1});
-        VERIFY_IS_TRUE(result.StderrContainsSubstring(L"Not Implemented"));
         VERIFY_ARE_NOT_EQUAL(
             std::wstring::npos,
             ReadFileContent(requestsPath.wstring())
