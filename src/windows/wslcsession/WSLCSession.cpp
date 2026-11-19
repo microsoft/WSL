@@ -604,16 +604,25 @@ std::vector<std::string> WSLCSession::GetProxyEnvironment() const
                 {
                     *url = wsl::windows::wslc::ResolveProxyUrl(*url, m_settings.HostLoopback);
                 }
-                const bool unsupported = m_settings.NetworkingMode == WSLCNetworkingModeNAT
-                                             ? HttpProxyStateTracker::IsUnsupportedProxy(
-                                                   wsl::shared::string::MultiByteToWide(*url).c_str(),
-                                                   wsl::core::NetworkingMode::Nat) != UnsupportedProxyReason::Supported
-                                             : wsl::windows::wslc::IsLoopbackProxyUrl(*url);
+
+                bool unsupported;
+                if (m_settings.NetworkingMode == WSLCNetworkingModeNAT)
+                {
+                    const auto reason = HttpProxyStateTracker::IsUnsupportedProxy(
+                        wsl::shared::string::MultiByteToWide(*url).c_str(), wsl::core::NetworkingMode::Nat);
+                    unsupported = reason != UnsupportedProxyReason::Supported;
+                }
+                else
+                {
+                    unsupported = wsl::windows::wslc::IsLoopbackProxyUrl(*url);
+                }
+
                 if (unsupported)
                 {
                     url->clear();
                 }
             }
+
             proxy->AddToEnvironment(windowsProxyEnvironment);
         }
     }));
