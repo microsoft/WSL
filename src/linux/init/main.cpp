@@ -174,6 +174,8 @@ int EnableInterface(int Socket, const char* Name);
 
 int ExportToSocket(const char* Source, int Socket, int ErrorSocket, unsigned int flags);
 
+int FlushDiskCache(const char* DevicePath);
+
 int FormatDevice(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
 
 std::string GetDiskDeviceName(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId);
@@ -531,7 +533,7 @@ Return Value:
 
     if (DeviceType == LxMiniInitMountDeviceTypeVirtioBlk)
     {
-        return 0;
+        return FlushDiskCache(DevicePath.c_str());
     }
 
     THROW_ERRNO_IF(EINVAL, DeviceType != LxMiniInitMountDeviceTypeScsi);
@@ -626,7 +628,7 @@ try
 
     if (DeviceType == LxMiniInitMountDeviceTypeVirtioBlk)
     {
-        return 0;
+        return FlushDiskCache(GetDiskDevicePath(DeviceType, DeviceId).c_str());
     }
 
     THROW_ERRNO_IF(EINVAL, DeviceType != LxMiniInitMountDeviceTypeScsi);
@@ -789,6 +791,39 @@ Return Value:
     }
 
     return Result;
+}
+
+int FlushDiskCache(const char* DevicePath)
+
+/*++
+
+Routine Description:
+
+    This routine flushes a disk's write cache so that completed writes are durable on the host.
+
+    N.B. virtio-blk disks are removed by the host, and the guest driver does not flush on removal,
+         unlike SCSI which issues SYNCHRONIZE CACHE when the guest deletes the device. fsync on a
+         block device writes back its pages and then issues VIRTIO_BLK_T_FLUSH.
+
+Arguments:
+
+    DevicePath - Supplies the path of the block device.
+
+Return Value:
+
+    0 on success, -1 on failure.
+
+--*/
+
+{
+    const wil::unique_fd BlockDevice{open(DevicePath, O_RDONLY | O_CLOEXEC)};
+    if (!BlockDevice || fsync(BlockDevice.get()) < 0)
+    {
+        LOG_ERROR("Failed to flush disk cache: '{}', {}", DevicePath, errno);
+        return -1;
+    }
+
+    return 0;
 }
 
 int FormatDevice(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int DeviceId)
