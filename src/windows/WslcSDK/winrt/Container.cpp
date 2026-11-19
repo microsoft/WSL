@@ -19,7 +19,6 @@ Abstract:
 #include "ContainerNetwork.h"
 #include "Process.h"
 #include "ProcessSettings.h"
-#include "WslcsdkInternal.h"
 
 using namespace winrt::Windows::Foundation;
 
@@ -60,7 +59,7 @@ Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::Pr
 
 void Container::Start()
 {
-    auto startFlags = WSLC_CONTAINER_START_FLAG_NONE;
+    auto startFlags = WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS;
     if (m_initProcess)
     {
         WI_SetFlagIf(
@@ -70,7 +69,7 @@ void Container::Start()
     }
 
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcStartContainerInternal(ToHandle(), startFlags, errorMessage.put(), FALSE);
+    auto hr = WslcStartContainer(ToHandle(), startFlags, errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 
     if (m_initProcess)

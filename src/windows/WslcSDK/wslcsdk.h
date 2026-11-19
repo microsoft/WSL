@@ -235,6 +235,8 @@ typedef enum WslcContainerStartFlags
 {
     WSLC_CONTAINER_START_FLAG_NONE = 0x00000000,
     WSLC_CONTAINER_START_FLAG_ATTACH = 0x00000001,
+    // Registers the init process IO callbacks without delivering them until WslcActivateContainerIOCallbacks is called.
+    WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS = 0x00000002,
 
 } WslcContainerStartFlags;
 
@@ -515,6 +517,13 @@ STDAPI WslcSetProcessSettingsCallbacks(_In_ WslcProcessSettings* processSettings
 // Must be called before WslcStartContainer (with WSLC_CONTAINER_START_FLAG_ATTACH).
 // Has no effect on a container that is already running.
 STDAPI WslcSetContainerInitProcessIOCallbacks(_In_ WslcContainer container, _In_ const WslcProcessCallbacks* callbacks, _In_opt_ PVOID context);
+
+// Starts delivering the init process IO callbacks of a container started with WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS.
+// Notes:
+//   - Until this is called, process output is held in the IO pipes. If they fill up, the init process blocks on writes.
+//   - Callbacks that are never activated are discarded when the container is released, and onExit is not called.
+//   - Succeeds without effect if the container has no init process IO callbacks or they are already active.
+STDAPI WslcActivateContainerIOCallbacks(_In_ WslcContainer container);
 
 // PROCESS MANAGEMENT
 

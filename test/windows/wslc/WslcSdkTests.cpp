@@ -3018,8 +3018,10 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcReleaseProcess(initProcess));
 
         const int countAtRelease = ctx.callbackCount.load();
-        Sleep(500);
-        VERIFY_IS_TRUE(ctx.callbackCount.load() > countAtRelease);
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_WIN32_IF(ERROR_RETRY, ctx.callbackCount.load() <= countAtRelease); },
+            std::chrono::milliseconds{100},
+            std::chrono::seconds{30}));
     }
 
     WSLC_TEST_METHOD(ProcessIoCallbackLargeOutput)
@@ -3185,6 +3187,61 @@ class WslcSdkTests
         WslcContainerState state{};
         VERIFY_SUCCEEDED(WslcGetContainerState(container.get(), &state));
         VERIFY_ARE_EQUAL(state, WSLC_CONTAINER_STATE_RUNNING);
+    }
+
+    WSLC_TEST_METHOD(DeferredContainerIOCallbacks)
+    {
+        struct Context
+        {
+            std::atomic<int> callbackCount{0};
+            std::string stdoutData;
+            wil::unique_event exitEvent{wil::EventOptions::ManualReset};
+        } ctx;
+
+        auto ioCb = [](WslcProcessIOHandle, const BYTE* data, uint32_t size, PVOID c) {
+            auto* cx = static_cast<Context*>(c);
+            cx->stdoutData.append(reinterpret_cast<const char*>(data), size);
+            cx->callbackCount.fetch_add(1);
+        };
+
+        auto exitCb = [](INT32, PVOID c) { static_cast<Context*>(c)->exitEvent.SetEvent(); };
+
+        WslcProcessSettings procSettings;
+        VERIFY_SUCCEEDED(WslcInitProcessSettings(&procSettings));
+        const char* argv[] = {"/bin/sh", "-c", "echo OUT"};
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCmdLine(&procSettings, argv, ARRAYSIZE(argv)));
+
+        WslcProcessCallbacks callbacks{};
+        callbacks.onStdOut = ioCb;
+        callbacks.onExit = exitCb;
+        VERIFY_SUCCEEDED(WslcSetProcessSettingsCallbacks(&procSettings, &callbacks, &ctx));
+
+        WslcContainerSettings containerSettings;
+        VERIFY_SUCCEEDED(WslcInitContainerSettings("debian:latest", &containerSettings));
+        VERIFY_SUCCEEDED(WslcSetContainerSettingsInitProcess(&containerSettings, &procSettings));
+
+        UniqueContainer container;
+        VERIFY_SUCCEEDED(WslcCreateContainer(m_defaultSession, &containerSettings, &container, nullptr));
+        VERIFY_SUCCEEDED(WslcStartContainer(
+            container.get(), WSLC_CONTAINER_START_FLAG_ATTACH | WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS, nullptr));
+
+        UniqueProcess process;
+        VERIFY_SUCCEEDED(WslcGetContainerInitProcess(container.get(), &process));
+
+        wil::unique_handle processExitEvent;
+        VERIFY_SUCCEEDED(WslcGetProcessExitEvent(process.get(), processExitEvent.put()));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(processExitEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+
+        // The process has exited, but nothing is delivered until the callbacks are activated.
+        VERIFY_ARE_EQUAL(ctx.callbackCount.load(), 0);
+        VERIFY_IS_FALSE(ctx.exitEvent.is_signaled());
+
+        VERIFY_SUCCEEDED(WslcActivateContainerIOCallbacks(container.get()));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.exitEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
+        VERIFY_ARE_EQUAL(ctx.stdoutData, "OUT\n");
+
+        // Activating again has no effect.
+        VERIFY_SUCCEEDED(WslcActivateContainerIOCallbacks(container.get()));
     }
 
     // -----------------------------------------------------------------------

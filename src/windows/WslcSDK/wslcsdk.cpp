@@ -15,7 +15,6 @@ Abstract:
 
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
-#include "WslcsdkInternal.h"
 #include "Defaults.h"
 #include "ProgressCallback.h"
 #include "CrashDumpCallback.h"
@@ -1308,11 +1307,6 @@ try
 CATCH_RETURN();
 
 STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage)
-{
-    return WslcStartContainerInternal(container, flags, errorMessage, TRUE);
-}
-
-STDAPI WslcStartContainerInternal(_In_ WslcContainer container, _In_ WslcContainerStartFlags flags, _Outptr_opt_result_z_ PWSTR* errorMessage, _In_ BOOL activateIOCallbacks)
 try
 {
     ErrorInfoWrapper errorInfoWrapper{errorMessage};
@@ -1336,7 +1330,7 @@ try
             auto ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
             internalType->ioCallbacks = ioCallbacks;
 
-            if (activateIOCallbacks)
+            if (WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS))
             {
                 ioCallbacks->Activate();
             }

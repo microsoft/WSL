@@ -61,6 +61,7 @@ WslcSetContainerSettingsCapabilityDrops
 WslcCreateContainerProcess
 WslcStartContainer
 WslcSetContainerInitProcessIOCallbacks
+WslcActivateContainerIOCallbacks
 WslcInspectContainer
 WslcGetContainerState
 WslcStopContainer
@@ -88,7 +89,3 @@ WslcInstallWithDependencies
 
 DllGetActivationFactory = WINRT_GetActivationFactory PRIVATE
 DllCanUnloadNow         = WINRT_CanUnloadNow         PRIVATE
-
-; Internal entry points for the WinRT wrapper, exported by ordinal only.
-WslcStartContainerInternal          @1000 NONAME
-WslcActivateContainerIOCallbacks    @1001 NONAME
