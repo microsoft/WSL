@@ -111,7 +111,7 @@ void IOCallback::Complete()
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), IsOnIOCallbackThread());
 
             // A callback that was never activated has no IO to drain and would otherwise wait forever.
-            if (!m_activateEvent.is_signaled())
+            if (!IsActivated())
             {
                 Cancel();
             }
@@ -119,6 +119,11 @@ void IOCallback::Complete()
             m_thread.join();
         }
     });
+}
+
+bool IOCallback::IsActivated() const noexcept
+{
+    return m_activateEvent.is_signaled();
 }
 
 bool IOCallback::IsOnIOCallbackThread() const noexcept

@@ -1055,14 +1055,15 @@ try
         }
         CATCH_LOG();
 
+        // Releasing an alias leaves the container's callback alone while it can still deliver IO: the process is still
+        // running, or the callback has not been activated yet.
+        if (!internalType->ownsIOCallbacks && (!exited || !internalType->ioCallbacks->IsActivated()))
+        {
+            return S_OK;
+        }
+
         if (!exited)
         {
-            // A running container still delivers IO through the callback it owns, so releasing an alias must leave it alone.
-            if (!internalType->ownsIOCallbacks)
-            {
-                return S_OK;
-            }
-
             internalType->ioCallbacks->Cancel();
         }
 

@@ -29,6 +29,7 @@ struct IOCallback
     void Cancel();
     void Complete();
 
+    bool IsActivated() const noexcept;
     bool IsOnIOCallbackThread() const noexcept;
 
     static bool HasIOCallback(const WslcContainerProcessOptionsInternal* options);

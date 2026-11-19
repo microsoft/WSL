@@ -3236,6 +3236,9 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(ctx.callbackCount.load(), 0);
         VERIFY_IS_FALSE(ctx.exitEvent.is_signaled());
 
+        // Releasing the init process handle must not discard the callbacks that have not been activated yet.
+        VERIFY_SUCCEEDED(WslcReleaseProcess(process.release()));
+
         VERIFY_SUCCEEDED(WslcActivateContainerIOCallbacks(container.get()));
         VERIFY_ARE_EQUAL(WaitForSingleObject(ctx.exitEvent.get(), 30 * 1000), static_cast<DWORD>(WAIT_OBJECT_0));
         VERIFY_ARE_EQUAL(ctx.stdoutData, "OUT\n");
