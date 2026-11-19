@@ -469,22 +469,39 @@ class WSLCE2ETlsRegistryTests
             ULONG sessionId{};
             VERIFY_SUCCEEDED(session.GetId(&sessionId));
 
+            constexpr std::array proxyNames{
+                L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY", L"no_proxy", L"NO_PROXY"};
             for (const bool configured : {true, false})
             {
                 SetWindowsProxySettings(configured ? "http://changed.proxy.invalid:3129" : "", configured ? ".changed.invalid" : "");
-                const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", image.NameAndTag()));
-                for (const auto* name : {L"http_proxy", L"HTTP_PROXY", L"https_proxy", L"HTTPS_PROXY", L"no_proxy", L"NO_PROXY"})
+
+                // WinHTTP notifies asynchronously, and each container keeps its creation-time environment.
+                const auto deadline = std::chrono::steady_clock::now() + 30s;
+                for (;;)
                 {
-                    if (configured)
+                    const auto environment = RunWslcAndGetStdoutLineSet(std::format(L"container run --rm {} env", image.NameAndTag()));
+                    VERIFY_IS_FALSE(environment.empty());
+                    const auto mismatch = std::ranges::find_if_not(proxyNames, [&](const auto* name) {
+                        if (configured)
+                        {
+                            const auto* value = _wcsicmp(name, L"no_proxy") == 0 ? L".changed.invalid" : L"http://changed.proxy.invalid:3129";
+                            return environment.contains(std::format(L"{}={}", name, value));
+                        }
+
+                        const auto prefix = std::format(L"{}=", name);
+                        return std::ranges::none_of(environment, [&](const auto& entry) { return entry.starts_with(prefix); });
+                    });
+                    if (mismatch == proxyNames.end())
                     {
-                        const auto* value = _wcsicmp(name, L"no_proxy") == 0 ? L".changed.invalid" : L"http://changed.proxy.invalid:3129";
-                        VERIFY_IS_TRUE(environment.contains(std::format(L"{}={}", name, value)));
+                        break;
                     }
-                    else
+                    if (std::chrono::steady_clock::now() >= deadline)
                     {
-                        VERIFY_IS_FALSE(std::ranges::any_of(
-                            environment, [&](const auto& entry) { return entry.starts_with(std::format(L"{}=", name)); }));
+                        VERIFY_FAIL(std::format(L"Timed out waiting for {} to {}", *mismatch, configured ? L"change" : L"clear").c_str());
+                        break;
                     }
+
+                    std::this_thread::sleep_for(500ms);
                 }
 
                 ULONG currentSessionId{};
