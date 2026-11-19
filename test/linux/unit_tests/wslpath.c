@@ -170,6 +170,8 @@ Return Value:
         "C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin",
         "/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin",
         true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows\\..\\Users", "/mnt/c/Users", true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows\\.\\..\\Users", "/mnt/c/Users", true));
 
 ErrorExit:
     return Result;

@@ -209,7 +209,7 @@ Return Value:
         }
         else
         {
-            if (RemoveSegmentCount == 0 && (SegmentLength == 0 || (SegmentLength == 1 && Segment[0] == '.')))
+            if (SegmentLength == 0 || (SegmentLength == 1 && Segment[0] == '.'))
             {
                 RemoveSegmentCount++;
             }
