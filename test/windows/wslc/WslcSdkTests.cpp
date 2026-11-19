@@ -3716,6 +3716,23 @@ class WslcSdkTests
         VERIFY_SUCCEEDED(WslcSetSessionSettingsFeatureFlags(&settings, WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES));
 
         UniqueSession session;
+        WslcVersion version{};
+        VERIFY_SUCCEEDED(WslcGetVersion(&version));
+        if (std::tuple{version.major, version.minor, version.revision} < c_wslcFeatureMinimumVersion)
+        {
+            wil::unique_cotaskmem_string message;
+            VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, WslcCreateSession(&settings, &session, &message));
+            VERIFY_IS_NULL(session.get());
+            VERIFY_IS_NOT_NULL(message.get());
+            VERIFY_ARE_EQUAL(
+                wsl::shared::Localization::MessageWslcOperationRequiresWslVersion(
+                    std::format("{}.{}.{}", version.major, version.minor, version.revision), "3.1.0"),
+                std::wstring(message.get()));
+            VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, WslcCreateSession(&settings, &session, nullptr));
+            VERIFY_IS_NULL(session.get());
+            return;
+        }
+
         VERIFY_SUCCEEDED(WslcCreateSession(&settings, &session, nullptr));
         VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
 

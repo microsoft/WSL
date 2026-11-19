@@ -199,9 +199,7 @@ inline HRESULT CheckWslRuntimeVersionSupport(const WSLCCompatVersion& version, c
     }
 
     const std::tuple<uint32_t, uint32_t, uint32_t> currentVersion{version.Major, version.Minor, version.Revision};
-    // Allow lockstep development builds before the feature's release version.
-    const std::tuple<uint32_t, uint32_t, uint32_t> clientVersion{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
-    if (currentVersion < minimumVersion && currentVersion != clientVersion)
+    if (currentVersion < minimumVersion)
     {
         if (errorMessage)
         {
