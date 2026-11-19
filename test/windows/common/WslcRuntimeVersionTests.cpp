@@ -14,11 +14,6 @@ class WslcRuntimeVersionTests
         for (const WSLCCompatVersion version :
              {WSLCCompatVersion{2, 9, 5}, WSLCCompatVersion{3, 0, 2}, WSLCCompatVersion{3, 0, 5}, WSLCCompatVersion{3, 0, 9}})
         {
-            if (version.Major == WSL_PACKAGE_VERSION_MAJOR && version.Minor == WSL_PACKAGE_VERSION_MINOR && version.Revision == WSL_PACKAGE_VERSION_REVISION)
-            {
-                continue;
-            }
-
             wil::unique_cotaskmem_string message;
             VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, CheckWslRuntimeVersionSupport(version, c_wslcFeatureMinimumVersion, &message));
             VERIFY_IS_NOT_NULL(message.get());
@@ -37,12 +32,12 @@ class WslcRuntimeVersionTests
         }
     }
 
-    TEST_METHOD(MatchingDevelopmentRuntime)
+    TEST_METHOD(MatchingClientVersionRequiresMinimumVersion)
     {
         const WSLCCompatVersion version{WSL_PACKAGE_VERSION_MAJOR, WSL_PACKAGE_VERSION_MINOR, WSL_PACKAGE_VERSION_REVISION};
         wil::unique_cotaskmem_string message;
-        VERIFY_SUCCEEDED(CheckWslRuntimeVersionSupport(version, {UINT32_MAX, UINT32_MAX, UINT32_MAX}, &message));
-        VERIFY_IS_NULL(message.get());
+        VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, CheckWslRuntimeVersionSupport(version, {UINT32_MAX, UINT32_MAX, UINT32_MAX}, &message));
+        VERIFY_IS_NOT_NULL(message.get());
     }
 };
 } // namespace WslcRuntimeVersionTests
