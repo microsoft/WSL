@@ -194,7 +194,7 @@ class WSLCTests
 
         wil::com_ptr<IWSLCSession> session;
 
-        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, nullptr, &session));
+        VERIFY_SUCCEEDED(sessionManager->CreateSession(&sessionSettings, Flags, nullptr, &session));
         wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
         WSLCSessionState state{};
@@ -468,7 +468,7 @@ class WSLCTests
         {
             auto settings = GetDefaultSessionSettings(nullptr);
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), WSLC_E_INVALID_SESSION_NAME);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject DisplayName at exact boundary (no room for null terminator).
@@ -476,7 +476,7 @@ class WSLCTests
             std::wstring boundaryName(std::size(WSLCSessionListEntry{}.DisplayName), L'x');
             auto settings = GetDefaultSessionSettings(boundaryName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), WSLC_E_INVALID_SESSION_NAME);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Reject too long DisplayName.
@@ -484,7 +484,7 @@ class WSLCTests
             std::wstring longName(std::size(WSLCSessionListEntry{}.DisplayName) + 1, L'x');
             auto settings = GetDefaultSessionSettings(longName.c_str());
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), WSLC_E_INVALID_SESSION_NAME);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), WSLC_E_INVALID_SESSION_NAME);
         }
 
         // Validate that creating a session on a non-existing storage fails if WSLCSessionStorageFlagsNoCreate is set.
@@ -493,9 +493,7 @@ class WSLCTests
             settings.StoragePath = L"C:\\does-not-exist";
             settings.StorageFlags = WSLCSessionStorageFlagsNoCreate;
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(
-                sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session),
-                HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
         }
 
         // Reject invalid storage flags.
@@ -503,7 +501,7 @@ class WSLCTests
             auto settings = GetDefaultSessionSettings(L"invalid-storage-flags");
             settings.StorageFlags = static_cast<WSLCSessionStorageFlags>(0x4);
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
         }
 
         // Reject non-empty storage directory that doesn't contain a session VHD.
@@ -522,7 +520,7 @@ class WSLCTests
             const auto storagePathString = storagePath.wstring();
             settings.StoragePath = storagePathString.c_str();
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
             ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because the directory is not empty", storagePathString));
         }
 
@@ -540,7 +538,7 @@ class WSLCTests
             const auto storagePathString = storagePath.wstring();
             settings.StoragePath = storagePathString.c_str();
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session), E_INVALIDARG);
             ValidateCOMErrorMessage(std::format(L"Cannot use '{}' as session storage because it is not a directory", storagePathString));
         }
 
@@ -548,7 +546,7 @@ class WSLCTests
         {
             auto settings = GetDefaultSessionSettings(L"invalid-session-flags");
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, static_cast<WSLCSessionFlags>(0x4), nullptr, nullptr, &session));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, static_cast<WSLCSessionFlags>(0x4), nullptr, &session));
         }
 
         // Reject invalid feature flags.
@@ -556,15 +554,14 @@ class WSLCTests
             auto settings = GetDefaultSessionSettings(L"invalid-feature-flags");
             settings.FeatureFlags = static_cast<WSLCFeatureFlags>(0x40);
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, &session));
+            VERIFY_ARE_EQUAL(E_INVALIDARG, sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, &session));
         }
 
         // Reject NULL output pointers across the session manager API.
         {
             auto settings = GetDefaultSessionSettings(L"null-out-session");
             VERIFY_ARE_EQUAL(
-                HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER),
-                sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr, nullptr));
+                HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, nullptr));
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->OpenSession(0, nullptr));
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER), sessionManager->OpenSessionByName(c_testSessionName, nullptr));
 
@@ -15343,9 +15340,7 @@ sys.exit(1 if queries else 0)
             auto settings = GetDefaultSessionSettings(L"session-1");
 
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(
-                manager->CreateSession(&settings, WSLCSessionFlagsPersistent, nullptr, nullptr, &session),
-                HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
+            VERIFY_ARE_EQUAL(manager->CreateSession(&settings, WSLCSessionFlagsPersistent, nullptr, &session), HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS));
 
             VERIFY_SUCCEEDED(session1Copy->Terminate());
             WSLCSessionState state{};
@@ -18086,84 +18081,45 @@ sys.exit(1 if queries else 0)
         LxsstuLaunchPowershellAndCaptureOutput(
             std::format(L"Set-WinhttpProxy -SettingScope User -Proxy \\\"{}\\\" -ProxyBypass \\\".windows.invalid\\\" -AutoconfigUrl \\\"\\\"", wsl::shared::string::MultiByteToWide(proxy)));
 
-        for (const bool manual : {false, true})
-        {
-            const auto name = std::format(L"windows-proxy-{}-{}-{}", static_cast<int>(NetworkingMode), Supported, manual);
-            auto settings = GetDefaultSessionSettings(name.c_str(), false, NetworkingMode);
-            const auto manualProxy = std::format("HTTP_PROXY=http://{}:8080", Host);
-            const LPCSTR values[]{manualProxy.c_str(), "https_proxy=", "NO_PROXY="};
-            const WSLCStringArray proxyEnvironment{values, ARRAYSIZE(values)};
-            const auto manager = OpenSessionManager();
-            wil::com_ptr<IWSLCSession> session;
-            VERIFY_SUCCEEDED(manager->CreateSession(&settings, WSLCSessionFlagsNone, manual ? &proxyEnvironment : nullptr, nullptr, &session));
-            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-            auto terminate = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
-            LoadTestImage(*session, "alpine:latest");
+        const auto sessionName = std::format(L"windows-proxy-{}-{}", static_cast<int>(NetworkingMode), Supported);
+        auto session = CreateSession(GetDefaultSessionSettings(sessionName.c_str(), false, NetworkingMode));
+        auto terminate = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
+        LoadTestImage(*session, "alpine:latest");
 
-            const auto readEnvironment = [&](const std::vector<std::string>& environment) {
-                WSLCContainerLauncher launcher("alpine:latest", "", {"env"}, environment, "bridge");
-                auto container = launcher.Launch(*session);
-                auto process = container.GetInitProcess();
-                const auto result = process.WaitAndCaptureOutput(30000);
-                VERIFY_ARE_EQUAL(0, result.Code);
-                return "\n" + result.Output.at(1);
-            };
-            const auto environment = readEnvironment({});
-            if (manual)
+        const auto readEnvironment = [&](const std::vector<std::string>& environment) {
+            WSLCContainerLauncher launcher("alpine:latest", "", {"env"}, environment, "bridge");
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+            const auto result = process.WaitAndCaptureOutput(30000);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            return "\n" + result.Output.at(1);
+        };
+        const auto environment = readEnvironment({});
+        for (const auto* name : {"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"})
+        {
+            if (Supported)
             {
-                for (const auto* value : values)
-                {
-                    VERIFY_IS_TRUE(environment.find(std::format("\n{}\n", value)) != std::string::npos);
-                }
-                for (const auto* name : {"http_proxy", "HTTPS_PROXY", "no_proxy"})
-                {
-                    VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
-                }
+                VERIFY_IS_TRUE(environment.find(std::format("\n{}={}\n", name, proxy)) != std::string::npos);
             }
             else
             {
-                for (const auto* name : {"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"})
-                {
-                    if (Supported)
-                    {
-                        VERIFY_IS_TRUE(environment.find(std::format("\n{}={}\n", name, proxy)) != std::string::npos);
-                    }
-                    else
-                    {
-                        VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
-                    }
-                }
-                for (const auto* name : {"no_proxy", "NO_PROXY"})
-                {
-                    VERIFY_IS_TRUE(environment.find(std::format("\n{}=.windows.invalid\n", name)) != std::string::npos);
-                }
-            }
-
-            const std::vector<std::string> overrides{"http_proxy=http://localhost:8081", "HTTPS_PROXY=", "no_proxy="};
-            const auto overriddenEnvironment = readEnvironment(overrides);
-            for (const auto& value : overrides)
-            {
-                VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}\n", value)) != std::string::npos);
-            }
-            for (const auto* name : {"HTTP_PROXY", "https_proxy", "NO_PROXY"})
-            {
-                VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}=", name)) == std::string::npos);
+                VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
             }
         }
-    }
-
-    WSLC_TEST_METHOD(ProxyEnvironmentRejectsMixedCaseSessionOverrides)
-    {
-        SKIP_TEST_SERVER();
-        auto settings = GetDefaultSessionSettings(L"mixed-case-proxy", false, WSLCNetworkingModeConsomme);
-        const auto manager = OpenSessionManager();
-        for (const auto* value : {"Http_Proxy=http://Manual.Proxy:8080", "hTtPs_PrOxY=", "No_PrOxY=LocalHost,.Manual.Example"})
+        for (const auto* name : {"no_proxy", "NO_PROXY"})
         {
-            const LPCSTR values[]{value};
-            const WSLCStringArray proxyEnvironment{values, ARRAYSIZE(values)};
-            wil::com_ptr<IWSLCSession> session;
-            VERIFY_ARE_EQUAL(E_INVALIDARG, manager->CreateSession(&settings, WSLCSessionFlagsNone, &proxyEnvironment, nullptr, &session));
-            VERIFY_IS_NULL(session.get());
+            VERIFY_IS_TRUE(environment.find(std::format("\n{}=.windows.invalid\n", name)) != std::string::npos);
+        }
+
+        const std::vector<std::string> overrides{"http_proxy=http://localhost:8081", "HTTPS_PROXY=", "no_proxy="};
+        const auto overriddenEnvironment = readEnvironment(overrides);
+        for (const auto& value : overrides)
+        {
+            VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}\n", value)) != std::string::npos);
+        }
+        for (const auto* name : {"HTTP_PROXY", "https_proxy", "NO_PROXY"})
+        {
+            VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}=", name)) == std::string::npos);
         }
     }
 
@@ -18246,49 +18202,6 @@ sys.exit(1 if queries else 0)
         std::vector<std::wstring> m_warnings;
     };
 
-    WSLC_TEST_METHOD(WarningCallbackLoopbackProxy)
-    {
-        SKIP_TEST_SERVER();
-
-        const auto expectedWarning = std::format(L"wsl: {}\n", wsl::shared::Localization::WSLCProxyLoopbackNotReachable());
-        const auto verifyWarning = [&](LPCWSTR name, LPCSTR httpProxy, LPCSTR httpsProxy, WSLCNetworkingMode networkingMode, bool expectWarning) {
-            auto settings = GetDefaultSessionSettings(name, false, networkingMode);
-            const auto http = std::format("HTTP_PROXY={}", httpProxy != nullptr ? httpProxy : "");
-            const auto https = std::format("HTTPS_PROXY={}", httpsProxy != nullptr ? httpsProxy : "");
-            const LPCSTR values[]{http.c_str(), https.c_str()};
-            const WSLCStringArray proxyEnvironment{values, ARRAYSIZE(values)};
-
-            auto warningCallback = Microsoft::WRL::Make<CapturingWarningCallback>();
-            auto sessionManager = OpenSessionManager();
-            wil::com_ptr<IWSLCSession> session;
-            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, &proxyEnvironment, warningCallback.Get(), &session));
-            wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
-            auto cleanup = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
-
-            const auto warnings = warningCallback->GetWarnings();
-            if (expectWarning)
-            {
-                VERIFY_IS_TRUE(std::ranges::find(warnings, expectedWarning) != warnings.end());
-            }
-            else
-            {
-                VERIFY_IS_TRUE(warnings.empty());
-            }
-
-            VERIFY_SUCCEEDED(session->Terminate());
-            cleanup.release();
-        };
-
-        verifyWarning(L"warning-https-loopback-http-proxy", "https://localhost:3128", nullptr, WSLCNetworkingModeConsomme, true);
-        verifyWarning(L"warning-https-loopback-https-proxy", nullptr, "https://127.0.0.1:3128", WSLCNetworkingModeConsomme, true);
-        verifyWarning(L"warning-ipv6-loopback-proxy", "http://[::1]:3128", nullptr, WSLCNetworkingModeConsomme, true);
-        verifyWarning(L"warning-https-loopback-nat", "https://localhost:3128", nullptr, WSLCNetworkingModeNAT, true);
-        verifyWarning(L"warning-http-loopback-nat", "http://127.0.0.1:3128", nullptr, WSLCNetworkingModeNAT, true);
-        verifyWarning(L"warning-ipv6-loopback-nat", nullptr, "http://[::1]:3128", WSLCNetworkingModeNAT, true);
-        verifyWarning(L"warning-non-loopback-nat", "http://proxy.example.com:3128", nullptr, WSLCNetworkingModeNAT, false);
-        verifyWarning(L"warning-loopback-networking-none", "https://localhost:3128", nullptr, WSLCNetworkingModeNone, false);
-    }
-
     WSLC_TEST_METHOD(WarningCallbackContainerRecovery)
     {
         SKIP_TEST_SERVER();
@@ -18330,7 +18243,7 @@ sys.exit(1 if queries else 0)
 
             const auto sessionManager2 = OpenSessionManager();
             wil::com_ptr<IWSLCSession> session2;
-            VERIFY_SUCCEEDED(sessionManager2->CreateSession(&settings2, WSLCSessionFlagsNone, nullptr, warningCallback.Get(), &session2));
+            VERIFY_SUCCEEDED(sessionManager2->CreateSession(&settings2, WSLCSessionFlagsNone, warningCallback.Get(), &session2));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session2.get());
 
             // The VM (and container recovery) starts lazily on the first operation. Trigger it via a
@@ -18406,7 +18319,7 @@ sys.exit(1 if queries else 0)
 
             const auto sessionManager = OpenSessionManager();
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, warningCallback.Get(), &session));
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
             // The VM (and volume recovery) starts lazily on the first operation. Trigger it via a
@@ -18479,7 +18392,7 @@ sys.exit(1 if queries else 0)
 
             const auto sessionManager = OpenSessionManager();
             wil::com_ptr<IWSLCSession> session;
-            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, nullptr, warningCallback.Get(), &session));
+            VERIFY_SUCCEEDED(sessionManager->CreateSession(&settings, WSLCSessionFlagsNone, warningCallback.Get(), &session));
             wsl::windows::common::security::ConfigureForCOMImpersonation(session.get());
 
             // The VM (and guest volume recovery) starts lazily on the first operation. Trigger it via a

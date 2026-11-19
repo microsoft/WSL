@@ -6,6 +6,7 @@
 #include "stringshared.h"
 #include <array>
 #include <cstring>
+#include <string_view>
 #include <winhttp.h>
 
 namespace wsl::windows::wslc {
@@ -47,13 +48,6 @@ namespace {
 
 } // namespace
 
-bool IsProxyEnvironmentVariable(std::string_view Entry)
-{
-    const auto name = EnvironmentName(Entry);
-    return Entry.find('=') != std::string_view::npos &&
-           std::ranges::any_of(c_proxyNames, [&](const auto& names) { return name == names.first || name == names.second; });
-}
-
 void AddProxyEnvironmentDefaults(std::vector<std::string>& Environment, const std::vector<std::string>& Defaults)
 {
     const auto explicitCount = Environment.size();
@@ -74,19 +68,6 @@ void AddProxyEnvironmentDefaults(std::vector<std::string>& Environment, const st
         if (std::ranges::none_of(Environment, [&](const auto& value) { return EnvironmentName(value) == name; }))
         {
             Environment.emplace_back(entry);
-        }
-    }
-}
-
-void ResolveProxyEnvironmentLoopback(std::vector<std::string>& Environment, const std::string& HostLoopback)
-{
-    for (auto& entry : Environment)
-    {
-        const auto name = EnvironmentName(entry);
-        if (name == "http_proxy" || name == "HTTP_PROXY" || name == "https_proxy" || name == "HTTPS_PROXY")
-        {
-            const auto offset = entry.find('=') + 1;
-            entry = entry.substr(0, offset) + ResolveProxyUrl(entry.substr(offset), HostLoopback);
         }
     }
 }

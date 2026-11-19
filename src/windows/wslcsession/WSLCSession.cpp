@@ -381,25 +381,6 @@ try
     // failures are streamed to the CLI.
     WSLCExecutionContext warningContext(this, WarningCallback);
 
-    RETURN_HR_IF(E_INVALIDARG, Settings->ProxyEnvironmentOverrides.Count != 0 && Settings->ProxyEnvironmentOverrides.Values == nullptr);
-
-    const auto isLoopbackProxy = [](LPCSTR entry) {
-        THROW_HR_IF_NULL(E_INVALIDARG, entry);
-
-        const std::string_view value{entry};
-        const auto equals = value.find('=');
-        const auto name = value.substr(0, equals);
-
-        return (wsl::shared::string::IsEqual(name, "http_proxy", true) || wsl::shared::string::IsEqual(name, "https_proxy", true)) &&
-               wsl::windows::wslc::IsLoopbackProxyUrl(std::string{value.substr(equals + 1)});
-    };
-
-    if ((Settings->NetworkingMode == WSLCNetworkingModeConsomme || Settings->NetworkingMode == WSLCNetworkingModeNAT) &&
-        std::ranges::any_of(wil::make_range(Settings->ProxyEnvironmentOverrides.Values, Settings->ProxyEnvironmentOverrides.Count), isLoopbackProxy))
-    {
-        EMIT_USER_WARNING(Localization::WSLCProxyLoopbackNotReachable());
-    }
-
     // The VM (and storage VHD) is created lazily on the first operation. Validate the storage
     // configuration eagerly here so misconfiguration is reported at session creation rather than
     // surfacing later on the first VM-starting operation.
@@ -599,18 +580,6 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
         m_settings.HostLoopback = nullptr;
     }
 
-    for (const auto* entry : wil::make_range(Settings.ProxyEnvironmentOverrides.Values, Settings.ProxyEnvironmentOverrides.Count))
-    {
-        THROW_HR_IF_NULL(E_INVALIDARG, entry);
-        m_proxyEnvironmentOverrides.emplace_back(entry);
-    }
-
-    std::ranges::transform(m_proxyEnvironmentOverrides, std::back_inserter(m_proxyEnvironmentOverrideValues), [](const auto& entry) {
-        return entry.c_str();
-    });
-    m_settings.ProxyEnvironmentOverrides = {
-        m_proxyEnvironmentOverrideValues.data(), static_cast<ULONG>(m_proxyEnvironmentOverrideValues.size())};
-
     THROW_HR_IF(E_UNEXPECTED, UserSid == nullptr);
 
     const auto length = GetLengthSid(UserSid);
@@ -649,9 +618,7 @@ std::vector<std::string> WSLCSession::GetProxyEnvironment() const
         }
     }));
 
-    auto environment = m_proxyEnvironmentOverrides;
-    wsl::windows::wslc::AddProxyEnvironmentDefaults(environment, windowsProxyEnvironment);
-    return environment;
+    return windowsProxyEnvironment;
 }
 
 WSLCSession::VmLease WSLCSession::AcquireLease(WSLCSessionRuntime::VmLeasePolicy Policy)

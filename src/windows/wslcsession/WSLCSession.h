@@ -471,8 +471,6 @@ private:
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
     std::optional<std::string> m_settingsHostLoopback;
-    std::vector<std::string> m_proxyEnvironmentOverrides;
-    std::vector<LPCSTR> m_proxyEnvironmentOverrideValues;
     std::unique_ptr<HttpProxyStateTracker> m_httpProxyStateTracker;
     std::vector<BYTE> m_userSid;
 

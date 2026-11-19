@@ -628,29 +628,6 @@ class WSLCCLISettingsUnitTests
         VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
     }
 
-    TEST_METHOD(ProxyEnvironment_NamesAreCaseSensitive)
-    {
-        const std::vector<std::pair<std::string, bool>> cases{
-            {"Http_Proxy=http://Proxy.Example:8080", false},
-            {"hTtPs_PrOxY=https://Proxy.Example:8443", false},
-            {"No_PrOxY=LocalHost,.Example.COM", false},
-            {"Http_Proxy=", false},
-            {"hTtPs_PrOxY=", false},
-            {"No_PrOxY=", false},
-            {"HTTP_PROXY=http://upper:8080", true},
-            {"HTTPS_PROXY=", true},
-            {"NO_PROXY=.upper.example", true},
-            {"http_proxy=http://lower:8080", true},
-            {"https_proxy=", true},
-            {"no_proxy=.lower.example", true},
-            {"http_proxy", false},
-            {"PATH=/bin", false}};
-        for (const auto& [entry, expected] : cases)
-        {
-            VERIFY_ARE_EQUAL(expected, IsProxyEnvironmentVariable(entry));
-        }
-    }
-
     TEST_METHOD(ProxyEnvironment_ExplicitCasingSuppressesDefaultAliases)
     {
         const std::vector<std::string> defaults{
@@ -699,30 +676,15 @@ class WSLCCLISettingsUnitTests
         VERIFY_IS_TRUE(environment == expected);
     }
 
-    TEST_METHOD(ProxyEnvironment_DefaultsAndLoopback)
+    TEST_METHOD(ProxyEnvironment_MixedCaseNamesDoNotSuppressDefaults)
     {
-        std::vector<std::string> environment{
-            "PATH=/bin", "Http_Proxy=http://localhost:8080", "hTtPs_PrOxY=http://localhost:8443", "No_PrOxY=LocalHost"};
-        AddProxyEnvironmentDefaults(
-            environment,
-            {"HTTP_PROXY=http://localhost:3128",
-             "http_proxy=http://localhost:3128",
-             "HTTPS_PROXY=http://localhost:8443",
-             "https_proxy=http://localhost:8443",
-             "NO_PROXY=localhost",
-             "no_proxy=localhost"});
-        ResolveProxyEnvironmentLoopback(environment, "host.wslc.internal");
-        const std::vector<std::string> expected{
-            "PATH=/bin",
-            "Http_Proxy=http://localhost:8080",
-            "hTtPs_PrOxY=http://localhost:8443",
-            "No_PrOxY=LocalHost",
-            "HTTP_PROXY=http://host.wslc.internal:3128",
-            "http_proxy=http://host.wslc.internal:3128",
-            "HTTPS_PROXY=http://host.wslc.internal:8443",
-            "https_proxy=http://host.wslc.internal:8443",
-            "NO_PROXY=localhost",
-            "no_proxy=localhost"};
+        std::vector<std::string> environment{"Http_Proxy=http://localhost:8080", "hTtPs_PrOxY=", "No_PrOxY=LocalHost"};
+        const std::vector<std::string> defaults{
+            "HTTP_PROXY=http://windows:3128", "https_proxy=http://windows:8443", "NO_PROXY=.example.com"};
+        auto expected = environment;
+        expected.insert(expected.end(), defaults.begin(), defaults.end());
+
+        AddProxyEnvironmentDefaults(environment, defaults);
         VERIFY_IS_TRUE(environment == expected);
     }
 
