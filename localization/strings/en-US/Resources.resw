@@ -2273,6 +2273,9 @@ Usage:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Port mappings are not supported with container network mode; ports are owned by the target container.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Port mappings are not supported when container networking is disabled. Enable networking or remove the port mappings.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Target container name is required for container network mode.</value>
   </data>
