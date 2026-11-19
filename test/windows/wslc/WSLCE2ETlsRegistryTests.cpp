@@ -37,6 +37,7 @@ namespace {
     constexpr USHORT c_changedProxyPort = 15013;
     constexpr auto c_proxyTargetHost = "registry.proxy.invalid";
     constexpr auto c_proxyTokenHost = "token.proxy.invalid";
+    const auto c_registryConnect = std::format("CONNECT {}:{} ", c_proxyTargetHost, c_registryPort);
 
     // DER-encodes a certificate-extension value structure (e.g. CERT_ALT_NAME_INFO for the SAN OID).
     std::vector<BYTE> EncodeCertExtensionValue(LPCSTR Oid, const void* StructInfo)
@@ -223,16 +224,35 @@ namespace {
         return server;
     }
 
+    size_t CountProxyRequests(const std::filesystem::path& requestsPath, std::string_view request)
+    {
+        std::ifstream log(requestsPath);
+        VERIFY_IS_TRUE(log.is_open());
+
+        // The user proxy can also receive unrelated requests from the host.
+        const auto marker = std::format("] \"{}", request);
+        size_t count = 0;
+        for (std::string line; std::getline(log, line);)
+        {
+            if (line.find(marker) != std::string::npos)
+            {
+                ++count;
+            }
+        }
+
+        VERIFY_IS_FALSE(log.bad());
+        return count;
+    }
+
     void PullAndVerifyProxyRequest(const std::filesystem::path& requestsPath)
     {
         // The HTTP server records CONNECT without implementing a proxy tunnel.
+        const auto expectedRequest = c_registryConnect + "HTTP/1.1\" 501";
+        const auto before = CountProxyRequests(requestsPath, expectedRequest);
         const auto result =
             RunWslc(std::format(L"image pull {}:{}/proxy-test:latest", string::MultiByteToWide(c_proxyTargetHost), c_registryPort));
         result.Verify({.ExitCode = 1});
-        VERIFY_ARE_NOT_EQUAL(
-            std::wstring::npos,
-            ReadFileContent(requestsPath.wstring())
-                .find(std::format(L"\"CONNECT {}:{} HTTP/1.1\" 501", string::MultiByteToWide(c_proxyTargetHost), c_registryPort)));
+        VERIFY_IS_GREATER_THAN(CountProxyRequests(requestsPath, expectedRequest), before);
     }
 
     std::string ReadBootId(IWSLCSession& session)
@@ -578,8 +598,8 @@ server.serve_forever()
             VERIFY_IS_TRUE(std::filesystem::create_directory(context));
             WriteTestFileContent(context / L"Dockerfile", std::format("FROM {}:{}/proxy-test:latest\n", c_proxyRegistryHost, c_proxyRegistryPort));
             const auto command = std::format(L"build \"{}\" --pull --no-cache -t wslc-proxy-build:latest", context.wstring());
-            const auto tokenRequest =
-                std::format(L"\"GET http://{}:{}/token?", string::MultiByteToWide(c_proxyTokenHost), c_proxyRegistryPort);
+            const auto tokenRequest = std::format("GET http://{}:{}/token?", c_proxyTokenHost, c_proxyRegistryPort);
+            const auto bypassedRegistryRequest = std::format("CONNECT {}:{} ", c_proxyRegistryHost, c_proxyRegistryPort);
 
             for (const bool bypassToken : {false, true})
             {
@@ -589,42 +609,45 @@ server.serve_forever()
                     bypassToken ? std::format("{};{}", c_proxyRegistryHost, c_proxyTokenHost) : c_proxyRegistryHost,
                     [&](IWSLCSession& session, const HostFileChange&) {
                         const auto bootId = ReadBootId(session);
-                        const auto before = ReadFileContent(requestsPath.wstring());
+                        const auto before = CountProxyRequests(requestsPath, tokenRequest);
                         const auto result = RunWslc(command);
                         result.Verify({.ExitCode = 1});
                         VERIFY_IS_TRUE(result.StderrContainsSubstring(L"failed to fetch anonymous token"));
                         VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTokenHost)));
+                        const auto originalRequests = CountProxyRequests(requestsPath, tokenRequest);
                         if (bypassToken)
                         {
-                            VERIFY_ARE_EQUAL(before, ReadFileContent(requestsPath.wstring()));
+                            VERIFY_ARE_EQUAL(before, originalRequests);
                         }
                         else
                         {
                             VERIFY_IS_TRUE(result.StderrContainsSubstring(L"404"));
-                            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, ReadFileContent(requestsPath.wstring()).find(tokenRequest));
+                            VERIFY_IS_GREATER_THAN(originalRequests, before);
 
                             const auto changedRequestsPath = directory / L"changed-proxy.log";
                             auto changedProxy = StartProxyServer(producer, changedRequestsPath, c_changedProxyPort);
                             SetWindowsProxySettings(std::format("http://localhost:{}", c_changedProxyPort), c_proxyRegistryHost);
-                            const auto originalRequests = ReadFileContent(requestsPath.wstring());
+                            const auto changedBefore = CountProxyRequests(changedRequestsPath, tokenRequest);
                             const auto changed = RunWslc(command);
                             changed.Verify({.ExitCode = 1});
                             VERIFY_IS_TRUE(changed.StderrContainsSubstring(L"failed to fetch anonymous token"));
                             VERIFY_IS_TRUE(changed.StderrContainsSubstring(L"404"));
-                            VERIFY_ARE_NOT_EQUAL(std::wstring::npos, ReadFileContent(changedRequestsPath.wstring()).find(tokenRequest));
-                            VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
+                            const auto changedRequests = CountProxyRequests(changedRequestsPath, tokenRequest);
+                            VERIFY_IS_GREATER_THAN(changedRequests, changedBefore);
+                            VERIFY_ARE_EQUAL(originalRequests, CountProxyRequests(requestsPath, tokenRequest));
 
-                            const auto changedRequests = ReadFileContent(changedRequestsPath.wstring());
                             SetWindowsProxySettings("", "");
                             const auto cleared = RunWslc(command);
                             cleared.Verify({.ExitCode = 1});
                             VERIFY_IS_TRUE(cleared.StderrContainsSubstring(L"failed to fetch anonymous token"));
                             VERIFY_IS_TRUE(cleared.StderrContainsSubstring(string::MultiByteToWide(c_proxyTokenHost)));
-                            VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
-                            VERIFY_ARE_EQUAL(changedRequests, ReadFileContent(changedRequestsPath.wstring()));
+                            VERIFY_ARE_EQUAL(originalRequests, CountProxyRequests(requestsPath, tokenRequest));
+                            VERIFY_ARE_EQUAL(changedRequests, CountProxyRequests(changedRequestsPath, tokenRequest));
+                            VERIFY_ARE_EQUAL(size_t{0}, CountProxyRequests(changedRequestsPath, bypassedRegistryRequest));
                             VERIFY_ARE_EQUAL(bootId, ReadBootId(session));
                         }
 
+                        VERIFY_ARE_EQUAL(size_t{0}, CountProxyRequests(requestsPath, bypassedRegistryRequest));
                         RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
                     });
             }
@@ -638,7 +661,7 @@ server.serve_forever()
             WithColdProxySession(
                 directory / L"localhost", std::format("http://localhost:{}", c_proxyPort), "", [&](IWSLCSession& session, const HostFileChange& settings) {
                     PullAndVerifyProxyRequest(requestsPath);
-                    const auto originalRequests = ReadFileContent(requestsPath.wstring());
+                    const auto originalRequests = CountProxyRequests(requestsPath, c_registryConnect);
                     const auto bootId = ReadBootId(session);
                     ULONG sessionId{};
                     VERIFY_SUCCEEDED(session.GetId(&sessionId));
@@ -656,9 +679,9 @@ server.serve_forever()
                     VERIFY_ARE_EQUAL(sessionId, restartedSessionId);
 
                     PullAndVerifyProxyRequest(changedRequestsPath);
-                    VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
+                    VERIFY_ARE_EQUAL(originalRequests, CountProxyRequests(requestsPath, c_registryConnect));
 
-                    const auto changedRequests = ReadFileContent(changedRequestsPath.wstring());
+                    const auto changedRequests = CountProxyRequests(changedRequestsPath, c_registryConnect);
                     const auto restartedBootId = ReadBootId(session);
                     SetWindowsProxySettings("", "");
                     VERIFY_SUCCEEDED(session.TriggerIdleTermination(&wasAlreadyIdle));
@@ -671,8 +694,8 @@ server.serve_forever()
                     result.Verify({.ExitCode = 1});
                     VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTargetHost)));
                     VERIFY_IS_FALSE(result.StderrContainsSubstring(L"proxyconnect tcp"));
-                    VERIFY_ARE_EQUAL(originalRequests, ReadFileContent(requestsPath.wstring()));
-                    VERIFY_ARE_EQUAL(changedRequests, ReadFileContent(changedRequestsPath.wstring()));
+                    VERIFY_ARE_EQUAL(originalRequests, CountProxyRequests(requestsPath, c_registryConnect));
+                    VERIFY_ARE_EQUAL(changedRequests, CountProxyRequests(changedRequestsPath, c_registryConnect));
                 });
         });
     }
@@ -699,13 +722,13 @@ server.serve_forever()
                         }
                         else
                         {
-                            const auto before = ReadFileContent(requestsPath.wstring());
+                            const auto before = CountProxyRequests(requestsPath, c_registryConnect);
                             const auto result = RunWslc(std::format(
                                 L"image pull {}:{}/proxy-test:latest", string::MultiByteToWide(c_proxyTargetHost), c_registryPort));
                             result.Verify({.ExitCode = 1});
                             VERIFY_IS_TRUE(result.StderrContainsSubstring(string::MultiByteToWide(c_proxyTargetHost)));
                             VERIFY_IS_FALSE(result.StderrContainsSubstring(L"proxyconnect tcp"));
-                            VERIFY_ARE_EQUAL(before, ReadFileContent(requestsPath.wstring()));
+                            VERIFY_ARE_EQUAL(before, CountProxyRequests(requestsPath, c_registryConnect));
                         }
 
                         RunWslc(L"image list --format json").Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
