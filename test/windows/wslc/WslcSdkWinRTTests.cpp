@@ -1586,7 +1586,9 @@ class WslcSdkWinRtTests
             containerSettings.PortMappings(winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
                 {WSLCSDK::ContainerPortMapping(12342, 8000, WSLCSDK::PortProtocol::TCP)}));
 
-            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), E_INVALIDARG);
+            VERIFY_THROWS_SPECIFIC(m_defaultSession.CreateContainer(containerSettings), winrt::hresult_error, [](winrt::hresult_error const& e) {
+                return e.code() == E_INVALIDARG && e.message() == wsl::shared::Localization::MessageWslcNetworkingDisabledNoPorts();
+            });
         }
 
         // Functional: BRIDGED networking with port mapping; HTTP server must be reachable.
