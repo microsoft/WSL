@@ -2273,6 +2273,9 @@ Användning:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Portmappningar stöds inte med containernätverksläge. portar ägs av målcontainern.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Portmappningar stöds inte när containernätverk är inaktiverat. Aktivera nätverk eller ta bort portmappningarna.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Målcontainernamn krävs för containernätverksläge.</value>
   </data>
