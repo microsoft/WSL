@@ -347,6 +347,7 @@ std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Crea
     try
     {
         auto description = wsl::windows::common::vm::openvmm::ValidateCreateRequest(Request);
+
         backend.reset(new OpenVmmVirtualMachineBackend{});
         backend->m_description = std::move(description);
         backend->Initialize(Request);
@@ -528,6 +529,10 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     const auto result = WaitForSingleObject(m_process.get(), 0);
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
     THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), result == WAIT_OBJECT_0);
+
+    // OpenVMM runs on the Windows Hypervisor Platform, which 'wsl --install' doesn't enable because OpenVMM is opt-in.
+    THROW_HR_WITH_USER_ERROR_IF(
+        createResult, wsl::shared::Localization::MessageOpenVmmHypervisorNotPresent(), createResult == HRESULT_FROM_WIN32(ERROR_HV_NOT_PRESENT));
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");
     for (const auto& disk : Request.BootDisks)
     {

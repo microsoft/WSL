@@ -903,6 +903,10 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
     <value>The .wslconfig settings 'experimental.openVmm=true' and 'wsl2.nestedVirtualization=true' conflict because OpenVMM does not support nested virtualization. Set 'wsl2.nestedVirtualization=false' to use OpenVMM.</value>
     <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated{Locked="experimental.openVmm=true"}{Locked="wsl2.nestedVirtualization=true"}{Locked="wsl2.nestedVirtualization=false"}{Locked="OpenVMM"}</comment>
   </data>
+  <data name="MessageOpenVmmHypervisorNotPresent" xml:space="preserve">
+    <value>OpenVMM could not find a hypervisor. Make sure virtualization is turned on in your computer's firmware settings and the Windows Hypervisor Platform optional component is enabled. To enable it, run 'dism.exe /online /enable-feature /featurename:HypervisorPlatform' from an elevated prompt and restart your computer.</value>
+    <comment>{Locked="OpenVMM"}{Locked="dism.exe /online /enable-feature /featurename:HypervisorPlatform"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageOpenVmmConfigConflict" xml:space="preserve">
     <value>The .wslconfig setting '{}' is incompatible with 'experimental.openVmm=true'. Set it to '{}'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated{Locked="experimental.openVmm=true"}</comment>
