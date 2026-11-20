@@ -716,6 +716,12 @@ Windows バージョン: {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>更新プログラムを確認しています。</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API のレート制限に達しました。後でもう一度お試しください。</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API のレート制限に達しました。Windows Update を使用して更新プログラムを確認しています。</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>この配布は、Microsoft Store からのみ使用できます。</value>
   </data>
@@ -2458,10 +2464,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
      <value>無効な余分な引数が見つかりました: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>値を持つエイリアス オプションはエイリアス チェーンの最後に配置する必要があります: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation.All rights reserved.
 この製品に関するプライバシー情報については、https://aka.ms/privacy にアクセスしてください。</value>
@@ -4184,6 +4186,14 @@ Windows バージョン: {}</value>
     <value>コンテナー '{}' のタイムスタンプを復元できませんでした</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>コンテナー '{}' の永続化された状態を読み込めませんでした。その状態に対する変更は保存されません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>コンテナー '{}' の永続化された状態を保存できませんでした</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>イメージのインポート進行状況の解析に失敗しました</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4229,8 @@ Windows バージョン: {}</value>
     <value>ホストの信頼されたルート証明書を VM にインストールできませんでした: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC は、ローカル ホスト名解決を初期化するための '{}' を書き込めませんでした (ゲスト エラー {})。</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC はゲストに '{}' を書き込めませんでした (ゲスト エラー {})。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

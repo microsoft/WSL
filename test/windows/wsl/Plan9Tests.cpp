@@ -375,6 +375,21 @@ class Plan9Tests
         VERIFY_ARE_EQUAL(STATUS_NOT_A_DIRECTORY, status);
     }
 
+    WSL2_TEST_METHOD(TestCreateDirectoryRetainedHandle)
+    {
+        const auto parentId = GetFileId({});
+        wil::unique_hfile file;
+        IO_STATUS_BLOCK ioStatus{};
+        VERIFY_NT_SUCCESS(CreateFileNt(&file, LXSST_P9_TEST_DIR L"\\createdirtest", FILE_GENERIC_READ, ioStatus, FILE_CREATE, 0, FILE_DIRECTORY_FILE));
+        VERIFY_ARE_EQUAL(static_cast<ULONG_PTR>(FILE_CREATED), ioStatus.Information);
+
+        BY_HANDLE_FILE_INFORMATION info{};
+        VERIFY_WIN32_BOOL_SUCCEEDED(GetFileInformationByHandle(file.get(), &info));
+        const auto fileId = static_cast<ULONGLONG>(info.nFileIndexHigh) << 32 | info.nFileIndexLow;
+        VERIFY_ARE_NOT_EQUAL(parentId, fileId);
+        VERIFY_ARE_EQUAL(GetFileId(L"\\createdirtest"), fileId);
+    }
+
     static auto EnablePlan9Logging()
     {
         auto config = std::make_unique<DistroFileChange>(L"/etc/wsl.conf", false);

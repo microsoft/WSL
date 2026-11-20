@@ -170,10 +170,11 @@ typedef HRESULT (*WSLPluginAPI_OnWslcVmStopping)(const struct WSLCSessionInforma
 //
 // WSLC plugin API calls.
 //
-// These operate on the VM that is currently backing the session; they never create one. A call made
-// while the session has no running VM fails with WSLC_E_VM_NOT_RUNNING, so a plugin that needs a VM
-// should do its work from OnWslcVmStarted (or before OnWslcVmStopping returns) rather than from a
-// session-level callback.
+// WSLCMountFolder, WSLCUnmountFolder, and WSLCCreateProcess use the current VM; they never create one.
+// Acquiring a VM lease after termination begins fails with HRESULT_FROM_WIN32(ERROR_INVALID_STATE).
+// Calls that already acquired a lease may finish.
+// Without a running VM, these calls fail with WSLC_E_VM_NOT_RUNNING.
+// Plugins that need a VM should do their work from OnWslcVmStarted or before OnWslcVmStopping returns.
 //
 
 // Mount a Windows folder into the WSLC session VM at the given 'Mountpoint' path. If the 'Mountpoint' doesn't exist, it will be created.

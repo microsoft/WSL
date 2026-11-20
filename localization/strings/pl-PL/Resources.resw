@@ -710,6 +710,12 @@ Argumenty:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Sprawdzanie dostępności aktualizacji.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Osiągnięto limit szybkości interfejsu API usługi GitHub. Spróbuj ponownie później.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Osiągnięto limit szybkości interfejsu API usługi GitHub. Sprawdzanie aktualizacji za pomocą usługi Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Ta dystrybucja jest dostępna tylko w sklepie Microsoft Store.</value>
   </data>
@@ -2452,10 +2458,6 @@ Użycie:
      <value>Napotkano nieprawidłowy dodatkowy argument: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasy opcji z wartością muszą znajdować się na końcu łańcucha aliasów: „{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Wszelkie prawa zastrzeżone.
 Aby uzyskać informacje o prywatności dotyczące tego produktu, odwiedź stronę HTTP://aka.ms/privacy.</value>
@@ -4178,6 +4180,14 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Nie można przywrócić sygnatury czasowej dla kontenera „{}”</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Nie można załadować utrwalonego stanu kontenera "{}". Zmiany jego stanu nie zostaną zapisane.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Nie można zapisać utrwalonego stanu kontenera '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Nie można przeanalizować postępu importu obrazu</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4213,8 +4223,8 @@ Przy pierwszym uruchomieniu tworzy plik ze wszystkimi ustawieniami ujętymi w ko
     <value>Nie można zainstalować zaufanych certyfikatów głównych hosta na maszynie wirtualnej: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC nie mógł zapisać „{}”, aby zainicjować lokalne rozpoznawanie nazw hostów (błąd gościa {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>Składnik WSLC nie mógł zapisać elementu „{}” w systemie gościa (błąd systemu gościa: {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

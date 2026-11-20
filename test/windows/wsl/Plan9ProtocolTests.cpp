@@ -2,6 +2,7 @@
 
 #include "precomp.h"
 #include "Common.h"
+#include "hvsocket.hpp"
 #include "p9defs.h"
 
 namespace Plan9ProtocolTests {
@@ -101,6 +102,14 @@ namespace {
             }
         }
     };
+
+    wil::unique_socket ConnectToDistroServer(ULONG port)
+    {
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --vm-id -n");
+        const auto vmId = wsl::shared::string::ToGuid(output);
+        VERIFY_IS_TRUE(vmId.has_value());
+        return wsl::windows::common::hvsocket::Connect(vmId.value(), port, nullptr, 5000);
+    }
 
     Plan9Server ConnectToServer()
     {
@@ -253,6 +262,47 @@ class Plan9ProtocolTests
         auto server = ConnectToServer();
 
         const auto response = SendMessageAndExpectResponse(server.client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+    }
+
+    WSL2_TEST_METHOD(VsockRejectsGuestConnections)
+    {
+        WslKeepAlive keepAlive;
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system -u root --exec modprobe vsock_loopback"), 0u);
+
+        // Extract the hvsocket port used by the plan9 server.
+        auto [portOutput, warnings] = LxsstuLaunchWslAndCaptureOutput(
+            L"--exec sh -c \"pid=$(pgrep -f '^plan9 --control-socket ') && "
+            L"ss -H -l -n -p --vsock | awk -v owner=pid=$pid, 'index($0, owner) { split($5, address, /:/); print address[2] "
+            L"}'\"");
+
+        Trim(portOutput);
+        VERIFY_IS_FALSE(portOutput.empty());
+
+        size_t parsedLength{};
+        const auto port = std::stoul(portOutput, &parsedLength);
+        VERIFY_ARE_EQUAL(parsedLength, portOutput.size());
+
+        // Validate that connecting to the server from the host using that port works.
+        auto client = ConnectToDistroServer(port);
+        auto response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
+        VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
+
+        for (int attempt = 0; attempt < 2; ++attempt)
+        {
+            auto commandLine = LxssGenerateWslCommandLine(
+                std::format(L"-u root --exec timeout 10 socat -d -d -u VSOCK-CONNECT:1:{} STDOUT", port).c_str());
+
+            const auto [output, error, exitCode] = LxsstuLaunchCommandAndCaptureOutputWithResult(commandLine.data());
+            VERIFY_IS_TRUE(error.find(L"successfully connected") != std::wstring::npos);
+            VERIFY_IS_TRUE(exitCode == 0 || (exitCode == 1 && error.find(L"Connection reset by peer") != std::wstring::npos));
+            VERIFY_IS_TRUE(output.empty());
+        }
+
+        // Validate that the server still accepts clients after a rejected connection.
+        client.reset();
+        client = ConnectToDistroServer(port);
+        response = SendMessageAndExpectResponse(client.get(), c_versionRequest, Plan9MessageType::Rversion);
         VERIFY_IS_TRUE(std::ranges::equal(c_versionResponse, response));
     }
 
@@ -466,6 +516,54 @@ class Plan9ProtocolTests
         const auto lockResponse = SendMessageAndExpectResponse(
             server.client.get(), MakePlan9Message(Plan9MessageType::Tlock, std::move(payload)), Plan9MessageType::Rlerror);
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, lockResponse));
+    }
+
+    WSL2_TEST_METHOD(DeleteDanglingSymlink)
+    {
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root mkdir /tmp/plan9-delete-symlink"), 0u);
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, []() { VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root rm -rf /tmp/plan9-delete-symlink"), 0u); });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root ln -s missing /tmp/plan9-delete-symlink/link"), 0u);
+
+        auto server = ConnectToServer();
+        const auto socket = server.client.get();
+        constexpr uint32_t c_rootFid = 1;
+        constexpr uint32_t c_linkFid = 2;
+
+        std::vector<uint8_t> payload;
+        AppendU32(payload, 8192);
+        AppendString(payload, ::p9fs::ProtocolVersionW);
+        SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)), Plan9MessageType::Rversion);
+
+        payload.clear();
+        AppendU32(payload, c_rootFid);
+        AppendU32(payload, ::p9fs::NoFid);
+        AppendString(payload, "");
+        AppendString(payload, "");
+        AppendU32(payload, 0);
+        SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rattach);
+
+        payload.clear();
+        AppendU32(payload, c_rootFid);
+        AppendU32(payload, c_linkFid);
+        AppendU32(payload, static_cast<uint32_t>(::p9fs::OpenFlags::NoAccess));
+        AppendU32(payload, static_cast<uint32_t>(::p9fs::WOpenFlags::DeleteAccess | ::p9fs::WOpenFlags::OpenSymlink));
+        AppendU32(payload, 0);
+        AppendU32(payload, 0);
+        AppendU64(payload, ::p9fs::GetAttrMode);
+        AppendU16(payload, 3);
+        AppendString(payload, "tmp");
+        AppendString(payload, "plan9-delete-symlink");
+        AppendString(payload, "link");
+        const auto response =
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Twopen, std::move(payload)), Plan9MessageType::Rwopen);
+        VERIFY_IS_GREATER_THAN(response.size(), static_cast<size_t>(::p9fs::HeaderSize));
+        VERIFY_ARE_EQUAL(static_cast<uint8_t>(::p9fs::WOpenStatus::Opened), response[::p9fs::HeaderSize]);
+
+        payload.clear();
+        AppendU32(payload, c_linkFid);
+        SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tremove, std::move(payload)), Plan9MessageType::Rremove);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root test ! -L /tmp/plan9-delete-symlink/link"), 0u);
     }
 };
 } // namespace Plan9ProtocolTests

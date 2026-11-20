@@ -717,6 +717,12 @@ Argumentos:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Verificando se há atualizações.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>O limite de taxa da API do GitHub foi atingido. Tente novamente mais tarde.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>O limite de taxa da API do GitHub foi atingido. Verificando se há atualizações usando o Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Esta distribuição só está disponível no Microsoft Store.</value>
   </data>
@@ -2459,10 +2465,6 @@ Uso:
      <value>Argumento extra inválido encontrado: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>As opções de alias com um valor devem ser as últimas na cadeia de alias: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Direitos autorais (c) Microsoft Corporation. Todos os direitos reservados.
 Para obter informações sobre a privacidade desse produto, visite https://aka.ms/privacy.</value>
@@ -4185,6 +4187,14 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Falha ao restaurar o carimbo de data e hora do contêiner '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Falha ao carregar o estado persistente do contêiner '{}'. As alterações em seu estado não serão salvas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Falha ao salvar o estado persistente do contêiner '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Falha ao analisar o progresso da importação da imagem</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4220,8 +4230,8 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Falha ao instalar certificados raiz confiáveis do host na VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>O WSLC não pôde gravar '{}' para inicializar a resolução do nome do host local (erro de convidado {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>O WSLC não pôde gravar '{}' no convidado (erro de convidado {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

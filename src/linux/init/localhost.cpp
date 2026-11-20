@@ -10,6 +10,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <sys/syscall.h>
 #include <linux/unistd.h>
 #include <linux/sock_diag.h>
@@ -320,6 +321,9 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
                 THROW_LAST_ERROR_IF(!tcpSocket);
 
+                const int noDelay = 1;
+                THROW_LAST_ERROR_IF(setsockopt(tcpSocket.get(), IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay)) < 0);
+
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
                     LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
@@ -514,6 +518,12 @@ int RunPortTracker(int Argc, char** Argv)
 
 #ifdef __x86_64__
     seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(I386_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(I386_NR_listen, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
 #else

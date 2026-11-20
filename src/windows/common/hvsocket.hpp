@@ -26,6 +26,13 @@ wil::unique_socket Connect(
     ULONG Timeout = 30000, // TODO: Fix
     const std::source_location& Location = std::source_location::current());
 
+wil::unique_socket Connect(
+    _In_ const GUID& VmId,
+    _In_ unsigned long Port,
+    _In_ gsl::span<const HANDLE> ExitHandles,
+    ULONG Timeout = 30000,
+    const std::source_location& Location = std::source_location::current());
+
 wil::unique_socket Create();
 
 wil::unique_socket Listen(_In_ const GUID& VmId, _In_ unsigned long Port, _In_ int Backlog = -1);

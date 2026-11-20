@@ -717,6 +717,12 @@
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Проверяется наличие обновлений.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Достигнут предел скорости API GitHub. Повторите попытку позже.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Достигнут предел скорости API GitHub. Проверка наличия обновлений с помощью клиентского компонента Центра обновления Windows.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Распространение возможно только из Microsoft Store.</value>
   </data>
@@ -2459,10 +2465,6 @@
      <value>Обнаружен недопустимый дополнительный аргумент: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Параметры псевдонима со значением должны быть последними в цепочке псевдонимов: "{}"</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>(c) Корпорация Майкрософт (Microsoft Corporation). Все права защищены.
 Сведения о конфиденциальности этого продукта см. на странице https://aka.ms/privacy.</value>
@@ -4185,6 +4187,14 @@
     <value>Не удалось восстановить метку времени для контейнера "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Не удалось загрузить сохраненное состояние контейнера "{}". Изменения его состояния не будут сохранены.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Не удалось сохранить сохраненное состояние контейнера "{}"</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Не удалось проанализировать ход импорта образа</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4220,8 +4230,8 @@
     <value>Не удалось установить доверенные корневые сертификаты узла на виртуальной машине: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC не удалось записать '{}' для инициализации локального разрешения имени узла (ошибка гостевой системы {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC не удалось записать "{}" в гостевую систему (ошибка гостевой системы {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

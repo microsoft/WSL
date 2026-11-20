@@ -326,8 +326,8 @@ private:
     // event before the job-close kill kicks in.
     wil::unique_handle m_processJobObject;
 
-    wil::unique_handle m_portRelayChannelRead;
-    wil::unique_handle m_portRelayChannelWrite;
+    wil::unique_hfile m_portRelayChannelRead;
+    wil::unique_hfile m_portRelayChannelWrite;
 
     std::map<ULONG, AttachedDisk> m_attachedDisks;
     std::map<std::string, GUID> m_mountedWindowsFolders;

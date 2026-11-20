@@ -242,7 +242,7 @@ private:
     std::filesystem::path m_tempPath;
     wil::shared_handle m_userToken;
     wil::unique_handle m_restrictedToken;
-    bool m_swapFileCreated = false;
+    bool m_deleteSwapFile = false;
     bool m_localDevicesKeyCreated = false;
     bool m_tempDirectoryCreated = false;
     bool m_enableInboxGpuLibs = false;

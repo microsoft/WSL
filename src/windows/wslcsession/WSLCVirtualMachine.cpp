@@ -685,6 +685,8 @@ std::vector<std::string> WSLCVirtualMachine::ListDirectory(const std::string& Pa
     message.WriteString(Path);
 
     gsl::span<gsl::byte> responseSpan;
+
+    std::lock_guard lock{m_lock};
     const auto& response = m_initChannel.Transaction<WSLC_LISTDIR>(message.Span(), &responseSpan, m_initChannelTimeout);
 
     THROW_HR_IF_MSG(E_FAIL, response.Result != 0, "Failed to list directory '%hs', init returned: %d", Path.c_str(), response.Result);
@@ -1109,10 +1111,11 @@ void WSLCVirtualMachine::LaunchPortRelay()
     std::lock_guard lock(m_portRelaylock);
     auto relayPort = channel.Transaction<WSLC_PORT_RELAY>();
 
-    wil::unique_handle readPipe;
-    wil::unique_handle writePipe;
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&readPipe, &m_portRelayChannelWrite, nullptr, 0));
-    THROW_IF_WIN32_BOOL_FALSE(CreatePipe(&m_portRelayChannelRead, &writePipe, nullptr, 0));
+    // wslrelay uses synchronous I/O on its ends. This process uses overlapped I/O so requests can be interrupted.
+    wil::unique_hfile readPipe;
+    wil::unique_hfile writePipe;
+    std::tie(readPipe, m_portRelayChannelWrite) = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, true);
+    std::tie(m_portRelayChannelRead, writePipe) = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
 
     // TODO: move the port relay infra into this process. Create a thread, pass handle ownership to thread, refactor and remove
     // wslrelaymode. wsl::windows::wslrelay::localhost::RunWSLCPortRelay(
@@ -1143,9 +1146,6 @@ void WSLCVirtualMachine::LaunchPortRelay()
     process.InheritHandle(m_vmTerminatingEvent.get());
     process.SetJobObject(m_processJobObject.get());
     process.Start();
-
-    readPipe.release();
-    writePipe.release();
 }
 
 void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short WindowsPort, _In_ unsigned short LinuxPort, _In_ bool Remove)
@@ -1160,14 +1160,55 @@ void WSLCVirtualMachine::MapRelayPort(_In_ int Family, _In_ unsigned short Windo
     message.AddressFamily = Family;
     message.Stop = Remove;
 
-    DWORD bytesTransfered{};
-    THROW_IF_WIN32_BOOL_FALSE(WriteFile(m_portRelayChannelWrite.get(), &message, sizeof(message), &bytesTransfered, nullptr));
-    THROW_HR_IF_MSG(E_UNEXPECTED, bytesTransfered != sizeof(message), "%u bytes transferred", bytesTransfered);
+    // An interrupted or failed exchange leaves the channel out of sync, so close it. wslrelay exits once its input closes.
+    auto closeChannel = wil::scope_exit([&]() {
+        m_portRelayChannelWrite.reset();
+        m_portRelayChannelRead.reset();
+    });
+
+    using io::MultiHandleWait;
+
+    MultiHandleWait wait;
+    std::vector<char> response;
+
+    // Any I/O failure ends the exchange. The incomplete response is reported below.
+    auto onError = [&]() {
+        LOG_CAUGHT_EXCEPTION();
+        wait.Cancel();
+    };
+
+    wait.AddHandle(
+        std::make_unique<io::WriteHandle>(HandleWrapper{m_portRelayChannelWrite.get()}, gslhelpers::struct_as_writeable_bytes(message)),
+        MultiHandleWait::None,
+        onError);
+
+    wait.AddHandle(
+        std::make_unique<io::ReadHandle>(
+            HandleWrapper{m_portRelayChannelRead.get()},
+            [&](const gsl::span<char>& buffer) {
+                response.insert(response.end(), buffer.begin(), buffer.end());
+                if (response.size() >= sizeof(HRESULT))
+                {
+                    wait.Cancel();
+                }
+            }),
+        MultiHandleWait::None,
+        onError);
+
+    for (const auto event : {m_vmTerminatingEvent.get(), m_sessionTerminatingEvent})
+    {
+        wait.AddHandle(std::make_unique<io::EventHandle>(event), MultiHandleWait::CancelOnCompleted | MultiHandleWait::NeedNotComplete);
+    }
+
+    wait.Run({});
+
+    THROW_HR_IF_MSG(E_ABORT, response.size() != sizeof(HRESULT), "Port relay exchange interrupted, %zu response bytes", response.size());
+
+    closeChannel.release();
 
     HRESULT result = E_UNEXPECTED;
-    THROW_IF_WIN32_BOOL_FALSE(ReadFile(m_portRelayChannelRead.get(), &result, sizeof(result), &bytesTransfered, nullptr));
+    std::memcpy(&result, response.data(), sizeof(result));
 
-    THROW_HR_IF(E_UNEXPECTED, bytesTransfered != sizeof(result));
     THROW_IF_FAILED_MSG(result, "Failed to map port: WindowsPort=%d, LinuxPort=%d, Family=%d, Remove=%d", WindowsPort, LinuxPort, Family, Remove);
 }
 
@@ -1268,21 +1309,23 @@ try
     const bool readOnly = WI_IsFlagSet(Flags, WSLCMountFlagsReadOnly);
     GUID shareGuid{};
 
-    {
-        std::lock_guard lock(m_lock);
+    std::unique_lock lock(m_lock);
 
-        // Verify that this folder isn't already mounted.
-        auto it = m_mountedWindowsFolders.find(LinuxPath);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
+    // Verify that this folder isn't already mounted.
+    auto it = m_mountedWindowsFolders.find(LinuxPath);
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), it != m_mountedWindowsFolders.end());
 
-        // Delegate to IWSLCVirtualMachine for the privileged share creation.
-        THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
+    // Delegate to IWSLCVirtualMachine for the privileged share creation.
+    THROW_IF_FAILED(m_vm->AddShare(WindowsPath, readOnly, &shareGuid));
 
-        m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
-    }
+    m_mountedWindowsFolders.emplace(LinuxPath, shareGuid);
 
     auto deleteOnFailure = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
-        std::lock_guard lock(m_lock);
+        if (!lock.owns_lock())
+        {
+            lock.lock();
+        }
+
         auto mountIt = m_mountedWindowsFolders.find(LinuxPath);
         if (WI_VERIFY(mountIt != m_mountedWindowsFolders.end()))
         {
@@ -1291,12 +1334,14 @@ try
         }
     });
 
+    auto [_, __, channel] = Fork(WSLC_FORK::Thread);
+
+    lock.unlock();
+
     // Create the guest mount
     auto shareName = shared::string::GuidToString<char>(shareGuid, shared::string::None);
     if (!FeatureEnabled(WslcFeatureFlagsVirtioFs))
     {
-        auto [_, __, channel] = Fork(WSLC_FORK::Process);
-
         WSLC_CONNECT message;
         message.HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT;
 
@@ -1311,7 +1356,7 @@ try
     else
     {
         std::string options = readOnly ? "ro" : "rw";
-        MountVirtioFsChild(m_initChannel, LX_INIT_DRVFS_VIRTIO_TAG, shareName.c_str(), LinuxPath, options.c_str(), Flags);
+        MountVirtioFsChild(channel, LX_INIT_DRVFS_VIRTIO_TAG, shareName.c_str(), LinuxPath, options.c_str(), Flags);
     }
 
     deleteOnFailure.release();

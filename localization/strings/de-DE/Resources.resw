@@ -716,6 +716,12 @@ Argumente:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Es wird nach Updates gesucht.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Das GitHub-API-Ratenlimit wurde erreicht. Versuchen Sie es später noch einmal.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Das GitHub-API-Ratenlimit wurde erreicht. Mit Windows Update wird nach Updates gesucht.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Diese Distribution ist nur im Microsoft Store verfügbar.</value>
   </data>
@@ -2458,10 +2464,6 @@ Verwendung:
      <value>Ungültiges zusätzliches Argument gefunden: „{}“</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasoptionen mit einem Wert müssen am Ende der Alias-Kette stehen: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
      <value>Copyright (c) Microsoft Corporation. Alle Rechte vorbehalten.
 Datenschutzinformationen zu diesem Produkt finden Sie unter https://aka.ms/privacy.</value>
@@ -4184,6 +4186,14 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Fehler beim Wiederherstellen des Zeitstempels für den Container „{}“</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Der persistierte Zustand des Containers „{}“ konnte nicht geladen werden. Änderungen an diesem Zustand werden nicht gespeichert.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Der persistierte Zustand des Containers „{}“ konnte nicht gespeichert werden</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Fehler beim Parsen des Bildimportfortschritts</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4229,8 @@ Erstellt bei der ersten Ausführung die Datei mit allen Einstellungen, die stand
     <value>Fehler beim Installieren der vertrauenswürdigen Hoststammzertifikate auf der VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC konnte "{}" nicht schreiben, um die Auflösung des lokalen Hostnamens zu initialisieren (Gastfehler {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC konnte "{}" nicht in den Gast schreiben (Gastfehler {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

@@ -254,7 +254,7 @@ std::string ResolveNetworkMode(LPCSTR networkMode, bool hasRequestedPorts, WSLCS
 
     // Canonicalize names, IDs, and ID prefixes to the network name so built-in networks get their mode-specific handling.
     auto name = ResolveContainerNetwork(std::string{mode}, session);
-    THROW_HR_IF_MSG(E_INVALIDARG, name == "none" && hasRequestedPorts, "Port mappings are not supported without networking");
+    THROW_HR_WITH_USER_ERROR_IF(E_INVALIDARG, Localization::MessageWslcNetworkingDisabledNoPorts(), name == "none" && hasRequestedPorts);
 
     return name;
 }

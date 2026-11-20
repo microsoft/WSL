@@ -37,6 +37,7 @@ Abstract:
 #include "CommandLine.h"
 #include "retryshared.h"
 #include "RingBuffer.h"
+#include "socket.hpp"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -1504,6 +1505,11 @@ class UnitTests
 
         validateEnv({{L"a", L"C:\\Users;C:\\Windows\\System32"}, {L"WSLENV", L"a/w"}}, {{L"a", L""}});
 
+        validateEnv(
+            {{L"a", std::format(L"\\\\wsl.localhost\\{}\\tmp\\escaped\uf05cpath;C:\\Windows", LXSS_DISTRO_NAME_TEST_L)},
+             {L"WSLENV", L"a/lp"}},
+            {{L"a", L"/tmp/escaped\\path:/mnt/c/Windows"}});
+
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
             THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"Empty", nullptr));
             THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"WSLENV", nullptr));
@@ -2131,6 +2137,12 @@ Usage:
             -1);
     }
 
+    static void VerifySwapSize(LPCWSTR Expected)
+    {
+        const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
+        VERIFY_ARE_EQUAL(std::wstring{Expected} + L"\n", output);
+    }
+
     WSL2_TEST_METHOD(TestExistingSwapVhd)
     {
         // Create a 100MB swap vhdx.
@@ -2153,20 +2165,42 @@ Usage:
         const auto escapedSwapVhd = std::regex_replace(swapVhd, std::wregex(L"\\\\"), L"\\\\");
         WslConfigChange configChange(LxssGenerateTestConfig() + L"\nswap=256MB\nswapFile=" + escapedSwapVhd);
 
-        auto validateSwapSize = [](LPCWSTR Expected) {
-            auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"swapon | awk 'END {print $3}'");
-
-            VERIFY_ARE_EQUAL(Expected + std::wstring(L"\n"), output);
-        };
-
-        validateSwapSize(L"256M");
+        VerifySwapSize(L"256M");
 
         // Validate that the vhdx is resized correctly if the swap size changes
         configChange.Update(LxssGenerateTestConfig() + L"\nswap=200MB\nswapFile=" + escapedSwapVhd);
-        validateSwapSize(L"200M");
+        VerifySwapSize(L"200M");
 
         WslShutdown();
+        VERIFY_IS_TRUE(std::filesystem::exists(swapVhd));
         VerifyNoVmAccessToVhd(swapVhd.c_str());
+    }
+
+    WSL2_TEST_METHOD(DefaultSwapFile)
+    {
+        WslConfigChange configChange(LxssGenerateTestConfig({.vmIdleTimeout = 60000}) + L"\nswap=256MB\n");
+        const auto swapPath = wsl::windows::common::helpers::GetVmTempPath(GetCurrentProcessToken()) / L"swap.vhdx";
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            WslShutdown();
+            DeleteFileW(swapPath.c_str());
+        });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--list --quiet"), 0u);
+        for (const bool existingSwap : {false, true})
+        {
+            if (existingSwap)
+            {
+                wil::CreateDirectoryDeep(swapPath.parent_path().c_str());
+                wsl::core::filesystem::CreateVhd(swapPath.c_str(), 100 * _1MB, tokenUser->User.Sid, false, false);
+            }
+
+            VerifySwapSize(L"256M");
+            VERIFY_IS_TRUE(std::filesystem::exists(swapPath));
+
+            WslShutdown();
+            VERIFY_IS_FALSE(std::filesystem::exists(swapPath));
+        }
     }
 
     TEST_METHOD(InitDoesntBlockSignals)
@@ -5206,10 +5240,21 @@ VERSION_ID="Invalid|Format"
         });
 
         RegistryKeyChange<DWORD> runOOBE(lxssKey.get(), testDistroIdString.c_str(), L"RunOOBE", 1);
-        const RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
+        RegistryKeyChange<DWORD> defaultUid(lxssKey.get(), testDistroIdString.c_str(), L"DefaultUid", 0);
 
-        auto validateOutput = [](LPCWSTR Cmd, LPCWSTR ExpectedOutput, LPCWSTR ExpectedWarnings = L"", DWORD ExpectedExitCode = 0) {
+        auto validateOutput = [](LPCWSTR Cmd,
+                                 LPCWSTR ExpectedOutput,
+                                 LPCWSTR ExpectedWarnings = L"",
+                                 DWORD ExpectedExitCode = 0,
+                                 std::string_view Input = "") {
             auto [read, write] = CreateSubprocessPipe(true, false);
+            if (!Input.empty())
+            {
+                DWORD written = 0;
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), Input.data(), static_cast<DWORD>(Input.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(Input.size()), written);
+            }
+
             write.reset();
 
             wsl::windows::common::SubProcess process(nullptr, LxssGenerateWslCommandLine(Cmd).c_str());
@@ -5334,6 +5379,18 @@ VERSION_ID="Invalid|Format"
                 testFilePathWindows.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
             VERIFY_IS_TRUE(file.is_valid());
             validateOutput(std::format(L"stat -c %u {}", testFilePathLinux).c_str(), L"1010\n");
+        }
+
+        {
+            runOOBE.Set(1);
+            defaultUid.Set(0);
+            distributionconf.SetContent(L"[oobe]\ncommand = /bin/bash -c 'echo OOBE'\ndefaultUid = 1010\n");
+            TerminateDistribution();
+
+            validateOutput(L"--user root", L"OOBE\n0\n", L"", 0, "id -u\n");
+            VERIFY_ARE_EQUAL(0, runOOBE.Get());
+            VERIFY_ARE_EQUAL(1010, defaultUid.Get());
+            validateOutput(L"id -u", L"1010\n");
         }
 
         if (LxsstuVmMode())
@@ -9424,6 +9481,101 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
             L"printf '#!/bin/sh\\nprintf found\\n' > /usr/sbin/wsl-exec-path-test && chmod +x /usr/sbin/wsl-exec-path-test");
 
         VerifyOutput(L"--exec wsl-exec-path-test", L"found");
+    }
+
+    WSL2_TEST_METHOD(MissingWindowsStdinDeliversEof)
+    {
+        constexpr DWORD c_timeout = 30 * 1000;
+        const auto installPath = wsl::windows::common::wslutil::GetMsiPackagePath();
+        const auto wslPath = installPath.value() + L"wsl.exe";
+
+        for (const auto stdinHandle : {static_cast<HANDLE>(nullptr), INVALID_HANDLE_VALUE})
+        {
+            auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            auto [stderrRead, stderrWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            wsl::windows::common::helpers::SetHandleInheritable(stdoutWrite.get());
+            wsl::windows::common::helpers::SetHandleInheritable(stderrWrite.get());
+            PartialHandleRead stdoutReader{std::move(stdoutRead)};
+            PartialHandleRead stderrReader{std::move(stderrRead)};
+            auto commandLine = std::format(L"\"{}\" --exec /bin/sh -c \"cat && printf stdout && printf stderr >&2 && exit 42\"", wslPath);
+
+            STARTUPINFOW startupInfo{};
+            startupInfo.cb = sizeof(startupInfo);
+            startupInfo.dwFlags = STARTF_USESTDHANDLES;
+            startupInfo.hStdInput = stdinHandle;
+            startupInfo.hStdOutput = stdoutWrite.get();
+            startupInfo.hStdError = stderrWrite.get();
+
+            wil::unique_process_information processInfo;
+            VERIFY_WIN32_BOOL_SUCCEEDED(CreateProcessW(
+                wslPath.c_str(), commandLine.data(), nullptr, nullptr, TRUE, DETACHED_PROCESS, nullptr, nullptr, &startupInfo, &processInfo));
+            auto cleanup = wil::scope_exit_log(
+                WI_DIAGNOSTICS_INFO, [&]() { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(processInfo.hProcess, 1)); });
+
+            stdoutWrite.reset();
+            stderrWrite.reset();
+            stdoutReader.ExpectClosed(c_timeout);
+            stderrReader.ExpectClosed(c_timeout);
+            VERIFY_ARE_EQUAL(WAIT_OBJECT_0, WaitForSingleObject(processInfo.hProcess, c_timeout));
+            cleanup.release();
+            VERIFY_ARE_EQUAL(42u, wsl::windows::common::SubProcess::GetExitCode(processInfo.hProcess, 0));
+
+            VERIFY_ARE_EQUAL(std::string("stdout"), stdoutReader.GetData());
+            VERIFY_ARE_EQUAL(std::string("stderr"), stderrReader.GetData());
+        }
+    }
+
+    WSL2_TEST_METHOD(ClosedStdinPreservesOutputAndExitStatus)
+    {
+        using wsl::windows::common::SubProcess;
+        constexpr DWORD c_timeout = 30 * 1000;
+
+        for (const bool bufferedStdin : {false, true})
+        {
+            const std::string initialInput = bufferedStdin ? std::string(1024 * 1024, 'x') : "initial\n";
+            const auto command = std::format(
+                L"--exec /bin/bash -c \"set -e; {}exec 0<&-; echo ready; "
+                L"sleep 1; echo stdout; echo stderr >&2; exit 42\"",
+                bufferedStdin ? L"sleep 1; " : L"read -r -t 30 initial; ");
+
+            auto [input, write] = CreateSubprocessPipe(true, false, static_cast<DWORD>(initialInput.size()));
+            auto [outputRead, outputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            auto [errorRead, errorWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            wsl::windows::common::helpers::SetHandleInheritable(outputWrite.get());
+            wsl::windows::common::helpers::SetHandleInheritable(errorWrite.get());
+            PartialHandleRead outputReader{std::move(outputRead)};
+            PartialHandleRead errorReader{std::move(errorRead)};
+
+            auto writeInput = [&](std::string_view data) {
+                DWORD written{};
+                VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(write.get(), data.data(), static_cast<DWORD>(data.size()), &written, nullptr));
+                VERIFY_ARE_EQUAL(data.size(), written);
+            };
+
+            writeInput(initialInput);
+            SubProcess process(nullptr, LxssGenerateWslCommandLine(command.c_str()).c_str());
+            process.SetStdHandles(input.get(), outputWrite.get(), errorWrite.get());
+            const auto handle = process.Start();
+            input.reset();
+            outputWrite.reset();
+            errorWrite.reset();
+            auto cleanup = wil::scope_exit([&]() { write.reset(); });
+
+            outputReader.ExpectConsume("ready\n");
+            if (!bufferedStdin)
+            {
+                writeInput("extra\n");
+            }
+
+            write.reset();
+
+            VERIFY_ARE_EQUAL(42u, SubProcess::GetExitCode(handle.get(), c_timeout));
+            outputReader.ExpectClosed(c_timeout);
+            errorReader.ExpectClosed(c_timeout);
+            VERIFY_ARE_EQUAL(outputReader.GetData(), "stdout\n");
+            VERIFY_ARE_EQUAL(errorReader.GetData(), "stderr\n");
+            cleanup.release();
+        }
     }
 };
 } // namespace UnitTests
