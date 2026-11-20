@@ -55,6 +55,14 @@ enum class ProgressMode
     Quiet,
 };
 
+struct RestartPolicy
+{
+    WSLCContainerRestartPolicy Policy = WSLCContainerRestartPolicyNo;
+
+    // Only valid with the on-failure policy. 0 means the number of restarts is unlimited.
+    ULONG MaximumRetryCount = 0;
+};
+
 struct ContainerOptions
 {
     std::vector<std::string> Arguments;
@@ -63,7 +71,7 @@ struct ContainerOptions
     bool Interactive = false;
     std::string Name;
     bool Remove = false;
-    WSLCContainerRestartPolicy Restart = WSLCContainerRestartPolicyNo;
+    RestartPolicy Restart{};
     bool TTY = false;
     bool PublishAll = false;
     WSLCSignal StopSignal = WSLCSignalNone;

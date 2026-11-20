@@ -70,9 +70,11 @@ struct WSLCContainerMetadataV1
     std::vector<WSLCPortMapping> Ports;
     std::vector<WSLCVolumeMount> Volumes;
     WSLCContainerRestartPolicy RestartPolicy{WSLCContainerRestartPolicyNo};
+    ULONG RestartPolicyMaximumRetryCount{};
     WSLCContainerStateStorage StateStorage{WSLCContainerStateStorage::None};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes, RestartPolicy, StateStorage);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
+        WSLCContainerMetadataV1, Flags, InitProcessFlags, Image, Ports, Volumes, RestartPolicy, RestartPolicyMaximumRetryCount, StateStorage);
 };
 
 struct WSLCContainerMetadata
