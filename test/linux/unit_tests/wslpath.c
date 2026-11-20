@@ -446,7 +446,7 @@ Arguments:
 
 Return Value:
 
-    Returns 0 on success, a negative value on failure.
+    Returns 0 on success, -1 on failure.
 
 --*/
 
@@ -471,7 +471,8 @@ ErrorExit:
     {
         if (fchdir(OriginalCwd) < 0)
         {
-            Result = -errno;
+            LxtLogError("fchdir failed: %d (%s)", errno, strerror(errno));
+            Result = LXT_RESULT_FAILURE;
         }
 
         close(OriginalCwd);
