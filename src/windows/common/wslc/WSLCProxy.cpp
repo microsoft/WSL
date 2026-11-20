@@ -98,11 +98,6 @@ std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopb
         return Url;
     }
 
-    if (wsl::shared::string::WideToMultiByte(wideUrl) != Url)
-    {
-        return Url;
-    }
-
     const auto hostOffset = static_cast<size_t>(host->data() - wideUrl.data());
     wideUrl.replace(hostOffset, host->size(), wsl::shared::string::MultiByteToWide(HostLoopback));
     return wsl::windows::common::string::WideToMultiByte(wideUrl);

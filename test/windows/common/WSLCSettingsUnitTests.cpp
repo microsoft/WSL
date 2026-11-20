@@ -757,9 +757,6 @@ class WSLCCLISettingsUnitTests
         }
         VERIFY_IS_TRUE(IsLoopbackProxyUrl("http://localhost:secret@localhost:3128/"));
 
-        const std::string invalidUtf8 = "http://localhost:3128/\xff";
-        VERIFY_ARE_EQUAL(invalidUtf8, ResolveProxyUrl(invalidUtf8, loopback));
-
         const std::string invalidAuthority = "http://user:pass@proxy.example.com@localhost:3128";
         VERIFY_ARE_EQUAL(invalidAuthority, ResolveProxyUrl(invalidAuthority, loopback));
         VERIFY_IS_FALSE(IsLoopbackProxyUrl(invalidAuthority));
