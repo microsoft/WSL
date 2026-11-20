@@ -2361,9 +2361,11 @@ Usage:
         // Some cases need a config without the test defaults. When running against OpenVMM, that config still has to
         // select the OpenVMM backend with the same overrides that LxssGenerateTestConfig() applies.
         const std::wstring minimalConfig =
-            LxsstuOpenVmmMode() ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
-                                  L"\ngpuSupport=false\nguiApplications=false\nnestedVirtualization=false\nvirtiofs=true\n"
-                                : L"[wsl2]\n";
+            LxsstuOpenVmmMode()
+                ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
+                  L"\ngpuSupport=false\nguiApplications=false\nnestedVirtualization=false\nvirtiofs=true\nfirewall=false\n"
+                  L"dnsTunneling=false\nhardwarePerformanceCounters=false\n"
+                : L"[wsl2]\n";
 
         // .wslconfig line numbers of the first line appended to each prefix.
         const auto firstLine = [](const std::wstring& prefix) { return std::ranges::count(prefix, L'\n') + 1; };

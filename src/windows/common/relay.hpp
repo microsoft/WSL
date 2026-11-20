@@ -34,10 +34,24 @@ std::thread CreateThread(
     _In_opt_ HANDLE ExitHandle = nullptr,
     _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE);
 
-DWORD
-InterruptableRead(_In_ HANDLE InputHandle, _In_ gsl::span<gsl::byte> Buffer, _In_ const std::vector<HANDLE>& ExitHandles, _In_opt_ LPOVERLAPPED Overlapped = nullptr);
+std::thread CreateSocketThread(
+    _In_ wil::unique_handle&& InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle = nullptr, _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE);
 
-void InterruptableRelay(_In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle = nullptr, _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE);
+DWORD
+InterruptableRead(
+    _In_ HANDLE InputHandle,
+    _In_ gsl::span<gsl::byte> Buffer,
+    _In_ const std::vector<HANDLE>& ExitHandles,
+    _In_opt_ LPOVERLAPPED Overlapped = nullptr,
+    _In_opt_ HANDLE SocketCloseEvent = nullptr,
+    _Inout_opt_ bool* SocketClosed = nullptr);
+
+void InterruptableRelay(
+    _In_ HANDLE InputHandle,
+    _In_opt_ HANDLE OutputHandle,
+    _In_opt_ HANDLE ExitHandle = nullptr,
+    _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE,
+    _In_opt_ HANDLE SocketCloseEvent = nullptr);
 
 bool InterruptableWait(_In_ HANDLE WaitObject, _In_ const std::vector<HANDLE>& ExitHandles = {});
 

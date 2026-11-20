@@ -83,6 +83,11 @@ bool TryLoadWinhttpProxyMethods() noexcept
 #define DNS_TUNNELING_TEST_ONLY() \
     { \
         WINDOWS_11_TEST_ONLY(); \
+        if (LxsstuOpenVmmMode()) \
+        { \
+            LogSkipped("OpenVMM doesn't support DNS tunneling. Skipping test..."); \
+            return; \
+        } \
         if (!AreExperimentalNetworkingFeaturesSupported()) \
         { \
             LogSkipped("DNS tunneling not supported on this OS. Skipping test..."); \
@@ -1137,21 +1142,10 @@ class NetworkTests
 
         WslConfigChange config(LxssGenerateTestConfig({.dnsTunneling = true}));
 
-        // OpenVMM NAT resolves DNS through Consomme, which serves DNS on the gateway address.
-        if (LxsstuOpenVmmMode())
-        {
-            const auto state = GetInterfaceState(L"eth0");
-            VERIFY_IS_TRUE(state.Gateway.has_value());
-            VerifyDnsTunneling(state.Gateway.value());
-        }
-        else
-        {
-            VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
-        }
+        VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
     }
 
-    // OpenVMM NAT always serves DNS on the Consomme gateway address.
-    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
+    WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
 
