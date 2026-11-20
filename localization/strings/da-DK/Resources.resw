@@ -710,6 +710,12 @@ Argumenter:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Søger efter opdateringer.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Hastighedsgrænsen for GitHub API blev nået. Prøv igen senere.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Hastighedsgrænsen for GitHub API blev nået. Søger efter opdateringer ved hjælp af Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Denne distribution er kun tilgængelig fra Microsoft Store.</value>
   </data>
@@ -2450,10 +2456,6 @@ Brug:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Der blev fundet et ugyldigt ekstra argument: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasindstillinger med en værdi skal være sidst i aliaskæden: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

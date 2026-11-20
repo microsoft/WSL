@@ -716,6 +716,12 @@ Windows 버전: {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>업데이트 확인 중입니다.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API 속도 제한에 도달했습니다. 나중에 다시 시도하세요.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API 속도 제한에 도달했습니다. Windows 업데이트를 사용하여 업데이트를 확인하는 중입니다.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>이 배포는 Microsoft Store에서만 사용할 수 있습니다.</value>
   </data>
@@ -2456,10 +2462,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>잘못된 추가 인수가 발견됨: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>값이 있는 별칭 옵션은 별칭 체인의 마지막에 있어야 합니다. '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

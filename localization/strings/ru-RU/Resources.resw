@@ -717,6 +717,12 @@
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Проверяется наличие обновлений.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Достигнут предел скорости API GitHub. Повторите попытку позже.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Достигнут предел скорости API GitHub. Проверка наличия обновлений с помощью клиентского компонента Центра обновления Windows.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Распространение возможно только из Microsoft Store.</value>
   </data>
@@ -2457,10 +2463,6 @@
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Обнаружен недопустимый дополнительный аргумент: "{}"</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Параметры псевдонима со значением должны быть последними в цепочке псевдонимов: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

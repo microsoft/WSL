@@ -710,6 +710,12 @@ Argumenter:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Ser etter oppdateringer.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API-hastighetsgrensen er nådd. Prøv på nytt senere.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API-hastighetsgrensen er nådd. Ser etter oppdateringer ved hjelp av Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Denne distribusjonen er bare tilgjengelig fra Microsoft Store.</value>
   </data>
@@ -2450,10 +2456,6 @@ Bruk:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Fant ugyldig ekstra argument: «{}»</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasalternativer med en verdi må være sist i aliaskjeden: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

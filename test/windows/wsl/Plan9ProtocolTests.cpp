@@ -517,5 +517,53 @@ class Plan9ProtocolTests
             server.client.get(), MakePlan9Message(Plan9MessageType::Tlock, std::move(payload)), Plan9MessageType::Rlerror);
         VERIFY_IS_TRUE(std::ranges::equal(c_invalidArgumentResponse, lockResponse));
     }
+
+    WSL2_TEST_METHOD(DeleteDanglingSymlink)
+    {
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root mkdir /tmp/plan9-delete-symlink"), 0u);
+        auto cleanup = wil::scope_exit_log(
+            WI_DIAGNOSTICS_INFO, []() { VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root rm -rf /tmp/plan9-delete-symlink"), 0u); });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root ln -s missing /tmp/plan9-delete-symlink/link"), 0u);
+
+        auto server = ConnectToServer();
+        const auto socket = server.client.get();
+        constexpr uint32_t c_rootFid = 1;
+        constexpr uint32_t c_linkFid = 2;
+
+        std::vector<uint8_t> payload;
+        AppendU32(payload, 8192);
+        AppendString(payload, ::p9fs::ProtocolVersionW);
+        SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tversion, std::move(payload)), Plan9MessageType::Rversion);
+
+        payload.clear();
+        AppendU32(payload, c_rootFid);
+        AppendU32(payload, ::p9fs::NoFid);
+        AppendString(payload, "");
+        AppendString(payload, "");
+        AppendU32(payload, 0);
+        SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tattach, std::move(payload)), Plan9MessageType::Rattach);
+
+        payload.clear();
+        AppendU32(payload, c_rootFid);
+        AppendU32(payload, c_linkFid);
+        AppendU32(payload, static_cast<uint32_t>(::p9fs::OpenFlags::NoAccess));
+        AppendU32(payload, static_cast<uint32_t>(::p9fs::WOpenFlags::DeleteAccess | ::p9fs::WOpenFlags::OpenSymlink));
+        AppendU32(payload, 0);
+        AppendU32(payload, 0);
+        AppendU64(payload, ::p9fs::GetAttrMode);
+        AppendU16(payload, 3);
+        AppendString(payload, "tmp");
+        AppendString(payload, "plan9-delete-symlink");
+        AppendString(payload, "link");
+        const auto response =
+            SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Twopen, std::move(payload)), Plan9MessageType::Rwopen);
+        VERIFY_IS_GREATER_THAN(response.size(), static_cast<size_t>(::p9fs::HeaderSize));
+        VERIFY_ARE_EQUAL(static_cast<uint8_t>(::p9fs::WOpenStatus::Opened), response[::p9fs::HeaderSize]);
+
+        payload.clear();
+        AppendU32(payload, c_linkFid);
+        SendMessageAndExpectResponse(socket, MakePlan9Message(Plan9MessageType::Tremove, std::move(payload)), Plan9MessageType::Rremove);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-u root test ! -L /tmp/plan9-delete-symlink/link"), 0u);
+    }
 };
 } // namespace Plan9ProtocolTests

@@ -716,6 +716,12 @@ Windows バージョン: {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>更新プログラムを確認しています。</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API のレート制限に達しました。後でもう一度お試しください。</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API のレート制限に達しました。Windows Update を使用して更新プログラムを確認しています。</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>この配布は、Microsoft Store からのみ使用できます。</value>
   </data>
@@ -2456,10 +2462,6 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>無効な余分な引数が見つかりました: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>値を持つエイリアス オプションはエイリアス チェーンの最後に配置する必要があります: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

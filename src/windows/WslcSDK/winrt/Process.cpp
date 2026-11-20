@@ -30,7 +30,12 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessSettings const& setti
     if (m_settings)
     {
         m_outputMode = GetImplementation(m_settings)->OutputMode();
-        ApplyCallbacksToSettings();
+
+        // Materialize the settings now so they can no longer be changed once an Event mode process is created from them.
+        if (m_outputMode == ProcessOutputMode::Event)
+        {
+            GetStructPointer(m_settings);
+        }
     }
 }
 
@@ -39,21 +44,6 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode outputMode
     // No ProcessSettings; used for opened-container paths where output mode is set independently.
     // For Event mode, callers are responsible for registering callbacks via
     // WslcSetContainerInitProcessIOCallbacks using the OutputCallback/ExitCallback statics.
-}
-
-void Process::ApplyCallbacksToSettings()
-{
-    // Callbacks are only used with OutputMode::Event.
-    // Stream and Discard modes use the exit event path (StartWaitingForExitAsync).
-    if (m_outputMode != ProcessOutputMode::Event)
-    {
-        return;
-    }
-
-    auto settingsPtr = GetStructPointer(m_settings);
-
-    WslcProcessCallbacks callbacks = GetEventCallbacks();
-    winrt::check_hresult(WslcSetProcessSettingsCallbacks(settingsPtr, &callbacks, this));
 }
 
 void Process::StartWaitingForExit()
@@ -118,8 +108,17 @@ void Process::Start()
 {
     EnsureCanStart();
 
+    // ProcessSettings can be shared by several processes, so callbacks are set on a per-process copy.
+    // The copy references storage owned by m_settings, which is kept alive until the process is created.
+    WslcProcessSettings settings = *GetStructPointer(m_settings);
+    if (m_outputMode == ProcessOutputMode::Event)
+    {
+        auto callbacks = GetEventCallbacks();
+        winrt::check_hresult(WslcSetProcessSettingsCallbacks(&settings, &callbacks, this));
+    }
+
     wil::unique_cotaskmem_string errorMessage;
-    auto hr = WslcCreateContainerProcess(GetHandle(m_container), GetStructPointer(m_settings), m_process.put(), errorMessage.put());
+    auto hr = WslcCreateContainerProcess(GetHandle(m_container), &settings, m_process.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 
     m_container = nullptr;

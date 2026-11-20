@@ -716,6 +716,12 @@ Argomenti:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Verifica della disponibilità di aggiornamenti.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>È stato raggiunto il limite di velocità dell'API GitHub. Riprova più tardi.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>È stato raggiunto il limite di velocità dell'API GitHub. Verifica della disponibilità di aggiornamenti tramite Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Questa distribuzione è disponibile solo dal Microsoft Store.</value>
   </data>
@@ -2456,10 +2462,6 @@ Utilizzo:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>È stato rilevato un argomento aggiuntivo non valido: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Le opzioni di alias con un valore devono essere le ultime nella catena di alias: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">

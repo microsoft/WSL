@@ -43,6 +43,7 @@ struct Container : ContainerT<Container>
 
 private:
     void EnsureNotClosed() const;
+    void RegisterInitProcessCallbacks();
 
     winrt::com_ptr<implementation::Process> m_initProcess;
     bool m_opened = false;

@@ -710,6 +710,12 @@ Argumentit:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Tarkistetaan päivityksiä.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub-ohjelmointirajapinnan tiedonsiirtorajoitus saavutettiin. Yritä myöhemmin uudelleen.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub-ohjelmointirajapinnan tiedonsiirtorajoitus saavutettiin. Tarkistetaan päivitysten saatavuutta Windows Update avulla.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Tämä jakelu on käytettävissä vain Microsoft Storesta.</value>
   </data>
@@ -2450,10 +2456,6 @@ Käyttö:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Virheellinen lisäargumentti: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Arvon sisältävien alias-asetusten on oltava viimeisinä alias-ketjussa: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
