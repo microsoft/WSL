@@ -27,6 +27,19 @@ class WSLCE2EComposeLifecycleTests
         return true;
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Compose_ReportsServiceValidationError)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        const auto composePath = projectDirectory / L"compose.yaml";
+        WriteTestFileContent(composePath, "services:\n  bad name:\n    image: alpine:latest\n");
+
+        const auto result = RunWslc(std::format(L"compose create \"{}\"", composePath.wstring()));
+        result.Verify({.Stdout = L"", .ExitCode = 1});
+        VERIFY_IS_TRUE(
+            result.StderrContainsSubstring(wsl::shared::Localization::MessageWslcComposeServiceNameInvalid("bad name")));
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Compose_Lifecycle_AcceptsFile)
     {
         const auto projectDirectory = std::filesystem::current_path() / ProjectName;
@@ -68,6 +81,49 @@ services:
         result = RunWslc(std::format(L"compose stop \"{}\"", composePath.wstring()));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
         VERIFY_ARE_EQUAL(0, up.Wait(120'000));
+    }
+
+    WSLC_TEST_METHOD(WSLCE2E_Compose_SymlinkUsesTargetProjectAndVolumes)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { Cleanup(); });
+        const auto composePath = projectDirectory / L"compose.yaml";
+        const auto linkDirectory = projectDirectory / L"links";
+        const auto linkPath = linkDirectory / L"compose.yaml";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(linkDirectory));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectDirectory / L"data"));
+        VERIFY_IS_TRUE(std::filesystem::create_directory(linkDirectory / L"data"));
+        WriteTestFileContent(projectDirectory / L"data" / L"marker.txt", "target-directory\n");
+        WriteTestFileContent(linkDirectory / L"data" / L"marker.txt", "link-directory\n");
+        WriteTestFileContent(
+            composePath,
+            std::format(
+                R"(
+services:
+ owned:
+   name: {}
+   image: {}
+   command: ["/bin/sleep", "99999"]
+   volumes:
+     - ./data:/work:ro
+)",
+                WideToMultiByte(ContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag())));
+        VERIFY_WIN32_BOOL_SUCCEEDED(CreateSymbolicLinkW(linkPath.c_str(), composePath.c_str(), 0));
+
+        auto result = RunWslc(std::format(L"compose create \"{}\"", linkPath.wstring()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_ARE_EQUAL(WideToMultiByte(ProjectName), InspectContainer(ContainerName).Config.Labels.at("com.microsoft.wslc.compose.project"));
+
+        result = RunWslc(std::format(L"compose start \"{}\"", composePath.wstring()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        result = RunWslc(std::format(L"container exec {} cat /work/marker.txt", ContainerName));
+        result.Verify({.Stdout = L"target-directory\n", .Stderr = L"", .ExitCode = 0});
+
+        result = RunWslc(std::format(L"compose stop \"{}\"", linkPath.wstring()));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        VERIFY_IS_FALSE(InspectContainer(ContainerName).State.Running);
     }
 
 private:
