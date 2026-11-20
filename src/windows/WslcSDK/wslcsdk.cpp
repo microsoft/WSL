@@ -999,16 +999,27 @@ try
     auto ioCallback = internalType->ioCallbacks.load();
     if (ioCallback)
     {
-        // If the container has an IO callback registered, and the container has exited, wait until the IO callback has processed all IO.
+        // If the container has exited, wait until the IO callback has processed all IO. Otherwise cancel it so a running
+        // container can't block the release.
+        bool exited = false;
         try
         {
             WSLCContainerState state{};
             THROW_IF_FAILED(internalType->container->GetState(&state));
+            exited = state == WslcContainerStateExited || state == WslcContainerStateDeleted;
+        }
+        CATCH_LOG();
 
-            if (state == WslcContainerStateExited || state == WslcContainerStateDeleted)
-            {
-                ioCallback->Complete();
-            }
+        if (!exited)
+        {
+            ioCallback->Cancel();
+        }
+
+        // Another thread can briefly hold a reference to the IO callback (for example while activating it), so its
+        // destructor is not guaranteed to run here. Join explicitly so that no callback runs after the release returns.
+        try
+        {
+            ioCallback->Complete();
         }
         CATCH_LOG();
     }
@@ -1032,19 +1043,35 @@ try
     auto internalType = CheckAndGetInternalTypeUniquePointer(process);
     if (internalType->ioCallbacks)
     {
-        // If the process has an IO callback registered, and the process is exited, wait until the IO callback has processed all IO.
-        // If the process is released while still running, cancel the IO callback so we don't get stuck since the process might still be emitting IO.
-
+        // If the process has exited, wait until the IO callback has processed all IO. Otherwise cancel it so a running
+        // process that might still be emitting IO can't block the release.
+        bool exited = false;
         try
         {
             WSLCProcessState state{};
             int exitCode{};
             THROW_IF_FAILED(internalType->process->GetState(&state, &exitCode));
+            exited = state == WslcProcessStateExited || state == WslcProcessStateSignalled;
+        }
+        CATCH_LOG();
 
-            if (state == WslcProcessStateExited || state == WslcProcessStateSignalled)
-            {
-                internalType->ioCallbacks->Complete();
-            }
+        // Releasing an alias leaves the container's callback alone while it can still deliver IO: the process is still
+        // running, or the callback has not been activated yet.
+        if (!internalType->ownsIOCallbacks && (!exited || !internalType->ioCallbacks->IsActivated()))
+        {
+            return S_OK;
+        }
+
+        if (!exited)
+        {
+            internalType->ioCallbacks->Cancel();
+        }
+
+        // Another thread can briefly hold a reference to the IO callback (for example while activating it), so its
+        // destructor is not guaranteed to run here. Join explicitly so that no callback runs after the release returns.
+        try
+        {
+            internalType->ioCallbacks->Complete();
         }
         CATCH_LOG();
     }
@@ -1299,11 +1326,33 @@ try
             wil::com_ptr<IWSLCCompatProcess> process;
             RETURN_IF_FAILED(internalType->container->GetInitProcess(&process));
             wsl::windows::common::security::ConfigureForCOMImpersonation(process.get());
-            internalType->ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+
+            // Publish ownership before any callback can run, so that a release from within a callback is rejected.
+            auto ioCallbacks = std::make_shared<IOCallback>(process.get(), internalType->ioCallbackOptions);
+            internalType->ioCallbacks = ioCallbacks;
+
+            if (WI_IsFlagClear(flags, WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS))
+            {
+                ioCallbacks->Activate();
+            }
         }
     }
 
     return errorInfoWrapper;
+}
+CATCH_RETURN();
+
+STDAPI WslcActivateContainerIOCallbacks(_In_ WslcContainer container)
+try
+{
+    auto internalType = CheckAndGetInternalType(container);
+
+    if (auto ioCallbacks = internalType->ioCallbacks.load())
+    {
+        ioCallbacks->Activate();
+    }
+
+    return S_OK;
 }
 CATCH_RETURN();
 
@@ -1508,12 +1557,21 @@ try
     {
         wsl::windows::common::security::ConfigureForCOMImpersonation(result->process.get());
 
+        std::shared_ptr<IOCallback> ioCallbacks;
         if (IOCallback::HasIOCallback(internalProcessSettings))
         {
-            result->ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+            ioCallbacks = std::make_shared<IOCallback>(result->process.get(), internalProcessSettings->ioCallbacks);
+            result->ioCallbacks = ioCallbacks;
+            result->ownsIOCallbacks = true;
         }
 
+        // Hand out the process handle before any callback can run.
         *newProcess = reinterpret_cast<WslcProcess>(result.release());
+
+        if (ioCallbacks)
+        {
+            ioCallbacks->Activate();
+        }
     }
 
     return errorInfoWrapper;

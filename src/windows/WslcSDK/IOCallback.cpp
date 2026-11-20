@@ -50,6 +50,12 @@ IOCallback::IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIO
     m_thread = std::thread([this]() {
         try
         {
+            HANDLE events[] = {m_activateEvent.get(), m_cancelEvent.get()};
+            if (WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE) != WAIT_OBJECT_0)
+            {
+                return;
+            }
+
             // Will be false when cancelled.
             bool runResult = m_io.Run({});
 
@@ -86,6 +92,11 @@ try
 }
 CATCH_LOG();
 
+void IOCallback::Activate()
+{
+    m_activateEvent.SetEvent();
+}
+
 void IOCallback::Cancel()
 {
     m_cancelEvent.SetEvent();
@@ -99,9 +110,20 @@ void IOCallback::Complete()
         {
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE), IsOnIOCallbackThread());
 
+            // A callback that was never activated has no IO to drain and would otherwise wait forever.
+            if (!IsActivated())
+            {
+                Cancel();
+            }
+
             m_thread.join();
         }
     });
+}
+
+bool IOCallback::IsActivated() const noexcept
+{
+    return m_activateEvent.is_signaled();
 }
 
 bool IOCallback::IsOnIOCallbackThread() const noexcept

@@ -69,7 +69,7 @@ void Container::RegisterInitProcessCallbacks()
 
 void Container::Start()
 {
-    auto startFlags = WSLC_CONTAINER_START_FLAG_NONE;
+    auto startFlags = WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS;
     if (m_initProcess)
     {
         WI_SetFlagIf(
@@ -92,6 +92,9 @@ void Container::Start()
             m_initProcess->AttachHandle(initHandle);
         }
     }
+
+    // The init process IO callbacks use m_initProcess as their context, so they are only delivered once its handle is attached.
+    winrt::check_hresult(WslcActivateContainerIOCallbacks(ToHandle()));
 }
 
 void Container::Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, TimeSpan timeout)

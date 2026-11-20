@@ -21,12 +21,15 @@ struct WslcContainerProcessOptionsInternal;
 
 struct IOCallback
 {
+    // No callbacks are delivered until Activate() is called, so the owner can publish this object first.
     IOCallback(IWSLCCompatProcess* process, const WslcContainerProcessIOCallbackOptions& options);
     ~IOCallback();
 
+    void Activate();
     void Cancel();
     void Complete();
 
+    bool IsActivated() const noexcept;
     bool IsOnIOCallbackThread() const noexcept;
 
     static bool HasIOCallback(const WslcContainerProcessOptionsInternal* options);
@@ -40,5 +43,6 @@ private:
     std::thread m_thread;
     wsl::windows::common::io::MultiHandleWait m_io;
     wil::unique_event m_cancelEvent{wil::EventOptions::ManualReset};
+    wil::unique_event m_activateEvent{wil::EventOptions::ManualReset};
     std::once_flag m_join;
 };

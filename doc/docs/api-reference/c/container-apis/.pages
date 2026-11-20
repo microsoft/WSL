@@ -18,6 +18,7 @@ nav:
   - wslcsetcontainersettingscapabilityadditions.md
   - wslcsetcontainersettingscapabilitydrops.md
   - wslcsetcontainerinitprocessiocallbacks.md
+  - wslcactivatecontaineriocallbacks.md
   - wslccreatecontainerprocess.md
   - wslcgetcontainerid.md
   - wslcgetcontainerinitprocess.md
