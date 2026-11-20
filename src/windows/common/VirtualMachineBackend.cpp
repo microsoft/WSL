@@ -128,11 +128,42 @@ VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind)
     THROW_HR(E_INVALIDARG);
 }
 
+VmDiskTransport GetDiskTransport(const VmGuestDiskAddress& Address) noexcept
+{
+    return std::holds_alternative<VmScsiAddress>(Address) ? VmDiskTransport::Scsi : VmDiskTransport::VirtioBlk;
+}
+
+std::uint32_t GetGuestDiskDeviceId(const VmGuestDiskAddress& Address) noexcept
+{
+    if (const auto* scsi = std::get_if<VmScsiAddress>(&Address))
+    {
+        return scsi->Lun;
+    }
+
+    return std::get<VmVirtioBlkAddress>(Address).Slot;
+}
+
+VmGuestDiskAddress MakeGuestDiskAddress(VmDiskTransport Transport, std::uint32_t DeviceId)
+{
+    switch (Transport)
+    {
+    case VmDiskTransport::Scsi:
+        return VmScsiAddress{0, DeviceId};
+
+    case VmDiskTransport::VirtioBlk:
+        return VmVirtioBlkAddress{DeviceId};
+    }
+
+    THROW_HR(E_INVALIDARG);
+}
+
 void wsl::windows::common::vm::validation::ValidateDiskPlacement(const VmDiskRequest& Request)
 {
     if (Request.Placement)
     {
-        THROW_HR_IF(c_notSupported, Request.Placement->Address.Controller != 0 || Request.Placement->Address.Lun >= c_maximumDisks);
+        const auto* scsi = std::get_if<VmScsiAddress>(&Request.Placement->Address);
+        THROW_HR_IF(c_notSupported, scsi != nullptr && scsi->Controller != 0);
+        THROW_HR_IF(c_notSupported, GetGuestDiskDeviceId(Request.Placement->Address) >= c_maximumDisks);
     }
 }
 

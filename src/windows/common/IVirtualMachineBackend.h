@@ -32,6 +32,7 @@ Abstract:
 #include <string>
 #include <variant>
 #include <vector>
+#include "GuestConnector.h"
 #include "defs.h"
 #include "stringshared.h"
 
@@ -67,11 +68,13 @@ struct VmDiskTag;
 struct VmDeviceTag;
 struct VmShareTag;
 struct VmPortBindingTag;
+struct VmHostSocketTag;
 
 using VmDiskId = VmResourceId<VmDiskTag>;
 using VmDeviceId = VmResourceId<VmDeviceTag>;
 using VmShareId = VmResourceId<VmShareTag>;
 using VmPortBindingId = VmResourceId<VmPortBindingTag>;
+using VmHostSocketId = VmResourceId<VmHostSocketTag>;
 
 // Backends own the extended resource; API methods return only its description by value.
 template <typename Description, typename BackendState>
@@ -105,27 +108,36 @@ enum class VmFeature
     NestedVirtualization,
     PerfmonPmu,
     PerfmonLbr,
+    MemoryOvercommit,
     DeferredMemoryCommit,
     ColdDiscard,
     SmallPageMemory,
+    HostingProcessNameSuffix,
     PhysicalDisk,
+    GuestDmaWindow,
     SerialConsole,
-    VirtioConsole,
     VirtioFsFileBacked,
-    SavedStateOnCrash,
     UserModeNatNetwork,
     TcpPortBinding,
     UdpPortBinding,
     Ipv6PortBinding,
     ScopedIpv6PortBinding,
+    SavedStateOnCrash,
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 16);
+static_assert(static_cast<size_t>(VmFeature::Count) == 18);
+
+enum class VmDiskTransport
+{
+    Scsi,
+    VirtioBlk
+};
 
 struct VmPlatformCapabilities
 {
     BackendKind Backend;
+    VmDiskTransport DiskTransport = VmDiskTransport::Scsi;
     std::bitset<static_cast<size_t>(VmFeature::Count)> Features;
 };
 
@@ -153,6 +165,14 @@ struct VmGuestListener
     // Keep an AF_UNIX socket path alive until after the socket is closed.
     wil::unique_hfile SocketFile;
     wil::unique_socket Socket;
+};
+
+// An AF_UNIX socket file that relays each accepted connection to a guest service port.
+struct VmHostSocket
+{
+    VmHostSocketId Id;
+    GuestServicePort Port;
+    std::filesystem::path Path;
 };
 
 struct VmProcessorRequest
@@ -236,7 +256,21 @@ struct VmScsiAddress
     std::uint32_t Lun = 0;
 };
 
-using VmGuestDiskAddress = VmScsiAddress;
+// Each virtio-blk disk is its own PCI device, so it has no controller or LUN. WSL numbers the disks
+// itself and the guest locates a disk by the slot embedded in its device serial.
+struct VmVirtioBlkAddress
+{
+    std::uint32_t Slot = 0;
+};
+
+using VmGuestDiskAddress = std::variant<VmScsiAddress, VmVirtioBlkAddress>;
+
+VmDiskTransport GetDiskTransport(const VmGuestDiskAddress& Address) noexcept;
+
+// Returns the transport-specific number that the guest uses to locate the disk: the LUN for SCSI, the slot for virtio-blk.
+std::uint32_t GetGuestDiskDeviceId(const VmGuestDiskAddress& Address) noexcept;
+
+VmGuestDiskAddress MakeGuestDiskAddress(VmDiskTransport Transport, std::uint32_t DeviceId);
 
 // The path is passed to the backend as-is; its filename is not validated.
 struct VmVirtualDiskSource
@@ -249,16 +283,17 @@ struct VmPhysicalDiskSource
     std::wstring DevicePath;
 };
 
-struct VmScsiPlacement
+struct VmDiskPlacement
 {
-    VmScsiAddress Address;
+    VmGuestDiskAddress Address;
 };
 
 struct VmDiskRequest
 {
     std::variant<VmVirtualDiskSource, VmPhysicalDiskSource> Source;
     bool ReadOnly = true;
-    std::optional<VmScsiPlacement> Placement;
+    // Must use the backend's disk transport (VmPlatformCapabilities::DiskTransport).
+    std::optional<VmDiskPlacement> Placement;
     // VHD access uses this token, falling back to the VM identity when unset. Physical disk
     // requests require an elevated token; an unset token is reserved for service-authorized restore.
     std::optional<wil::shared_handle> UserToken;
@@ -336,7 +371,13 @@ struct VmUserModeNatNetwork
 {
     WslVirtioNetConfig Configuration{};
     std::vector<IpAddress> Nameservers;
-
+    // OpenVMM only: answer guest DNS queries with the NAT's built-in resolver instead of the host's DNS servers.
+    bool InternalDns = true;
+    std::wstring ClientIp;
+    std::wstring GatewayIp;
+    std::wstring NetMask;
+    std::wstring ClientIpv6;
+    bool AllowHostLocalAccess = false;
     wsl::shared::string::MacAddress ClientMacAddress() const;
 };
 
@@ -668,10 +709,19 @@ public:
     virtual std::optional<std::filesystem::path> GetCrashLogPath() const = 0;
     virtual void Start() = 0;
     virtual void Terminate() = 0;
+    // Callbacks may re-enter Terminate, but must defer destruction to another thread and must not
+    // wait for that destruction. The owner must keep the backend alive during other backend calls.
     void RegisterTerminationCallback(TerminationCallback Callback);
 
     virtual VmGuestListener CreateGuestListener(GuestServicePort Port) = 0;
-    virtual wil::unique_socket ConnectGuest(GuestServicePort Port) = 0;
+    virtual wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) = 0;
+    virtual wsl::windows::common::GuestConnector GetGuestConnector() const = 0;
+
+    // Creates a host socket for host components that can connect only over AF_UNIX, such as P9Rdr.
+    // Returns std::nullopt when such components can reach guest service ports directly over AF_HYPERV.
+    virtual std::optional<VmHostSocket> CreateHostSocket(GuestServicePort Port) = 0;
+    // Stops accepting connections on the host socket and deletes its file. Established connections are not affected.
+    virtual void CloseHostSocket(VmHostSocketId Socket) = 0;
 
     virtual VmDiskAttachment AttachDisk(const VmDiskRequest& Request) = 0;
     virtual std::vector<VmDiskAttachment> GetAttachedDisks() const = 0;

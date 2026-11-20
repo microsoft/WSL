@@ -174,13 +174,6 @@ std::string ReadFileContent(const std::filesystem::path& Path)
     return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 }
 
-void WriteFileContent(const std::filesystem::path& Path, std::string_view Content)
-{
-    std::ofstream file(Path, std::ios::binary);
-    VERIFY_IS_TRUE(file.is_open());
-    file << Content;
-}
-
 size_t CountEntries(const std::filesystem::path& Directory)
 {
     return static_cast<size_t>(std::distance(std::filesystem::directory_iterator(Directory), std::filesystem::directory_iterator{}));

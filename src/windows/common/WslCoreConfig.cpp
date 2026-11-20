@@ -126,6 +126,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::Experimental::InitialAutoProxyTimeout, InitialAutoProxyTimeout),
         ConfigKey(ConfigSetting::Experimental::IgnoredPorts, std::move(parseIgnoredPorts)),
         ConfigKey(ConfigSetting::Experimental::HostAddressLoopback, EnableHostAddressLoopback),
+        ConfigKey(ConfigSetting::Experimental::OpenVmm, EnableOpenVmm),
         ConfigKey(ConfigSetting::Experimental::SetVersionDebug, SetVersionDebug),
         ConfigKey(ConfigSetting::Experimental::Swiotlb, MemoryString(SwiotlbSizeBytes)),
         ConfigKey(ConfigSetting::Experimental::VirtioFsAggregateShares, EnableVirtioFsAggregateShares)};
@@ -164,7 +165,9 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         DnsTunnelingIpAddress = address.S_un.S_addr;
     }
 
-    if (macAddressPresent == ConfigKeyPresence::Absent && NetworkingMode == NetworkingMode::Bridged)
+    // OpenVMM's user-mode NAT takes the guest MAC from the configuration, unlike HNS which assigns one.
+    if (macAddressPresent == ConfigKeyPresence::Absent &&
+        (NetworkingMode == NetworkingMode::Bridged || (EnableOpenVmm && NetworkingMode == NetworkingMode::Nat)))
     {
         // Generate a random mac address if unspecified, so that the VM retains the same if restarted
         const std::independent_bits_engine<std::default_random_engine, 16, unsigned short> random;
@@ -428,6 +431,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableNestedVirtualization, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableHardwarePerformanceCounters, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGpuSupport, false);
+        VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableOpenVmm, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableVirtio, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGuiApps, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, SwapSizeBytes, 0);
@@ -436,6 +440,34 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
         VALIDATE_CONFIG_OPTION(EnableSafeMode, NetworkingMode, NetworkingMode::None);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableDnsTunneling, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableAutoProxy, false);
+    }
+
+    if (EnableOpenVmm)
+    {
+        const auto validateSetting = [](bool Conflict, PCWSTR Setting, PCWSTR RequiredValue) {
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), shared::Localization::MessageOpenVmmConfigConflict(Setting, RequiredValue), Conflict);
+        };
+        validateSetting(EnableGpuSupport, L"wsl2.gpuSupport", L"false");
+        validateSetting(EnableGuiApps, L"wsl2.guiApplications", L"false");
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), shared::Localization::MessageOpenVmmNestedVirtualizationConflict(), EnableNestedVirtualization);
+        validateSetting(!EnableVirtio, L"wsl2.virtio", L"true");
+        validateSetting(!EnableVirtioFs, L"wsl2.virtioFs", L"true");
+        validateSetting(EnableVirtio9p, L"wsl2.virtio9p", L"false");
+        validateSetting(EnableVirtioFsAggregateShares, L"experimental.virtioFsAggregateShares", L"false");
+        validateSetting(EnableHardwarePerformanceCounters, L"wsl2.hardwarePerformanceCounters", L"false");
+        validateSetting(SwiotlbSizeBytes != 0, L"experimental.swiotlb", L"0");
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+            shared::Localization::MessageOpenVmmNetworkingConflict(),
+            NetworkingMode != NetworkingMode::Nat && NetworkingMode != NetworkingMode::None);
+        if (NetworkingMode == NetworkingMode::Nat)
+        {
+            validateSetting(FirewallConfig.Enabled(), L"wsl2.firewall", L"false");
+            validateSetting(EnableDnsTunneling, L"wsl2.dnsTunneling", L"false");
+            validateSetting(EnableIpv6, L"wsl2.ipv6", L"false");
+        }
     }
 
     if (!EnableVirtio)
@@ -459,7 +491,11 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
 
     // Compute a default swiotlb config only when a virtio device that requires bounce buffers is present.
     // N.B. Must run after policy overrides so networking/fs modes reflect final values.
-    if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
+    if (EnableOpenVmm)
+    {
+        VALIDATE_CONFIG_OPTION(EnableOpenVmm, SwiotlbSizeBytes, 0);
+    }
+    else if (SwiotlbSizeBytes == 0 && (EnableVirtioFs || EnableVirtio9p || (NetworkingMode == NetworkingMode::Consomme)))
     {
         SwiotlbSizeBytes = wsl::windows::common::helpers::ComputeDefaultSwiotlbConfig(MemorySizeBytes);
     }

@@ -66,13 +66,18 @@ wil::unique_handle GetElevatedTestToken()
     return impersonationToken;
 }
 
+UINT32 GetLun(const VmDiskAttachment& Disk)
+{
+    return std::get<VmScsiAddress>(Disk.GuestAddress).Lun;
+}
+
 VmDiskRequest CreateDiskRequest(const std::filesystem::path& Path, std::optional<UINT32> Lun = std::nullopt)
 {
     VmDiskRequest request;
     request.Source = VmVirtualDiskSource{Path};
     if (Lun)
     {
-        request.Placement = VmScsiPlacement{{0, Lun.value()}};
+        request.Placement = VmDiskPlacement{VmScsiAddress{0, Lun.value()}};
     }
 
     return request;
@@ -169,11 +174,11 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(request.Boot.KernelCommandLine, description.Boot.KernelCommandLine);
         const auto capabilities = backend->GetCapabilities();
         VERIFY_ARE_EQUAL(BackendKind::Hcs, capabilities.Backend);
+        VERIFY_ARE_EQUAL(VmDiskTransport::Scsi, capabilities.DiskTransport);
         VERIFY_ARE_EQUAL(
             wsl::windows::common::helpers::IsWindows11OrAbove(),
             capabilities.Features.test(static_cast<size_t>(VmFeature::SavedStateOnCrash)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::SerialConsole)));
-        VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioConsole)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::VirtioFsFileBacked)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::UserModeNatNetwork)));
         VERIFY_IS_TRUE(capabilities.Features.test(static_cast<size_t>(VmFeature::TcpPortBinding)));
@@ -437,6 +442,11 @@ class HcsVirtualMachineBackendTests
         auto request = CreateRunnableRequest();
         VmBootDiskRequest exact;
         exact.Key = L"exact";
+        exact.Disk = CreateDiskRequest(exactPath);
+        exact.Disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{253}};
+        request.BootDisks = {exact};
+        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { HcsVirtualMachineBackend::Create(request); }));
+
         exact.Disk = CreateDiskRequest(exactPath, 253);
         VmBootDiskRequest automatic;
         automatic.Key = L"automatic";
@@ -445,8 +455,8 @@ class HcsVirtualMachineBackendTests
 
         auto backend = HcsVirtualMachineBackend::Create(request);
         const auto& bootDisks = backend->GetDescription().BootDisks;
-        VERIFY_ARE_EQUAL(UINT32{253}, bootDisks.at(L"exact").GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(UINT32{0}, bootDisks.at(L"automatic").GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{253}, GetLun(bootDisks.at(L"exact")));
+        VERIFY_ARE_EQUAL(UINT32{0}, GetLun(bootDisks.at(L"automatic")));
         backend->Terminate();
     }
 
@@ -496,19 +506,19 @@ class HcsVirtualMachineBackendTests
         const auto exact = backend->AttachDisk(CreateDiskRequest(exactPath, 2));
         const auto replacement = backend->AttachDisk(CreateDiskRequest(replacementPath));
 
-        VERIFY_ARE_EQUAL(UINT32{0}, automatic.GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(UINT32{2}, exact.GuestAddress.Lun);
-        VERIFY_ARE_EQUAL(UINT32{1}, replacement.GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{0}, GetLun(automatic));
+        VERIFY_ARE_EQUAL(UINT32{2}, GetLun(exact));
+        VERIFY_ARE_EQUAL(UINT32{1}, GetLun(replacement));
         VERIFY_IS_TRUE(IsEqualGUID(backend->GetDescription().Identity.VmId, automatic.Id.Owner.VmId));
 
         const auto duplicate = backend->AttachDisk(CreateDiskRequest(automaticPath, 3));
         VERIFY_ARE_EQUAL(automatic.Id.Value, duplicate.Id.Value);
-        VERIFY_ARE_EQUAL(automatic.GuestAddress.Lun, duplicate.GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(GetLun(automatic), GetLun(duplicate));
         const auto differentlyCased = backend->AttachDisk(CreateDiskRequest(ChangePathCase(automaticPath)));
         VERIFY_ARE_EQUAL(automatic.Id.Value, differentlyCased.Id.Value);
-        VERIFY_ARE_EQUAL(automatic.GuestAddress.Lun, differentlyCased.GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(GetLun(automatic), GetLun(differentlyCased));
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] {
-                             backend->AttachDisk(CreateDiskRequest(invalidPath, exact.GuestAddress.Lun));
+                             backend->AttachDisk(CreateDiskRequest(invalidPath, GetLun(exact)));
                          }));
 
         auto invalidOwner = automatic.Id;
@@ -520,8 +530,8 @@ class HcsVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), OperationResult([&] { backend->DetachDisk(unknown); }));
 
         backend->DetachDisk(replacement.Id);
-        const auto reused = backend->AttachDisk(CreateDiskRequest(invalidPath, replacement.GuestAddress.Lun));
-        VERIFY_ARE_EQUAL(replacement.GuestAddress.Lun, reused.GuestAddress.Lun);
+        const auto reused = backend->AttachDisk(CreateDiskRequest(invalidPath, GetLun(replacement)));
+        VERIFY_ARE_EQUAL(GetLun(replacement), GetLun(reused));
         VERIFY_ARE_NOT_EQUAL(replacement.Id.Value, reused.Id.Value);
 
         backend->DetachDisk(reused.Id);
@@ -545,7 +555,7 @@ class HcsVirtualMachineBackendTests
         auto firstGuest = StartGuest(*firstBackend);
         const auto first = firstBackend->AttachDisk(CreateDiskRequest(firstPath, 253));
 
-        VERIFY_ARE_EQUAL(UINT32{253}, first.GuestAddress.Lun);
+        VERIFY_ARE_EQUAL(UINT32{253}, GetLun(first));
         VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { firstBackend->AttachDisk(CreateDiskRequest(secondPath, 254)); }));
 
         firstBackend->DetachDisk(first.Id);

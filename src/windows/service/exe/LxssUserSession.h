@@ -658,7 +658,7 @@ private:
     wsl::core::Config _GetResultantConfig(_In_ const HANDLE userToken);
 
     _Requires_exclusive_lock_held_(m_instanceLock)
-    void _LoadDiskMount(_In_ HKEY Key, _In_ const std::wstring& LunStr) const;
+    void _LoadDiskMount(_In_ HKEY Key, _In_ const std::wstring& DeviceIdStr) const;
 
     _Requires_exclusive_lock_held_(m_instanceLock)
     void _LoadDiskMounts();

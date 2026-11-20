@@ -45,7 +45,10 @@ public:
     void Terminate() override;
 
     VmGuestListener CreateGuestListener(GuestServicePort Port) override;
-    wil::unique_socket ConnectGuest(GuestServicePort Port) override;
+    wil::unique_socket ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle = nullptr) override;
+    wsl::windows::common::GuestConnector GetGuestConnector() const override;
+    std::optional<VmHostSocket> CreateHostSocket(GuestServicePort Port) override;
+    void CloseHostSocket(VmHostSocketId Socket) override;
 
     VmDiskAttachment AttachDisk(const VmDiskRequest& Request) override;
     std::vector<VmDiskAttachment> GetAttachedDisks() const override;
@@ -140,7 +143,7 @@ private:
     void CloseGuestDevicesLocked() noexcept;
 
     _Requires_lock_held_(m_lock)
-    std::uint32_t ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const;
+    std::uint32_t ReserveLunLocked(const std::optional<VmDiskPlacement>& Placement) const;
 
     _Requires_lock_held_(m_lock)
     std::map<std::uint64_t, AttachedDisk>::iterator FindAttachedDiskLocked(bool PassThrough, const std::wstring& Path);

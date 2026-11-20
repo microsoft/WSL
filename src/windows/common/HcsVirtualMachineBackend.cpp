@@ -290,6 +290,25 @@ VmEffectiveBoot ConfigureBoot(const VmLinuxBootRequest& Request, schema::Chipset
     return boot;
 }
 
+// HCS attaches every disk to the SCSI controller.
+const VmScsiAddress& GetScsiAddress(const VmDiskAttachment& Disk)
+{
+    return std::get<VmScsiAddress>(Disk.GuestAddress);
+}
+
+const VmScsiAddress* GetScsiPlacement(const std::optional<VmDiskPlacement>& Placement)
+{
+    if (!Placement)
+    {
+        return nullptr;
+    }
+
+    const auto* address = std::get_if<VmScsiAddress>(&Placement->Address);
+    THROW_HR_IF_MSG(c_notSupported, address == nullptr, "HCS attaches disks only over SCSI");
+    THROW_HR_IF(c_notSupported, address->Controller != 0);
+    return address;
+}
+
 } // namespace
 
 HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfiguration(const VmCreateRequest& Request)
@@ -348,10 +367,9 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
 
         const auto& path = validation::ValidateDiskSource(bootDisk.Disk);
         std::uint32_t lun = 0;
-        if (bootDisk.Disk.Placement)
+        if (const auto* placement = GetScsiPlacement(bootDisk.Disk.Placement))
         {
-            THROW_HR_IF(c_notSupported, bootDisk.Disk.Placement->Address.Controller != 0);
-            lun = bootDisk.Disk.Placement->Address.Lun;
+            lun = placement->Lun;
             THROW_HR_IF(E_BOUNDS, lun >= c_maximumDisks);
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), lunInUse(lun));
         }
@@ -398,7 +416,7 @@ HcsVirtualMachineBackend::VmConfiguration HcsVirtualMachineBackend::BuildConfigu
         scsi.Attachments[std::to_string(lun)] = std::move(attachment);
 
         const VmDiskAttachment diskAttachment{
-            {Request.Identity, configuration.NextDiskId}, {0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
+            {Request.Identity, configuration.NextDiskId}, VmScsiAddress{0, lun}, bootDisk.Disk.ReadOnly, bootDisk.Disk.UserDisk, path, false};
         description.BootDisks.emplace(bootDisk.Key, diskAttachment);
         configuration.BootDisks.emplace(
             diskAttachment.Id.Value,
@@ -581,13 +599,16 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
 {
     VmPlatformCapabilities capabilities{};
     capabilities.Backend = BackendKind::Hcs;
+    capabilities.DiskTransport = VmDiskTransport::Scsi;
     for (const auto feature :
-         {VmFeature::DeferredMemoryCommit,
+         {VmFeature::NestedVirtualization,
+          VmFeature::MemoryOvercommit,
+          VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
           VmFeature::SmallPageMemory,
           VmFeature::SerialConsole,
-          VmFeature::VirtioConsole,
           VmFeature::PhysicalDisk,
+          VmFeature::GuestDmaWindow,
           VmFeature::VirtioFsFileBacked,
           VmFeature::UserModeNatNetwork,
           VmFeature::TcpPortBinding,
@@ -604,7 +625,7 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
     CATCH_LOG()
 
     capabilities.Features.set(static_cast<size_t>(VmFeature::SmallPageMemory), schema::IsSmallPageMemorySupported());
-    // Saved-state crash capture needs the DebugOptions of schema 2.7, which Windows 10 does not have.
+    capabilities.Features.set(static_cast<size_t>(VmFeature::HostingProcessNameSuffix), wsl::windows::common::helpers::IsVmemmSuffixSupported());
     capabilities.Features.set(static_cast<size_t>(VmFeature::SavedStateOnCrash), wsl::windows::common::helpers::IsWindows11OrAbove());
     const auto [perfmonPmuSupported, perfmonLbrSupported] = schema::GetPerfmonCapabilities();
     capabilities.Features.set(static_cast<size_t>(VmFeature::PerfmonPmu), perfmonPmuSupported);
@@ -616,6 +637,11 @@ VmDescription HcsVirtualMachineBackend::GetDescription() const
 {
     auto lock = m_lock.lock_shared();
     return m_configuration.Description;
+}
+
+wsl::windows::common::GuestConnector HcsVirtualMachineBackend::GetGuestConnector() const
+{
+    return wsl::windows::common::GuestConnector::CreateHcs(GetDescription().Identity.VmId);
 }
 
 VmState HcsVirtualMachineBackend::GetState() const
@@ -742,19 +768,31 @@ VmGuestListener HcsVirtualMachineBackend::CreateGuestListener(GuestServicePort P
     return VmGuestListener{wsl::windows::common::hvsocket::Listen(m_configuration.Description.Identity.VmId, Port.Value)};
 }
 
-wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port)
+wil::unique_socket HcsVirtualMachineBackend::ConnectGuest(GuestServicePort Port, _In_opt_ HANDLE ExitHandle)
 {
     auto lock = m_lock.lock_shared();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_system || m_state == VmState::Stopped);
-    return wsl::windows::common::hvsocket::Connect(m_configuration.Description.Identity.VmId, Port.Value);
+    return wsl::windows::common::GuestConnector::CreateHcs(m_configuration.Description.Identity.VmId).Connect(Port.Value, ExitHandle);
 }
 
-std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmScsiPlacement>& Placement) const
+std::optional<VmHostSocket> HcsVirtualMachineBackend::CreateHostSocket(GuestServicePort)
+{
+    // Host components connect to HCS guests directly over AF_HYPERV.
+    return std::nullopt;
+}
+
+void HcsVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
+{
+    validation::ValidateResourceId(Socket, m_configuration.Description.Identity);
+    THROW_HR(HRESULT_FROM_WIN32(ERROR_NOT_FOUND));
+}
+
+std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmDiskPlacement>& Placement) const
 {
     const auto lunInUse = [this](std::uint32_t Lun) {
         for (const auto& entry : m_attachedDisks)
         {
-            if (entry.second.GuestAddress.Lun == Lun)
+            if (GetScsiAddress(entry.second).Lun == Lun)
             {
                 return true;
             }
@@ -763,12 +801,10 @@ std::uint32_t HcsVirtualMachineBackend::ReserveLunLocked(const std::optional<VmS
     };
 
     std::uint32_t lun = 0;
-    if (Placement)
+    if (const auto* address = GetScsiPlacement(Placement))
     {
-        const auto& address = Placement->Address;
-        THROW_HR_IF(c_notSupported, address.Controller != 0);
-        THROW_HR_IF(E_BOUNDS, address.Lun >= c_maximumDisks);
-        lun = address.Lun;
+        THROW_HR_IF(E_BOUNDS, address->Lun >= c_maximumDisks);
+        lun = address->Lun;
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), lunInUse(lun));
     }
     else
@@ -889,7 +925,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
             m_system.get(),
             m_vmIdString.c_str(),
             found->second.Path.c_str(),
-            found->second.GuestAddress.Lun,
+            GetScsiAddress(found->second).Lun,
             found->second.PassThrough ? nullptr : found->second.Backend.UserToken.get(),
             found->second.Backend.Flags,
             static_cast<size_t>(found->second.Backend.DeviceTimeout.count()));
@@ -933,7 +969,7 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
     });
 
     const VmDiskAttachment attachment{
-        {m_configuration.Description.Identity, m_nextDiskId}, {0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
+        {m_configuration.Description.Identity, m_nextDiskId}, VmScsiAddress{0, lun}, Request.ReadOnly, Request.UserDisk, path, passThrough};
     m_attachedDisks.emplace(
         attachment.Id.Value,
         AttachedDisk{attachment, {diskFlags, Request.DeviceTimeout, passThrough ? wil::shared_handle{} : userToken, std::move(backingFile)}});
@@ -944,8 +980,8 @@ VmDiskAttachment HcsVirtualMachineBackend::AttachDisk(const VmDiskRequest& Reque
         "HcsAttachDiskEnd",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(attachment.Id.Value, "diskId"),
-        TraceLoggingValue(attachment.GuestAddress.Controller, "controller"),
-        TraceLoggingValue(attachment.GuestAddress.Lun, "lun"),
+        TraceLoggingValue(GetScsiAddress(attachment).Controller, "controller"),
+        TraceLoggingValue(GetScsiAddress(attachment).Lun, "lun"),
         TraceLoggingValue(passThrough, "passThrough"),
         TraceLoggingValue(Request.ReadOnly, "readOnly"));
 
@@ -989,7 +1025,7 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         m_system.get(),
         m_vmIdString.c_str(),
         disk->second.Path.c_str(),
-        disk->second.GuestAddress.Lun,
+        GetScsiAddress(disk->second).Lun,
         disk->second.PassThrough ? nullptr : disk->second.Backend.UserToken.get(),
         disk->second.Backend.Flags,
         static_cast<size_t>(disk->second.Backend.DeviceTimeout.count()));
@@ -998,8 +1034,8 @@ void HcsVirtualMachineBackend::DetachDisk(VmDiskId Disk)
         "HcsDetachDiskEnd",
         TraceLoggingValue(m_configuration.Description.Identity.VmId, "vmId"),
         TraceLoggingValue(Disk.Value, "diskId"),
-        TraceLoggingValue(disk->second.GuestAddress.Controller, "controller"),
-        TraceLoggingValue(disk->second.GuestAddress.Lun, "lun"),
+        TraceLoggingValue(GetScsiAddress(disk->second).Controller, "controller"),
+        TraceLoggingValue(GetScsiAddress(disk->second).Lun, "lun"),
         TraceLoggingValue(disk->second.PassThrough, "passThrough"));
 
     m_attachedDisks.erase(disk);

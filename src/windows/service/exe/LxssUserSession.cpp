@@ -1903,14 +1903,14 @@ try
 
     // Ensure VM exists and attach the VHD.
     _CreateVm();
-    const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+    const auto disk = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
 
     // Resize the underlying filesystem.
     //
     // N.B. Passing zero as the size causes the resize to consume all available space on the block device.
     {
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
-        m_utilityVm->ResizeDistribution(lun, OutputHandle, resizingLarger ? 0 : NewSize);
+        m_utilityVm->ResizeDistribution(disk, OutputHandle, resizingLarger ? 0 : NewSize);
     }
 
     // If shrinking the VHD, resize the underlying VHD file. This is only supported for .vhdx files.
@@ -1968,9 +1968,9 @@ try
         try
         {
             _CreateVm();
-            const auto lun = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
+            const auto disk = m_utilityVm->AttachDisk(vhdPath.c_str(), WslCoreVm::DiskType::VHD, {}, true, userToken.get());
             auto ejectVhd = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] { m_utilityVm->EjectVhd(vhdPath.c_str()); });
-            m_utilityVm->TrimDistribution(lun);
+            m_utilityVm->TrimDistribution(disk);
         }
         CATCH_LOG();
     }
@@ -3515,7 +3515,7 @@ wsl::core::Config LxssUserSessionImpl::_GetResultantConfig(_In_ const HANDLE use
     return config;
 }
 
-void LxssUserSessionImpl::_LoadDiskMount(_In_ HKEY Key, _In_ const std::wstring& LunStr) const
+void LxssUserSessionImpl::_LoadDiskMount(_In_ HKEY Key, _In_ const std::wstring& DeviceIdStr) const
 try
 {
     // Get the disk path
@@ -3527,7 +3527,7 @@ try
 
     THROW_HR_IF(E_UNEXPECTED, (diskType != WslCoreVm::DiskType::VHD && diskType != WslCoreVm::DiskType::PassThrough));
 
-    // Attach the disk to the VM, reusing the same LUN if possible.
+    // Attach the disk to the VM, reusing the same guest device ID (SCSI LUN or virtio-blk slot) if possible.
     //
     // N.B. The disk-mount state is stored under the user's SID in a volatile (per-boot)
     // registry key, so the disk being restored here was mounted earlier in this same boot
@@ -3540,9 +3540,9 @@ try
     // may no longer be elevated, so it is restored as SYSTEM (no token). Block-device paths
     // (\\.\PhysicalDriveN) have no reparse-point surface, so there is no swap to defend
     // against.
-    auto lun = std::stoul(LunStr);
+    const auto deviceId = std::stoul(DeviceIdStr);
     const HANDLE userToken = (diskType == WslCoreVm::DiskType::VHD) ? m_userToken.get() : nullptr;
-    m_utilityVm->AttachDisk(path.c_str(), diskType, lun, true, userToken);
+    m_utilityVm->AttachDisk(path.c_str(), diskType, deviceId, true, userToken);
 
     // Restore each mount point.
     for (const auto& e : wsl::windows::common::registry::EnumKeys(Key, KEY_READ))
