@@ -2279,6 +2279,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>ポート マッピングは、コンテナー ネットワーク モードではサポートされていません。ポートはターゲット コンテナーによって所有されます。</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>コンテナー ネットワークが無効になっている場合、ポート マッピングはサポートされません。ネットワークを有効にするか、ポート マッピングを削除してください。</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>コンテナー ネットワーク モードにはターゲット コンテナー名が必要です。</value>
   </data>

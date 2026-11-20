@@ -2280,6 +2280,9 @@ Utilisation :
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Les mappages de ports ne sont pas pris en charge avec le mode réseau de conteneurs ; Les ports appartiennent au conteneur cible.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Les mappages de ports ne sont pas pris en charge lorsque la mise en réseau des conteneurs est désactivée. Activez la mise en réseau ou supprimez les mappages de port.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Le nom du conteneur cible est obligatoire pour le mode réseau de conteneurs.</value>
   </data>
