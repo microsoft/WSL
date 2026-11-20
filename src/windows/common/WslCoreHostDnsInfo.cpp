@@ -106,41 +106,54 @@ wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsTunneli
 }
 
 std::vector<std::string> wsl::core::networking::HostDnsInfo::GetDnsServerStrings(
-    _In_ const PIP_ADAPTER_DNS_SERVER_ADDRESS& FirstDnsServer, _In_ USHORT IpFamilyFilter, _In_ USHORT MaxValues)
+    const IpAdapterAddress& adapter, _In_ USHORT IpFamilyFilter, _In_ USHORT MaxValues, bool appendIpv6LinkLocalScopeId, const Ipv6LinkLocalScopeFilter& ipv6LinkLocalScopeFilter)
 {
     std::vector<std::string> DnsServerStrings;
-    CHAR IpBuffer[46];
+    CHAR IpBuffer[INET6_ADDRSTRLEN];
 
-    PIP_ADAPTER_DNS_SERVER_ADDRESS DnsServer = FirstDnsServer;
-    while ((DnsServer != nullptr) && (DnsServerStrings.size() < MaxValues))
+    for (auto server = adapter->FirstDnsServerAddress; server != nullptr && DnsServerStrings.size() < MaxValues; server = server->Next)
     {
-        PVOID IpAddress = nullptr;
-        const USHORT IpFamily = DnsServer->Address.lpSockaddr->sa_family;
-        if (IpFamily == AF_INET)
-        {
-            IpAddress = &((sockaddr_in*)DnsServer->Address.lpSockaddr)->sin_addr;
-        }
-        else if (IpFamily == AF_INET6)
-        {
-            IpAddress = &((sockaddr_in6*)DnsServer->Address.lpSockaddr)->sin6_addr;
-        }
-
-        DnsServer = DnsServer->Next;
+        const auto* address = server->Address.lpSockaddr;
+        const USHORT IpFamily = address->sa_family;
         if (IpFamily != IpFamilyFilter)
         {
             continue;
         }
 
-        THROW_LAST_ERROR_IF_MSG(
-            (InetNtopA(IpFamily, IpAddress, IpBuffer, ARRAYSIZE(IpBuffer)) == NULL), "Failed to convert IP address");
+        NET_IFINDEX ifIndex = NET_IFINDEX_UNSPECIFIED;
+        const void* ipAddress;
+        if (IpFamily == AF_INET)
+        {
+            ipAddress = &reinterpret_cast<const sockaddr_in*>(address)->sin_addr;
+        }
+        else
+        {
+            const auto* ipv6 = reinterpret_cast<const sockaddr_in6*>(address);
+            ipAddress = &ipv6->sin6_addr;
+            if (IN6_IS_ADDR_LINKLOCAL(&ipv6->sin6_addr))
+            {
+                const auto zone = ipv6->sin6_scope_struct.Zone;
+                ifIndex = (zone == NET_IFINDEX_UNSPECIFIED || zone == adapter->ZoneIndices[ScopeLevelLink]) ? adapter->Ipv6IfIndex : zone;
+                if (ipv6LinkLocalScopeFilter && !ipv6LinkLocalScopeFilter(ifIndex))
+                {
+                    continue;
+                }
+            }
+        }
 
-        DnsServerStrings.push_back(IpBuffer);
+        THROW_LAST_ERROR_IF_MSG(!InetNtopA(IpFamily, ipAddress, IpBuffer, ARRAYSIZE(IpBuffer)), "Failed to convert IP address");
+        auto& serverString = DnsServerStrings.emplace_back(IpBuffer);
+        if (appendIpv6LinkLocalScopeId && ifIndex != NET_IFINDEX_UNSPECIFIED)
+        {
+            serverString += '%' + std::to_string(ifIndex);
+        }
     }
 
     return DnsServerStrings;
 }
 
-std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsServers(const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags)
+std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsServers(
+    const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags, const Ipv6LinkLocalScopeFilter& ipv6LinkLocalScopeFilter)
 {
     std::vector<std::string> DnsServers;
 
@@ -158,7 +171,7 @@ std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsServ
         }
 
         // Add DNS nameservers from the interface, with the IPv4 addresses first.
-        std::vector<std::string> ipv4Servers = GetDnsServerStrings(NextAddress->FirstDnsServerAddress, AF_INET, MaxDnsServers);
+        std::vector<std::string> ipv4Servers = GetDnsServerStrings(NextAddress, AF_INET, MaxDnsServers, false);
         DnsServers.insert(DnsServers.end(), ipv4Servers.begin(), ipv4Servers.end());
 
         WI_ASSERT(DnsServers.size() <= MaxResolvConfDnsServers);
@@ -166,7 +179,11 @@ std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsServ
         if (WI_IsFlagSet(Flags, DnsSettingsFlags::IncludeIpv6Servers))
         {
             std::vector<std::string> ipv6Servers = GetDnsServerStrings(
-                NextAddress->FirstDnsServerAddress, AF_INET6, static_cast<USHORT>(MaxResolvConfDnsServers - DnsServers.size()));
+                NextAddress,
+                AF_INET6,
+                static_cast<USHORT>(MaxResolvConfDnsServers - DnsServers.size()),
+                WI_IsFlagSet(Flags, DnsSettingsFlags::AppendIpv6LinkLocalScopeId),
+                ipv6LinkLocalScopeFilter);
 
             DnsServers.insert(DnsServers.end(), ipv6Servers.begin(), ipv6Servers.end());
         }
@@ -225,7 +242,7 @@ std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsSuff
     return DnsSuffixes;
 }
 
-wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsSettings(_In_ DnsSettingsFlags Flags)
+wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsSettings(_In_ DnsSettingsFlags Flags, const Ipv6LinkLocalScopeFilter& ipv6LinkLocalScopeFilter)
 {
     std::vector<IpAdapterAddress> Addresses = AdapterAddresses::GetCurrent();
 
@@ -306,7 +323,7 @@ wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsSetting
 
     DnsInfo DnsSettings{};
 
-    DnsSettings.Servers = GetInterfaceDnsServers(Addresses, Flags);
+    DnsSettings.Servers = GetInterfaceDnsServers(Addresses, Flags, ipv6LinkLocalScopeFilter);
 
     if (WI_IsFlagSet(Flags, DnsSettingsFlags::IncludeAllSuffixes))
     {

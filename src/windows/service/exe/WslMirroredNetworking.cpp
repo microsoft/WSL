@@ -443,9 +443,31 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessDNSChange()
     }
     else
     {
-        m_dnsInfo = wsl::core::networking::HostDnsInfo::GetDnsSettings(
-            wsl::core::networking::DnsSettingsFlags::IncludeVpn | wsl::core::networking::DnsSettingsFlags::IncludeIpv6Servers |
-            wsl::core::networking::DnsSettingsFlags::IncludeAllSuffixes);
+        std::map<NET_IFINDEX, GUID> interfaceGuidsByHostIndex;
+        for (const auto& endpoint : m_networkEndpoints)
+        {
+            if (endpoint.Network->IsConnected && m_hostConnectedInterfaces.contains(endpoint.InterfaceGuid))
+            {
+                interfaceGuidsByHostIndex.emplace(endpoint.Network->InterfaceIndex, endpoint.InterfaceGuid);
+            }
+        }
+
+        auto dnsInfo = HostDnsInfo::GetDnsSettings(
+            DnsSettingsFlags::IncludeVpn | DnsSettingsFlags::IncludeIpv6Servers | DnsSettingsFlags::IncludeAllSuffixes |
+                DnsSettingsFlags::AppendIpv6LinkLocalScopeId,
+            [&](NET_IFINDEX ifIndex) { return ifIndex != NET_IFINDEX_UNSPECIFIED && interfaceGuidsByHostIndex.contains(ifIndex); });
+
+        // Replace the Windows scope index with the mirrored adapter GUID so Linux can look up its own interface index.
+        for (auto& server : dnsInfo.Servers)
+        {
+            if (const auto zone = server.find('%'); zone != std::string::npos)
+            {
+                const auto ifIndex = std::stoul(server.substr(zone + 1));
+                server.replace(zone + 1, std::string::npos, wsl::shared::string::GuidToString<char>(interfaceGuidsByHostIndex.at(ifIndex)));
+            }
+        }
+
+        m_dnsInfo = std::move(dnsInfo);
     }
 
     if (initialDnsInfo != m_dnsInfo)
@@ -994,6 +1016,16 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
 
     if (!endpoint.StateTracking->InitialSyncComplete)
     {
+        // Drop this adapter's cached DNS scope to force a resend: a recreated adapter may have a different Linux interface index.
+        const auto zoneSuffix = '%' + wsl::shared::string::GuidToString<char>(endpoint.InterfaceGuid);
+        for (auto& server : m_trackedDnsInfo.Servers)
+        {
+            if (server.ends_with(zoneSuffix))
+            {
+                server.erase(server.size() - zoneSuffix.size());
+            }
+        }
+
         // Tell GNS that we're ready to start pushing addresses and routes to Linux on this interface.
         hns::InitialIpConfigurationNotification notification{};
         notification.targetDeviceName = wsl::shared::string::GuidToString<wchar_t>(endpoint.InterfaceGuid);
