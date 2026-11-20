@@ -103,7 +103,7 @@ namespace {
         THROW_HR_WITH_USER_ERROR_IF(
             E_INVALIDARG, Localization::WSLCCLI_ComposeProjectNameInvalidError(name, WSLC_MAX_COMPOSE_PROJECT_NAME_LENGTH), !valid);
 
-        return string::WideToMultiByte(name);
+        return wsl::shared::string::WideToMultiByte(name);
     }
 
     models::ComposeProjectFiles ResolveProjectFiles(ArgMap& args, const std::filesystem::path& currentDirectory, std::optional<std::string> projectName)
