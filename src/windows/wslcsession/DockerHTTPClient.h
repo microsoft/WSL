@@ -186,7 +186,11 @@ public:
     wil::unique_socket StartExec(const std::string& Id, const common::docker_schema::StartExec& Request);
     void ResizeExecTty(const std::string& Id, ULONG Rows, ULONG Columns);
 
-    wil::unique_socket MonitorEvents();
+    wil::unique_socket MonitorEvents(std::optional<std::int64_t> SinceNano = {});
+
+    std::vector<std::string> ListEvents(std::int64_t SinceNano, std::int64_t UntilNano, std::optional<std::chrono::milliseconds> Timeout = {});
+
+    std::int64_t GetSystemTimeNano(std::optional<std::chrono::milliseconds> Timeout = {});
 
     struct DockerHttpResponseHandle : public common::io::ReadHandle
     {
@@ -248,13 +252,13 @@ private:
         boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
 
     std::pair<HTTPResponse, std::string> SendRequestAndReadResponse(
-        boost::beast::http::verb Method, const URL& Url, const std::string& Body = "");
+        boost::beast::http::verb Method, const URL& Url, const std::string& Body = "", std::optional<std::chrono::milliseconds> Timeout = {});
 
     std::pair<HTTPResponse, wil::unique_socket> SendRequest(
         boost::beast::http::verb Method, const URL& Url, const std::string& Body, const std::map<std::string, std::string>& Headers = {});
 
     template <typename TRequest = common::docker_schema::EmptyRequest, typename TResponse = TRequest::TResponse>
-    auto Transaction(boost::beast::http::verb Method, const URL& Url, const TRequest& RequestObject = {})
+    auto Transaction(boost::beast::http::verb Method, const URL& Url, const TRequest& RequestObject = {}, std::optional<std::chrono::milliseconds> Timeout = {})
     {
         std::string requestString;
         if constexpr (!std::is_same_v<TRequest, common::docker_schema::EmptyRequest>)
@@ -262,7 +266,7 @@ private:
             requestString = wsl::shared::ToJson(RequestObject);
         }
 
-        auto [response, body] = SendRequestAndReadResponse(Method, Url, requestString);
+        auto [response, body] = SendRequestAndReadResponse(Method, Url, requestString, Timeout);
 
         WSL_LOG(
             "HTTPTransaction",

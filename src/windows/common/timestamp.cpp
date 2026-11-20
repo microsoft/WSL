@@ -391,6 +391,14 @@ std::string wsl::windows::common::timestamp::EpochToRfc3339Nano(std::int64_t epo
     return output;
 }
 
+std::string wsl::windows::common::timestamp::EpochToUnixTimestamp(std::int64_t epochNanoseconds)
+{
+    // The sign is rendered separately so the fraction counts away from zero, as ParseTimestamp reads it.
+    const auto magnitude =
+        epochNanoseconds < 0 ? 0 - static_cast<std::uint64_t>(epochNanoseconds) : static_cast<std::uint64_t>(epochNanoseconds);
+    return std::format("{}{}.{:09}", epochNanoseconds < 0 ? "-" : "", magnitude / std::nano::den, magnitude % std::nano::den);
+}
+
 std::string wsl::windows::common::timestamp::EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds)
 {
     const std::chrono::time_zone* zone;
