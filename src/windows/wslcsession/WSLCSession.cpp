@@ -605,7 +605,7 @@ std::vector<std::string> WSLCSession::GetProxyEnvironment() const
                     *url = wsl::windows::wslc::ResolveProxyUrl(*url, m_settings.HostLoopback);
                 }
 
-                bool unsupported;
+                bool unsupported = false;
                 if (m_settings.NetworkingMode == WSLCNetworkingModeNAT)
                 {
                     const auto reason = HttpProxyStateTracker::IsUnsupportedProxy(
