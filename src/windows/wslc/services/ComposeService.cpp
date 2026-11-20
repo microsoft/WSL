@@ -25,6 +25,30 @@ namespace wsl::windows::wslc::services {
 
 namespace {
 
+    std::string FormatProjectStatus(const WSLCComposeProjectSummary& project)
+    {
+        std::string result;
+        const auto append = [&](std::string_view name, ULONG count) {
+            if (count == 0)
+            {
+                return;
+            }
+
+            if (!result.empty())
+            {
+                result += ", ";
+            }
+
+            result += std::format("{}({})", name, count);
+        };
+
+        append("created", project.CreatedContainersCount);
+        append("exited", project.ExitedContainersCount);
+        append("other", project.OtherContainersCount);
+        append("running", project.RunningContainersCount);
+        return result;
+    }
+
     struct CapturedComposeDocuments
     {
         explicit CapturedComposeDocuments(const std::wstring& path)
@@ -166,6 +190,24 @@ namespace {
 
 } // namespace
 
+std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& session, bool all)
+{
+    WSLCComposeProjectListOptions options{};
+    options.All = all;
+
+    wil::unique_cotaskmem_array_ptr<WSLCComposeProjectSummary> projects;
+    THROW_IF_FAILED(session.Get()->ListComposeProjects(&options, &projects, projects.size_address<ULONG>()));
+
+    std::vector<models::ComposeProjectInformation> result;
+    result.reserve(projects.size());
+    for (const auto& project : projects)
+    {
+        result.emplace_back(project.ProjectKey, FormatProjectStatus(project));
+    }
+
+    return result;
+}
+
 void ComposeService::Create(Terminal&, models::Session& session, const std::wstring& path, HANDLE cancelEvent)
 {
     Execute(session, ComposeProjectReference{std::filesystem::path{path}}, WSLCComposeActionCreate, cancelEvent);
@@ -191,6 +233,15 @@ int ComposeService::Attach(Terminal&, models::Session& session, const ComposePro
 void ComposeService::Stop(Terminal&, models::Session& session, const ComposeProjectReference& project, ULONG timeout, HANDLE cancelEvent)
 {
     Execute(session, project, WSLCComposeActionStop, cancelEvent, timeout);
+}
+
+void ComposeService::Remove(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
+{
+    const auto result = Execute(session, project, WSLCComposeActionRemove, cancelEvent);
+    if (result.value.AffectedContainersCount == 0)
+    {
+        terminal.Info(L"{}\n", wsl::shared::Localization::WSLCCLI_ComposeNoStoppedContainers());
+    }
 }
 
 } // namespace wsl::windows::wslc::services
