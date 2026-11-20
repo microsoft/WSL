@@ -45,7 +45,7 @@ ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, cons
     // Interpretation consumes the captured snapshot; source paths provide document context.
     // yaml-cpp detects the document encoding from the original bytes and any byte-order mark.
     const std::string content(reinterpret_cast<const char*>(document.Content.data()), document.Content.size());
-    auto spec = ComposeSpec::Parse(document.SourcePath, content);
+    auto spec = ComposeSpec::Parse(document.SourcePath, document.BaseDirectory, content);
 
     std::string projectName;
     if (documents.ExplicitProjectName.has_value())
