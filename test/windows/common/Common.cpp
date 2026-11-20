@@ -2668,15 +2668,12 @@ ScopedWindowsProxySettings::ScopedWindowsProxySettings()
     INTERNET_PER_CONN_OPTION_LISTW list{sizeof(list), nullptr, ARRAYSIZE(options), 0, options};
     DWORD size = sizeof(list);
 
-    const auto result =
-        InternetQueryOptionW(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, &size) ? S_OK : HRESULT_FROM_WIN32(GetLastError());
+    THROW_IF_WIN32_BOOL_FALSE(InternetQueryOptionW(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, &size));
 
+    m_flags = options[0].Value.dwValue;
     m_proxy.reset(options[1].Value.pszValue);
     m_bypasses.reset(options[2].Value.pszValue);
     m_autoconfigUrl.reset(options[3].Value.pszValue);
-
-    THROW_IF_FAILED(result);
-    m_flags = options[0].Value.dwValue;
 }
 
 ScopedWindowsProxySettings::~ScopedWindowsProxySettings()
