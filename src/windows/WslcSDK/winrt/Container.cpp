@@ -33,6 +33,8 @@ Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::Con
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateContainer(session, GetStructPointer(settings), m_container.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    RegisterInitProcessCallbacks();
 }
 
 Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::ProcessOutputMode initProcessOutputMode) :
@@ -42,11 +44,7 @@ Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::Pr
 
     m_initProcess = winrt::make_self<implementation::Process>(initProcessOutputMode);
 
-    if (initProcessOutputMode == ProcessOutputMode::Event)
-    {
-        auto callbacks = m_initProcess->GetEventCallbacks();
-        winrt::check_hresult(WslcSetContainerInitProcessIOCallbacks(m_container.get(), &callbacks, m_initProcess.get()));
-    }
+    RegisterInitProcessCallbacks();
 
     // Best-effort: attach the init process handle if one is available. The container may not
     // have been started yet, or may not have an init process at all.
@@ -55,6 +53,18 @@ Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::Pr
     {
         m_initProcess->AttachHandle(initHandle);
     }
+}
+
+void Container::RegisterInitProcessCallbacks()
+{
+    // Callbacks are registered on the container handle so that a ProcessSettings shared with other processes is never modified.
+    if (!m_initProcess || m_initProcess->OutputMode() != ProcessOutputMode::Event)
+    {
+        return;
+    }
+
+    auto callbacks = m_initProcess->GetEventCallbacks();
+    winrt::check_hresult(WslcSetContainerInitProcessIOCallbacks(m_container.get(), &callbacks, m_initProcess.get()));
 }
 
 void Container::Start()
