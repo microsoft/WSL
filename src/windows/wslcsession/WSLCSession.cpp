@@ -25,6 +25,7 @@ Abstract:
 #include "wslpolicies.h"
 #include "APICompat.h"
 #include "WSLCContainerEntry.h"
+#include "wslc/WSLCProxy.h"
 
 using namespace wsl::windows::common;
 using io::MultiHandleWait;
@@ -424,6 +425,13 @@ try
     const auto tokenInfo = wil::get_token_information<TOKEN_USER>(GetCurrentProcessToken());
     PersistSettings(*Settings, tokenInfo->User.Sid);
 
+    LOG_IF_FAILED(wil::ResultFromException([&] {
+        THROW_IF_FAILED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+        wil::unique_handle userToken;
+        THROW_IF_WIN32_BOOL_FALSE(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        m_httpProxyStateTracker = std::make_unique<HttpProxyStateTracker>(1000, userToken.get());
+    }));
+
     WSL_LOG(
         "SessionInitialized",
         TraceLoggingValue(m_id, "SessionId"),
@@ -562,11 +570,64 @@ void WSLCSession::PersistSettings(const WSLCSessionInitSettings& Settings, PSID 
         m_settings.RootVhdTypeOverride = nullptr;
     }
 
+    if (Settings.HostLoopback != nullptr)
+    {
+        m_settingsHostLoopback = Settings.HostLoopback;
+        m_settings.HostLoopback = m_settingsHostLoopback->c_str();
+    }
+    else
+    {
+        m_settings.HostLoopback = nullptr;
+    }
+
     THROW_HR_IF(E_UNEXPECTED, UserSid == nullptr);
 
     const auto length = GetLengthSid(UserSid);
     const auto* bytes = reinterpret_cast<const BYTE*>(UserSid);
     m_userSid.assign(bytes, bytes + length);
+}
+
+std::vector<std::string> WSLCSession::GetProxyEnvironment() const
+{
+    std::vector<std::string> windowsProxyEnvironment;
+    LOG_IF_FAILED(wil::ResultFromException([&] {
+        if (!m_httpProxyStateTracker)
+        {
+            return;
+        }
+
+        if (auto proxy = m_httpProxyStateTracker->WaitForInitialProxySettings())
+        {
+            for (auto* url : {&proxy->Proxy, &proxy->SecureProxy})
+            {
+                if (m_settings.NetworkingMode == WSLCNetworkingModeConsomme && m_settings.HostLoopback != nullptr)
+                {
+                    *url = wsl::windows::wslc::ResolveProxyUrl(*url, m_settings.HostLoopback);
+                }
+
+                bool unsupported = false;
+                if (m_settings.NetworkingMode == WSLCNetworkingModeNAT)
+                {
+                    const auto reason = HttpProxyStateTracker::IsUnsupportedProxy(
+                        wsl::shared::string::MultiByteToWide(*url).c_str(), wsl::core::NetworkingMode::Nat);
+                    unsupported = reason != UnsupportedProxyReason::Supported;
+                }
+                else
+                {
+                    unsupported = wsl::windows::wslc::IsLoopbackProxyUrl(*url);
+                }
+
+                if (unsupported)
+                {
+                    url->clear();
+                }
+            }
+
+            proxy->AddToEnvironment(windowsProxyEnvironment);
+        }
+    }));
+
+    return windowsProxyEnvironment;
 }
 
 WSLCSession::VmLease WSLCSession::AcquireLease(WSLCSessionRuntime::VmLeasePolicy Policy)
@@ -749,9 +810,16 @@ void WSLCSession::OnContainerdExited()
 }
 
 ServiceRunningProcess WSLCSession::StartProcess(
-    const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback)
+    const std::string& Executable,
+    const std::vector<std::string>& Args,
+    PCSTR LogSource,
+    std::function<void()>&& ExitCallback,
+    const std::vector<std::string>& ExtraEnvironment)
 {
-    ServiceProcessLauncher launcher{Executable, Args, {{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"}}};
+    std::vector<std::string> environment{"PATH=/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin"};
+    environment.insert(environment.end(), ExtraEnvironment.begin(), ExtraEnvironment.end());
+
+    ServiceProcessLauncher launcher{Executable, Args, environment};
 
     auto process = launcher.Launch(m_runtime.Vm());
 
@@ -792,7 +860,8 @@ void WSLCSession::StartDockerd()
         args.emplace_back("--debug");
     }
 
-    m_runtime.SetDockerdProcess(StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this)));
+    m_runtime.SetDockerdProcess(
+        StartProcess("/usr/bin/dockerd", args, "dockerd", std::bind(&WSLCSession::OnDockerdExited, this), GetProxyEnvironment()));
     WSL_LOG("DockerdStarted");
 }
 
@@ -1108,8 +1177,6 @@ try
     // one parent directory per file secret are mounted.
     mountedPaths.reserve(static_cast<size_t>(3) + Options->Secrets.Count);
 
-    // Environment for the docker process. Env/in-memory secrets are delivered as variables here so their
-    // values never touch disk; kept off telemetry (only buildArgs is logged).
     std::vector<std::string> buildEnv;
 
     if (policyState == WSLCVirtualMachine::BuildKitPolicyState::Configured)
@@ -1332,6 +1399,8 @@ try
 
     WSL_LOG("BuildImageStart", TraceLoggingValue(wsl::shared::string::Join(buildArgs, ' ').c_str(), "Command"));
 
+    // The buildx auth provider fetches registry tokens in the client process, separately from dockerd.
+    wsl::windows::wslc::AddProxyEnvironmentDefaults(buildEnv, GetProxyEnvironment());
     ServiceProcessLauncher buildLauncher(buildArgs[0], buildArgs, buildEnv, WSLCProcessFlagsStdin);
     auto buildProcess = buildLauncher.Launch(runtime.Vm());
 

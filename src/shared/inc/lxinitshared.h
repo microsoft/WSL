@@ -1792,13 +1792,7 @@ struct WSLC_EXEC
 
     char Buffer[];
 
-    PRETTY_PRINT(
-        FIELD(Header),
-        STRING_FIELD(ExecutableIndex),
-        STRING_FIELD(CurrentDirectoryIndex),
-        FIELD(FdIndex),
-        STRING_ARRAY_FIELD(CommandLineIndex),
-        STRING_ARRAY_FIELD(EnvironmentIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(ExecutableIndex), STRING_FIELD(CurrentDirectoryIndex), FIELD(FdIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 struct WSLC_FORK_RESULT
 {
