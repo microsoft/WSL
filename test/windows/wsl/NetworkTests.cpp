@@ -5762,7 +5762,9 @@ class MirroredTests
 
     static std::string CaptureNetworkChange(const std::function<void()>& change)
     {
-        auto [readPipe, writePipe] = CreateSubprocessPipe(false, true);
+        auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(writePipe.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
         auto command = LxssGenerateWslCommandLine(L"ip -o monitor label address route");
         NetworkTests::unique_kill_process monitor(LxsstuStartProcess(command.data(), nullptr, writePipe.get(), writePipe.get()));
         writePipe.reset();
