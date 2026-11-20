@@ -79,16 +79,7 @@ std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopb
         return Url;
     }
 
-    const auto byteCount = gsl::narrow<int>(Url.size());
-    std::wstring wideUrl(Url.size(), L'\0');
-    const auto wideCount = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, Url.data(), byteCount, wideUrl.data(), byteCount);
-    if (wideCount == 0)
-    {
-        THROW_LAST_ERROR_IF(GetLastError() != ERROR_NO_UNICODE_TRANSLATION);
-        return Url;
-    }
-
-    wideUrl.resize(wideCount);
+    auto wideUrl = wsl::shared::string::MultiByteToWide(Url);
     const auto host = FindProxyHost(wideUrl);
     if (!host)
     {
@@ -103,6 +94,11 @@ std::string ResolveProxyUrl(const std::string& Url, const std::string& HostLoopb
 
     const auto scheme = std::wstring_view{wideUrl}.substr(0, wideUrl.find(L"://"));
     if (wsl::shared::string::IsEqual(scheme, L"https", true))
+    {
+        return Url;
+    }
+
+    if (wsl::shared::string::WideToMultiByte(wideUrl) != Url)
     {
         return Url;
     }
