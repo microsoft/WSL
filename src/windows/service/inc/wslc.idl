@@ -628,7 +628,8 @@ typedef enum _WSLCComposeProjectType
 
 typedef struct _WSLCComposeDocument
 {
-    // SourcePath supplies diagnostic context and its parent resolves relative bind mounts.
+    // SourcePath supplies diagnostic context; BaseDirectory resolves relative bind mounts.
+    // Documents merge in collection order, with later documents overriding earlier ones.
     // Content contains the original document bytes, including any encoding marker.
     [string] LPCWSTR SourcePath;
     [string] LPCWSTR BaseDirectory;
