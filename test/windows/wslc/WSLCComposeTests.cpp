@@ -101,6 +101,13 @@ struct ComposeRequestStorage
         request.ActionOptions.Value.Stop.TimeoutSeconds = timeout;
     }
 
+    void SetProjectDirectory(std::filesystem::path directory)
+    {
+        projectDirectory = std::move(directory);
+        document.BaseDirectory = projectDirectory.c_str();
+        documents.ProjectDirectory = projectDirectory.c_str();
+    }
+
     void SetProjectName(std::string name)
     {
         explicitProjectName = std::move(name);
@@ -783,6 +790,48 @@ class WSLCComposeTests
     TEST_METHOD(ComposeProjectIdentitySharedAcrossNormalizedDirectories)
     {
         VerifyProjectIdentitySharedAcrossFiles(true);
+    }
+
+    TEST_METHOD(ComposeRelativeBindMountUsesProjectDirectory)
+    {
+        const auto rootPath = std::filesystem::current_path() / "compose-bind-root";
+        const auto filesPath = rootPath / "files";
+        const auto projectPath = rootPath / "compose-bind-project";
+        const auto composePath = filesPath / "compose.yaml";
+        const auto projectKey = projectPath.filename().string();
+        const auto containerName = std::format("{}-writer-1", projectKey);
+        auto cleanup = wil::scope_exit([&] {
+            wil::com_ptr<IWSLCContainer> container;
+            if (SUCCEEDED(m_defaultSession->OpenContainer(containerName.c_str(), &container)))
+            {
+                LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+            }
+
+            LOG_IF_FAILED(m_defaultSession->DeleteNetwork(std::format("{}_default", projectKey).c_str()));
+            std::error_code error;
+            std::filesystem::remove_all(rootPath, error);
+        });
+
+        std::filesystem::create_directories(filesPath);
+        std::filesystem::create_directories(projectPath / "data");
+        WriteFileContent(composePath, R"(
+services:
+  writer:
+    image: alpine:latest
+    command: ["/bin/sh", "-c", "touch /work/marker; while true; do sleep 1; done"]
+    volumes:
+      - ./data:/work
+)");
+
+        ComposeRequestStorage upRequest{composePath, WSLCComposeActionUp};
+        upRequest.SetProjectDirectory(projectPath);
+        ExecuteCompose(*m_defaultSession, upRequest);
+
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_RETRY), !std::filesystem::exists(projectPath / "data" / "marker")); },
+            100ms,
+            std::chrono::milliseconds{c_waitTimeoutMs});
+        VERIFY_IS_FALSE(std::filesystem::exists(filesPath / "data"));
     }
 
     TEST_METHOD(ComposeContainerNameHttpRequest)

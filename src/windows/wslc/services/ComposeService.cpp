@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "ComposeService.h"
 #include "ConsoleService.h"
+#include <array>
 #include <relay.hpp>
 #include <WSLCContainerEntry.h>
 #include <WSLCProcessLauncher.h>
@@ -23,38 +24,30 @@ namespace wsl::windows::wslc::services {
 
 namespace {
 
-    std::vector<char> ReadComposeDocument(const std::filesystem::path& sourcePath)
+    std::string ReadComposeDocument(const std::filesystem::path& sourcePath)
     {
-        std::ifstream stream{sourcePath, std::ios::binary | std::ios::ate};
+        std::ifstream stream{sourcePath, std::ios::binary};
         THROW_HR_WITH_USER_ERROR_IF(
             HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), wsl::shared::Localization::MessageWslcComposeFileOpenFailed(sourcePath.wstring()), !stream);
 
-        const auto documentSize = stream.tellg();
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_READ_FAULT), wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()), documentSize < 0);
-        THROW_HR_IF(E_INVALIDARG, documentSize == 0);
-        THROW_HR_IF_MSG(
-            HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
-            static_cast<uint64_t>(documentSize) > ULONG_MAX,
-            "Compose document exceeds the maximum transport size: %ls",
-            sourcePath.c_str());
-        const auto contentSize = gsl::narrow<ULONG>(static_cast<uint64_t>(documentSize));
-        const auto streamSize = gsl::narrow<std::streamsize>(contentSize);
+        std::string content;
+        std::array<char, 4096> buffer{};
+        while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
+        {
+            const auto bytesRead = gsl::narrow<size_t>(stream.gcount());
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
+                bytesRead > ULONG_MAX - content.size(),
+                "Compose document exceeds the maximum transport size: %ls",
+                sourcePath.c_str());
+            content.append(buffer.data(), bytesRead);
+        }
 
-        std::vector<char> content(contentSize);
-        stream.seekg(0, std::ios::beg);
-        stream.read(content.data(), streamSize);
         THROW_HR_WITH_USER_ERROR_IF(
             HRESULT_FROM_WIN32(ERROR_READ_FAULT),
             wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-            stream.gcount() != streamSize);
-
-        char extraByte{};
-        stream.read(&extraByte, 1);
-        THROW_HR_WITH_USER_ERROR_IF(
-            HRESULT_FROM_WIN32(ERROR_READ_FAULT),
-            wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-            stream.gcount() != 0);
+            stream.bad() || !stream.eof());
+        THROW_HR_IF(E_INVALIDARG, content.empty());
 
         return content;
     }
@@ -96,7 +89,7 @@ namespace {
         std::vector<std::filesystem::path> sourcePaths;
         std::filesystem::path projectDirectory;
         std::optional<std::string> projectName;
-        std::vector<std::vector<char>> contents;
+        std::vector<std::string> contents;
         std::vector<WSLCComposeDocument> documentEntries;
         WSLCComposeDocumentCollection documents{};
     };
@@ -151,8 +144,8 @@ namespace {
 
         ComposeOperationResult result;
         THROW_IF_FAILED(session.Get()->ExecuteComposeOperation(&request, nullptr, cancelEvent, &result.value));
-        THROW_HR_WITH_USER_ERROR_IF(
-            result.value.Result, result.value.ErrorMessage, FAILED(result.value.Result) && result.value.ErrorMessage != nullptr);
+        const bool failedWithMessage = FAILED(result.value.Result) && result.value.ErrorMessage != nullptr;
+        THROW_HR_WITH_USER_ERROR_IF(result.value.Result, result.value.ErrorMessage, failedWithMessage);
         THROW_IF_FAILED(result.value.Result);
         THROW_HR_IF(E_UNEXPECTED, result.value.Status != WSLCComposeOperationStatusSucceeded);
         return result;
