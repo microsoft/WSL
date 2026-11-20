@@ -262,7 +262,7 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, Socket);
 
-    auto socket = socket::CancellableAccept(m_guestListener.Socket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+    auto socket = wsl::windows::common::socket::CancellableAccept(m_guestListener.Socket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
     THROW_HR_IF(E_ABORT, !socket.has_value());
     *Socket = reinterpret_cast<HANDLE>(socket->release());
     return S_OK;
