@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "ComposeEnvironment.h"
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -62,7 +63,8 @@ struct ComposeSpec
     std::vector<ComposeContainerDefinition> Containers;
     std::string ProjectName;
 
-    static ComposeSpec Parse(const std::vector<ComposeSpecDocument>& documents);
+    // Variable references in values are replaced using variables before documents merge.
+    static ComposeSpec Parse(const std::vector<ComposeSpecDocument>& documents, const ComposeVariables& variables);
 };
 
 } // namespace wsl::windows::service::wslc

@@ -34,6 +34,7 @@ std::vector<Argument> ComposeCommand::GetGlobalArguments() const
 {
     return {
         CreateGlobalArgument(ArgType::ComposeFile, {.Limit = Limit::Unlimited}),
+        CreateGlobalArgument(ArgType::EnvFile, {.Limit = Limit::Unlimited}),
         CreateGlobalArgument(ArgType::ComposeProjectDirectory),
         CreateGlobalArgument(ArgType::ComposeProjectName),
     };

@@ -106,6 +106,37 @@ namespace {
         return wsl::shared::string::WideToMultiByte(name);
     }
 
+    // Explicit files must exist; otherwise the project directory's .env file is used when present.
+    std::vector<std::filesystem::path> ResolveEnvironmentFiles(
+        ArgMap& args, const std::filesystem::path& currentDirectory, const std::filesystem::path& projectDirectory)
+    {
+        std::vector<std::filesystem::path> environmentFiles;
+        for (const auto& file : args.GetAllValues<ArgType::EnvFile>())
+        {
+            auto path = (currentDirectory / file).lexically_normal();
+            std::error_code error;
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND),
+                Localization::WSLCCLI_ComposeEnvFileNotFoundError(path.wstring()),
+                !std::filesystem::is_regular_file(path, error));
+            environmentFiles.push_back(std::move(path));
+        }
+
+        if (!environmentFiles.empty())
+        {
+            return environmentFiles;
+        }
+
+        auto defaultFile = projectDirectory / L".env";
+        std::error_code error;
+        if (std::filesystem::is_regular_file(defaultFile, error))
+        {
+            environmentFiles.push_back(std::move(defaultFile));
+        }
+
+        return environmentFiles;
+    }
+
     models::ComposeProjectFiles ResolveProjectFiles(ArgMap& args, const std::filesystem::path& currentDirectory, std::optional<std::string> projectName)
     {
         std::optional<std::filesystem::path> projectDirectory;
@@ -131,6 +162,7 @@ namespace {
         project.ProjectDirectory = projectDirectory.value_or(files.front().parent_path());
         project.Files = std::move(files);
         project.ProjectName = std::move(projectName);
+        project.EnvironmentFiles = ResolveEnvironmentFiles(args, currentDirectory, project.ProjectDirectory);
         return project;
     }
 

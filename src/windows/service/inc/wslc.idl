@@ -637,6 +637,14 @@ typedef struct _WSLCComposeDocument
     ULONG ContentSize;
 } WSLCComposeDocument;
 
+typedef struct _WSLCComposeEnvironmentFile
+{
+    // SourcePath supplies diagnostic context; Content contains the original file bytes and may be empty.
+    [string] LPCWSTR SourcePath;
+    [unique, size_is(ContentSize)] const byte* Content;
+    ULONG ContentSize;
+} WSLCComposeEnvironmentFile;
+
 typedef struct _WSLCComposeDocumentCollection
 {
     // Supplies the default project name when ExplicitProjectName is absent.
@@ -644,6 +652,11 @@ typedef struct _WSLCComposeDocumentCollection
     [unique, string] LPCSTR ExplicitProjectName;
     [unique, size_is(DocumentCount)] const WSLCComposeDocument* Documents;
     ULONG DocumentCount;
+    // KEY=VALUE variables used for interpolation; they override values from EnvironmentFiles.
+    WSLCStringArray Environment;
+    // Environment files apply in order, with later files overriding earlier ones.
+    [unique, size_is(EnvironmentFileCount)] const WSLCComposeEnvironmentFile* EnvironmentFiles;
+    ULONG EnvironmentFileCount;
 } WSLCComposeDocumentCollection;
 
 typedef struct _WSLCComposeProject

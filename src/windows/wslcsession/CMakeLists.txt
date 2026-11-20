@@ -9,6 +9,7 @@ set(SOURCES
 
     # Session and container implementation
     ComposeCancellation.cpp
+    ComposeEnvironment.cpp
     ComposeNormalizer.cpp
     ComposeReconciler.cpp
     ComposeSpec.cpp
@@ -41,6 +42,7 @@ set(SOURCES
 
 set(HEADERS
     ComposeCancellation.h
+    ComposeEnvironment.h
     ComposeNormalizer.h
     ComposeReconciler.h
     ComposeSpec.h

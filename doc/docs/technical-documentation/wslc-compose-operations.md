@@ -75,6 +75,26 @@ already present. The `!reset` tag clears a setting or removes a service, and
 `!override` replaces a setting or service instead of merging it. Required
 settings such as `image` are checked after merging.
 
+### Variables
+
+Before a document is validated, `$NAME` and `${NAME}` references in its values
+are replaced. Keys are not interpolated. `$$` produces a literal `$`, and an
+unset variable produces an empty string. Braced references support `:-` and `-`
+defaults, `:+` and `+` alternates, and `:?` and `?` required checks; the colon
+forms also treat an empty value as unset.
+
+Variables come from `EnvironmentFiles`, applied in order, and then from
+`Environment`, whose `KEY=VALUE` entries override every file. The CLI supplies
+its own process environment and either each `--env-file` value, resolved
+against the current directory, or `<project directory>\.env` when that file
+exists. Environment files hold `KEY=VALUE` lines with `#` comments and an
+optional `export` prefix. Single-quoted values are literal; double-quoted values
+expand escapes and references, and may span lines.
+
+An `environment` entry without a value, such as `KEY:` in a map or `KEY` in a
+list, takes the variable's value when it is set and is otherwise passed without
+a value, leaving it unset in the container.
+
 ## Actions and execution
 
 | Action | Accepted project input | Behavior |
@@ -242,7 +262,7 @@ standard WinRT async interfaces with explicit cancellation bridging.
 `test\windows\wslc\WSLCComposeTests.cpp` covers request validation, discovery,
 resource ordering, error details, session-process exit, project concurrency,
 cancellation checkpoints, late cancellation, partial state, nonfatal observer failures, callback shutdown,
-deletion during Up, and auto-remove Stop.
+deletion during Up, auto-remove Stop, multi-document merging, and variable interpolation.
 `WSLCE2EComposeLifecycleTests.cpp` covers the CLI lifecycle.
 
 Build the full Windows project before running the focused suite:

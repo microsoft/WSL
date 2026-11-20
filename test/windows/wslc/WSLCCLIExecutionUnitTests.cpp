@@ -1072,6 +1072,39 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(directory.Path().wstring(), files.ProjectDirectory.wstring());
     }
 
+    TEST_METHOD(ComposeProject_EnvironmentFiles)
+    {
+        ScopedTempDirectory directory;
+        const auto projectDirectory = directory.Path() / L"project";
+        directory.AddFile(L"project\\compose.yml");
+
+        auto project = ResolveProject({L"compose", L"up"}, task::ComposeProjectSelection::Files, projectDirectory);
+        VERIFY_ARE_EQUAL(0u, ProjectFiles(project).EnvironmentFiles.size());
+
+        const auto defaultFile = directory.AddFile(L"project\\.env");
+        project = ResolveProject({L"compose", L"up"}, task::ComposeProjectSelection::Files, projectDirectory);
+        VERIFY_ARE_EQUAL(1u, ProjectFiles(project).EnvironmentFiles.size());
+        VERIFY_ARE_EQUAL(defaultFile.wstring(), ProjectFiles(project).EnvironmentFiles[0].wstring());
+
+        // Explicit files resolve against the current directory, keep their order, and replace the default file.
+        const auto first = directory.AddFile(L"b.env");
+        const auto second = directory.AddFile(L"sub\\a.env");
+        project = ResolveProject(
+            {L"compose", L"--project-directory", L"project", L"--env-file", L"b.env", L"--env-file", L"sub\\a.env", L"up"},
+            task::ComposeProjectSelection::Files,
+            directory.Path());
+        const auto& files = ProjectFiles(project);
+        VERIFY_ARE_EQUAL(2u, files.EnvironmentFiles.size());
+        VERIFY_ARE_EQUAL(first.wstring(), files.EnvironmentFiles[0].wstring());
+        VERIFY_ARE_EQUAL(second.wstring(), files.EnvironmentFiles[1].wstring());
+
+        VerifyResolveFails(
+            {L"compose", L"--env-file", L"missing.env", L"up"},
+            task::ComposeProjectSelection::Files,
+            projectDirectory,
+            HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));
+    }
+
     TEST_METHOD(ComposeProject_NameSelection)
     {
         ScopedTempDirectory directory;
