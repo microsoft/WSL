@@ -6097,6 +6097,25 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    WSL2_TEST_METHOD(WildcardAndLoopbackRebindAfterClose)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        const auto bindAndClose = [](uint16_t port, std::wstring_view address) {
+            auto [listener, read] =
+                NetworkTests::BindGuestPort(std::format(L"TCP4-LISTEN:{},bind={},accept-timeout=0.001", port, address), true);
+            VERIFY_ARE_EQUAL(WaitForSingleObject(listener.m_process.get(), 30000), WAIT_OBJECT_0);
+        };
+
+        bindAndClose(12345, L"0.0.0.0");
+        bindAndClose(12345, L"127.0.0.1");
+
+        bindAndClose(12346, L"127.0.0.1");
+        bindAndClose(12346, L"0.0.0.0");
+    }
+
     WSL2_TEST_METHOD(GuestOnlyAddressBind)
     {
         CONSOMME_TEST_ONLY();

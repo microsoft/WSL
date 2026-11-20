@@ -22,8 +22,8 @@
 #define PIDFD_THREAD O_EXCL
 #endif
 
-constexpr size_t c_bind_timeout_seconds = 60;
-constexpr auto c_sock_diag_listing_delay = std::chrono::milliseconds(500);
+constexpr std::chrono::seconds c_bind_timeout_seconds{60};
+constexpr std::chrono::milliseconds c_sock_diag_listing_delay{500};
 
 GnsPortTracker::GnsPortTracker(
     std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
@@ -53,7 +53,7 @@ void GnsPortTracker::RunPortListing()
         // Netlink will sometimes return EBUSY. Don't fail for that
         try
         {
-            auto result = ListPortsResult{ListBoundPorts(), time(nullptr)};
+            auto result = ListPortsResult{ListBoundPorts(), Clock::now()};
             m_eventQueue.post(TrackerEvent{std::move(result)});
 
             m_portListingResume.get();
@@ -251,7 +251,7 @@ GnsPortTracker::ActivePorts GnsPortTracker::ListBoundPorts()
     return ports;
 }
 
-void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp)
+void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, Clock::time_point Timestamp)
 {
     // Because there's no way to get notified when the bind() call actually completes, it' possible
     // that this method is called before the bind() completion and so the port allocation may not be visible yet.
@@ -660,7 +660,7 @@ try
 {
     // Use insert_or_assign so the deallocation timeout is refreshed if the same
     // port key is already present (emplace would silently keep the old entry).
-    m_allocatedPorts.insert_or_assign(std::move(allocation), std::make_optional(time(nullptr) + c_bind_timeout_seconds));
+    m_allocatedPorts.insert_or_assign(std::move(allocation), Clock::now() + c_bind_timeout_seconds);
 }
 catch (const std::exception& e)
 {
