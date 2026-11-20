@@ -4,6 +4,7 @@
 #include "ArgumentConvertedTypes.h"
 #include "ComposeService.h"
 #include "ComposeTasks.h"
+#include <filesystem.hpp>
 
 using namespace wsl::windows::wslc::argument;
 using namespace wsl::windows::wslc::execution;
@@ -74,7 +75,7 @@ namespace {
     std::filesystem::path ResolveComposeFilePath(const std::filesystem::path& path)
     {
         std::error_code error;
-        auto resolved = std::filesystem::weakly_canonical(path, error);
+        auto resolved = wsl::windows::common::filesystem::GetCanonicalPath(path, error);
         THROW_HR_WITH_USER_ERROR_IF(
             HRESULT_FROM_WIN32(error.value()), Localization::MessageWslcComposePathResolveFailed(path.wstring()), static_cast<bool>(error));
 
