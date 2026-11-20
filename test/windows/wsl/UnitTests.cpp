@@ -282,6 +282,7 @@ class UnitTests
         }
 
         // Validate user sessions state with gui apps enabled.
+        if (!LxsstuOpenVmmMode())
         {
             config.Update(LxssGenerateTestConfig({.guiApplications = true}));
 
@@ -332,7 +333,8 @@ class UnitTests
         return false;
     }
 
-    WSL2_TEST_METHOD(SystemdNoClearTmpUnit)
+    // Requires GUI applications, which OpenVMM doesn't support yet.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(SystemdNoClearTmpUnit)
     {
         // The X11 socket is only created when gui applications are enabled.
         WslConfigChange config(LxssGenerateTestConfig({.guiApplications = true}));
@@ -1094,7 +1096,7 @@ class UnitTests
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'none'"), 0u);
 
-            if (IsMirroredNetworkingSupported())
+            if (!LxsstuOpenVmmMode() && IsMirroredNetworkingSupported())
             {
                 config.Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
                 VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'mirrored'"), 0u);
@@ -1202,7 +1204,8 @@ class UnitTests
         VERIFY_NO_THROW(LxsstuRunTest(L"/data/test/wsl_unit_tests fstab", L"fstab"));
     }
 
-    TEST_METHOD(X11SocketOverTmpMount)
+    // Requires GUI applications, which OpenVMM doesn't support yet.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(X11SocketOverTmpMount)
     {
         if (!LxsstuVmMode())
         {
@@ -1591,7 +1594,8 @@ class UnitTests
                 ValidateErrorMessage(
                     L"--mount DoesNotExist",
                     L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. ",
-                    L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND");
+                    LxsstuOpenVmmMode() ? L"Wsl/Service/AttachDisk/MountDisk/OpenVmm/ERROR_FILE_NOT_FOUND"
+                                        : L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND");
             }
 
             ValidateErrorMessage(
@@ -1626,7 +1630,8 @@ class UnitTests
                     L"-d DummyBrokenDistro",
                     L"Failed to attach disk 'C:\\DoesNotExit\\ext4.vhdx' to WSL2: The system cannot find the path "
                     L"specified. ",
-                    L"Wsl/Service/CreateInstance/MountDisk/ERROR_PATH_NOT_FOUND");
+                    LxsstuOpenVmmMode() ? L"Wsl/Service/CreateInstance/MountDisk/OpenVmm/ERROR_PATH_NOT_FOUND"
+                                        : L"Wsl/Service/CreateInstance/MountDisk/ERROR_PATH_NOT_FOUND");
 
                 // Purposefully set an incorrect value type to validate registry error handling.
                 wsl::windows::common::registry::WriteString(distroKey.get(), nullptr, L"Version", L"Broken");
@@ -2180,7 +2185,7 @@ Usage:
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L" grep '^rootfs /init rootfs ro,' /proc/self/mounts", nullptr, nullptr, nullptr, nullptr), 0u);
     }
 
-    WSL2_TEST_METHOD(GpuMounts)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(GpuMounts)
     {
         auto ValidateGpuMounts = [](HANDLE Token) {
             VERIFY_ARE_EQUAL(
@@ -2353,6 +2358,18 @@ Usage:
     {
         WslConfigChange configChange(LxssGenerateTestConfig());
 
+        // Some cases need a config without the test defaults. When running against OpenVMM, that config still has to
+        // select the OpenVMM backend with the same overrides that LxssGenerateTestConfig() applies.
+        const std::wstring minimalConfig =
+            LxsstuOpenVmmMode() ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
+                                  L"\ngpuSupport=false\nguiApplications=false\nnestedVirtualization=false\nvirtiofs=true\n"
+                                : L"[wsl2]\n";
+
+        // .wslconfig line numbers of the first line appended to each prefix.
+        const auto firstLine = [](const std::wstring& prefix) { return std::ranges::count(prefix, L'\n') + 1; };
+        const auto line = firstLine(LxssGenerateTestConfig());
+        const auto minimalLine = firstLine(minimalConfig);
+
         auto validateWarnings = [&configChange](
                                     const std::wstring& config,
                                     const std::wstring& expectedWarnings,
@@ -2405,84 +2422,95 @@ Usage:
                 ? std::format(L"wsl: {}\r\n", wsl::shared::Localization::MessageDnsTunnelingDisabled())
                 : L"";
 
-        validateWarnings(L"a=b", std::format(L"wsl: Unknown key 'wsl2.a' in {}:22\r\n", wslConfigPath));
-        validateWarnings(L"[=b", std::format(L"wsl: Invalid section name in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"a=b", std::format(L"wsl: Unknown key 'wsl2.a' in {}:{}\r\n", wslConfigPath, line));
+        validateWarnings(L"[=b", std::format(L"wsl: Invalid section name in {}:{}\r\n", wslConfigPath, line));
 
         validateWarnings(
             L"dhcpTimeout=NotANumber",
-            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'wsl2.dhcpTimeout' in {}:22\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'wsl2.dhcpTimeout' in {}:{}\r\n", wslConfigPath, line));
 
-        validateWarnings(L"ipv6=NotABoolean", std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'wsl2.ipv6' in {}:22\r\n", wslConfigPath));
+        validateWarnings(
+            L"ipv6=NotABoolean",
+            std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'wsl2.ipv6' in {}:{}\r\n", wslConfigPath, line));
 
-        validateWarnings(L"[sectionNotComplete", std::format(L"wsl: Expected ']' in {}:22\r\n", wslConfigPath));
-        validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:22\r\n", wslConfigPath));
+        validateWarnings(L"[sectionNotComplete", std::format(L"wsl: Expected ']' in {}:{}\r\n", wslConfigPath, line));
+        validateWarnings(L"NoEqual", std::format(L"wsl: Expected '=' in {}:{}\r\n", wslConfigPath, line));
         validateWarnings(
             L"networkingMode=InvalidMode",
-            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:2 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath),
-            L"[wsl2]\n");
-        validateWarnings(
-            L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:2\r\n", wslConfigPath), L"[wsl2]\n");
+            std::format(L"wsl: Invalid value 'InvalidMode' for config key 'wsl2.networkingMode' in {}:{} (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath, minimalLine),
+            minimalConfig);
+        validateWarnings(L"networkingMode=a\\m", std::format(L"wsl: Invalid escaped character: 'm' in {}:{}\r\n", wslConfigPath, minimalLine), minimalConfig);
 
         validateWarnings(
             L"\nswap=200MB\nswapFile=C:\\\\DoesNotExist\\\\swap.vhdx",
             L"wsl: Failed to create the swap disk in 'C:\\DoesNotExist\\swap.vhdx': The system cannot find the path "
             L"specified. \r\n");
 
-        validateWarnings(L"\nswap=/", std::format(L"wsl: Invalid memory string '/' for .wslconfig entry 'wsl2.swap' in {}:23\r\n", wslConfigPath));
+        validateWarnings(
+            L"\nswap=/",
+            std::format(L"wsl: Invalid memory string '/' for .wslconfig entry 'wsl2.swap' in {}:{}\r\n", wslConfigPath, line + 1));
         validateWarnings(L"\nswap=0GB", L"");
-        validateWarnings(L"\nswap=0foo", std::format(L"wsl: Invalid memory string '0foo' for .wslconfig entry 'wsl2.swap' in {}:23\r\n", wslConfigPath));
-        validateWarnings(L"safeMode=true", L"wsl: SAFE MODE ENABLED - many features will be disabled\r\n", L"[wsl2]\n");
-        validateWarnings(L"processors=", std::format(L"wsl: Invalid integer value '' for key 'wsl2.processors' in {}:22\r\n", wslConfigPath));
-        validateWarnings(L"memory=", std::format(L"wsl: Invalid memory string '' for .wslconfig entry 'wsl2.memory' in {}:22\r\n", wslConfigPath));
-        validateWarnings(L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:22\r\n", wslConfigPath));
+        validateWarnings(
+            L"\nswap=0foo",
+            std::format(L"wsl: Invalid memory string '0foo' for .wslconfig entry 'wsl2.swap' in {}:{}\r\n", wslConfigPath, line + 1));
+        validateWarnings(L"safeMode=true", L"wsl: SAFE MODE ENABLED - many features will be disabled\r\n", minimalConfig);
+        validateWarnings(L"processors=", std::format(L"wsl: Invalid integer value '' for key 'wsl2.processors' in {}:{}\r\n", wslConfigPath, line));
+        validateWarnings(
+            L"memory=", std::format(L"wsl: Invalid memory string '' for .wslconfig entry 'wsl2.memory' in {}:{}\r\n", wslConfigPath, line));
+        validateWarnings(
+            L"debugConsole=", std::format(L"wsl: Invalid boolean value '' for key 'wsl2.debugConsole' in {}:{}\r\n", wslConfigPath, line));
         validateWarnings(
             L"networkingMode=",
-            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:22 (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid value '' for config key 'wsl2.networkingMode' in {}:{} (Valid values: Bridged, Consomme, Mirrored, Nat, None, VirtioProxy)\r\n", wslConfigPath, line));
 
         validateWarnings(
             L"ipv6=true\nipv6=false",
-            std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:23 (Conflicting key: 'wsl2.ipv6' in {}:22)\r\n", wslConfigPath, wslConfigPath));
+            std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:{} (Conflicting key: 'wsl2.ipv6' in {}:{})\r\n", wslConfigPath, line + 1, wslConfigPath, line));
 
         validateWarnings(
             L"networkingMode=NAT\n[experimental]\nnetworkingMode=Mirrored",
-            std::format(L"wsl: Duplicated config key 'experimental.networkingMode' in {}:4 (Conflicting key: 'wsl2.networkingMode' in {}:2)\r\n", wslConfigPath, wslConfigPath),
-            L"[wsl2]\n");
+            std::format(L"wsl: Duplicated config key 'experimental.networkingMode' in {}:{} (Conflicting key: 'wsl2.networkingMode' in {}:{})\r\n", wslConfigPath, minimalLine + 2, wslConfigPath, minimalLine),
+            minimalConfig);
 
-        validateWarnings(
-            L"networkingMode=bridged",
-            L"wsl: " +
-                FormatErrorMessage(
-                    L"Bridged networking requires wsl2.vmSwitch to be set.",
-                    L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_SET") +
-                L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
-            L"[wsl2]\n");
+        // Bridged networking requires a Hyper-V VmSwitch, which doesn't apply to OpenVMM.
+        if (!LxsstuOpenVmmMode())
+        {
+            validateWarnings(
+                L"networkingMode=bridged",
+                L"wsl: " +
+                    FormatErrorMessage(
+                        L"Bridged networking requires wsl2.vmSwitch to be set.",
+                        L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_SET") +
+                    L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
+                L"[wsl2]\n");
 
-        validateWarnings(
-            L"networkingMode=bridged\nvmSwitch=DoesNotExist",
-            L"wsl: " +
-                FormatErrorMessage(
-                    L"The VmSwitch 'DoesNotExist' was not found. Available switches:*",
-                    L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_FOUND") +
-                L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
-            L"[wsl2]\n",
-            true);
+            validateWarnings(
+                L"networkingMode=bridged\nvmSwitch=DoesNotExist",
+                L"wsl: " +
+                    FormatErrorMessage(
+                        L"The VmSwitch 'DoesNotExist' was not found. Available switches:*",
+                        L"CreateInstance/CreateVm/ConfigureNetworking/WSL_E_VMSWITCH_NOT_FOUND") +
+                    L"wsl: Failed to configure network (networkingMode Bridged), falling back to networkingMode None.\r\n",
+                L"[wsl2]\n",
+                true);
+        }
 
         if (!AreExperimentalNetworkingFeaturesSupported())
         {
             validateWarnings(
                 L"[experimental]\nnetworkingMode=mirrored",
                 L"wsl: Experimental networking features are not supported, falling back to default settings\r\n",
-                L"[wsl2]\n");
+                minimalConfig);
 
             validateWarnings(
                 L"[experimental]\ndnsTunneling=true",
                 L"wsl: Experimental networking features are not supported, falling back to default settings\r\n",
-                L"[wsl2]\n");
+                minimalConfig);
 
             validateWarnings(
                 L"[experimental]\nfirewall=true",
                 L"wsl: Experimental networking features are not supported, falling back to default settings\r\n",
-                L"[wsl2]\n");
+                minimalConfig);
         }
         else
         {
@@ -2494,17 +2522,17 @@ Usage:
 
                 validateWarnings(
                     L"[experimental]\ndnsTunneling=true\ndnsTunnelingIpAddress=1.2.3",
-                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:24\r\n", wslConfigPath));
+                    std::format(L"wsl: Invalid IP value '1.2.3' for key 'experimental.dnsTunnelingIpAddress' in {}:{}\r\n", wslConfigPath, line + 2));
             }
         }
 
         validateWarnings(
             L"[experimental]\nignoredPorts=NotANumber",
-            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'experimental.ignoredPorts' in {}:23\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid integer value 'NotANumber' for key 'experimental.ignoredPorts' in {}:{}\r\n", wslConfigPath, line + 1));
 
         validateWarnings(
             L"[experimental]\nignoredPorts=65536",
-            std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:23\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid integer value '65536' for key 'experimental.ignoredPorts' in {}:{}\r\n", wslConfigPath, line + 1));
 
         // Verify experimental.swiotlb parsing and validation.
         //
@@ -2522,7 +2550,7 @@ Usage:
         // Malformed values are rejected by the parser; only the parser warning is reported.
         validateWarnings(
             L"[experimental]\nswiotlb=garbage",
-            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:23\r\n", wslConfigPath));
+            std::format(L"wsl: Invalid memory string 'garbage' for .wslconfig entry 'experimental.swiotlb' in {}:{}\r\n", wslConfigPath, line + 1));
 
         // Verify that the vhdSize setting is parsed correctly.
         validateWarnings(L"[wsl2]\ndefaultVhdSize=64GB\n", L"");
@@ -2573,7 +2601,7 @@ Usage:
         VERIFY_ARE_EQUAL(L"", warnings);
     }
 
-    WSL2_TEST_METHOD(DmesgCollection)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(DmesgCollection)
     {
         const auto dmesgLogFile = std::filesystem::current_path() / L"test-dmesg.txt";
         auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { DeleteFile(dmesgLogFile.c_str()); });
@@ -2640,28 +2668,32 @@ Usage:
     WSL2_TEST_METHOD(GuiApplications)
     {
         auto validateEnvironment = [&](bool systemdEnabled) {
-            WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = true}));
+            const bool guiApplicationsEnabled = !LxsstuOpenVmmMode();
+            WslConfigChange configChange(LxssGenerateTestConfig({.guiApplications = guiApplicationsEnabled}));
 
-            // Validate that running the system distro works.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system true"), 0L);
+            if (guiApplicationsEnabled)
+            {
+                // Validate that running the system distro works.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"--system true"), 0L);
 
-            // Validate that $DISPLAY and $WAYLAND_DISPLAY are set
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep DISPLAY="), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep WAYLAND_DISPLAY="), 0L);
+                // Validate that $DISPLAY and $WAYLAND_DISPLAY are set
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep DISPLAY="), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep WAYLAND_DISPLAY="), 0L);
 
-            // Validate the X11 socket is in the expected location and that we can connect to it.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
+                // Validate the X11 socket is in the expected location and that we can connect to it.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /tmp/.X11-unix"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:/tmp/.X11-unix/X0 < /dev/null"), 0L);
 
-            // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
+                // Validate that distro-provided tmpfiles rules cannot modify the read-only X11 mount.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/tmpfiles.d/x11.conf"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"systemd-tmpfiles --create --boot x11.conf"), 0L);
 
-            // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -S $XDG_RUNTIME_DIR/wayland-0"), 0L);
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/wayland-0 < /dev/null"), 0L);
+                // Validate the runtime dir exists and the wayland-0 socket is in the expected location.
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"env | grep XDG_RUNTIME_DIR="), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d $XDG_RUNTIME_DIR"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -S $XDG_RUNTIME_DIR/wayland-0"), 0L);
+                VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/wayland-0 < /dev/null"), 0L);
+            }
 
             // Validate that WSLg can be disabled.
             configChange.Update(LxssGenerateTestConfig({.guiApplications = false}));
@@ -2746,7 +2778,8 @@ Usage:
     {
         DistroFileChange wslConf(L"/etc/wsl.conf", false);
         wslConf.SetContent(L"[boot]\nsystemd=true\n");
-        WslConfigChange config{LxssGenerateTestConfig({.guiApplications = true})};
+        const bool guiApplicationsEnabled = !LxsstuOpenVmmMode();
+        WslConfigChange config{LxssGenerateTestConfig({.guiApplications = guiApplicationsEnabled})};
 
         auto validateSocketExists = [](bool exists) {
             LxsstuLaunchWsl(L"ls -a /tmp/.X11-unix/");
@@ -2754,6 +2787,7 @@ Usage:
         };
 
         // Validate that wslg.service restores the socket if it's deleted.
+        if (guiApplicationsEnabled)
         {
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -f /run/systemd/generator/wslg.service"), 0L);
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -e /run/systemd/generator/default.target.wants/wslg.service"), 0L);
@@ -2890,14 +2924,14 @@ Usage:
         };
 
         // Attempt to import a vhd with an open handle.
+        // TODO: OpenVMM needs proper gRPC error marshalling to preserve ERROR_SHARING_VIOLATION instead of E_FAIL.
+        const bool openVmm = LxsstuOpenVmmMode();
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
             FormatErrorMessage(
-                std::format(
-                    L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
-                    L"another process. ",
-                    vhdPath.wstring()),
-                L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
+                std::format(L"Failed to attach disk '\\\\?\\{}' to WSL2: {} ", vhdPath.wstring(), openVmm ? L"Unspecified error" : L"The process cannot access the file because it is being used by another process."),
+                openVmm ? L"Wsl/Service/RegisterDistro/MountDisk/OpenVmm/E_FAIL"
+                        : L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
 
         vhd.reset();
 
@@ -4020,6 +4054,28 @@ EOF
 
         TerminateDistribution();
         VERIFY_IS_TRUE(isDriveMountingEnabled());
+    }
+
+    WSL2_TEST_METHOD(OpenVmmNestedVirtualizationConflict)
+    {
+        WSL_SETTINGS_TEST();
+        if (!LxsstuOpenVmmMode())
+        {
+            LogSkipped("Requires the OpenVMM backend");
+            return;
+        }
+
+        {
+            WslConfigChange config(LxssGenerateTestConfig({.nestedVirtualization = true}));
+            const auto [output, _] = LxsstuLaunchWslAndCaptureOutput(L"--exec true", -1);
+            VERIFY_IS_TRUE(output.find(L"experimental.openVmm=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.find(L"wsl2.nestedVirtualization=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.find(L"wsl2.nestedVirtualization=false") != std::wstring::npos);
+            VERIFY_IS_TRUE(output.find(L"OpenVmm/ERROR_NOT_SUPPORTED") != std::wstring::npos);
+        }
+
+        WslConfigChange config(LxssGenerateTestConfig());
+        VERIFY_ARE_EQUAL(0u, LxsstuLaunchWsl(L"--exec true"));
     }
 
     WSL2_TEST_METHOD(WriteWslConfig)
@@ -5849,7 +5905,8 @@ VERSION_ID="Invalid|Format"
                 WI_DIAGNOSTICS_INFO, []() { LxsstuLaunchWsl(L"--unregister test-overridden-default-location"); });
 
             auto currentPath = std::filesystem::current_path();
-            WslConfigChange wslconfig(std::format(L"[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
+            WslConfigChange wslconfig(
+                LxssGenerateTestConfig() + std::format(L"\n[general]\ndistributionInstallPath = {}", EscapePath(currentPath.wstring())));
 
             InstallFromTar(g_testDistroPath.c_str(), L"--name test-overridden-default-location");
             ValidateDistributionStarts(L"test-overridden-default-location");
@@ -7681,8 +7738,9 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         ValidateOutput(
             L"echo ok",
             FormatErrorMessage(
-                wsl::shared::Localization::MessageFailedToAttachDisk(vhdPath, GetSystemErrorString(E_ACCESSDENIED)),
-                L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"),
+                LxsstuOpenVmmMode() ? GetSystemErrorString(E_ACCESSDENIED)
+                                    : wsl::shared::Localization::MessageFailedToAttachDisk(vhdPath, GetSystemErrorString(E_ACCESSDENIED)),
+                LxsstuOpenVmmMode() ? L"Wsl/Service/CreateInstance/CreateVm/OpenVmm/E_ACCESSDENIED" : L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"),
             L"");
     }
 
@@ -7785,8 +7843,11 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
                     VERIFY_ARE_EQUAL(
                         out,
                         FormatErrorMessage(
-                            wsl::shared::Localization::MessageFailedToAttachDisk(path.wstring(), GetSystemErrorString(E_ACCESSDENIED)),
-                            L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"));
+                            LxsstuOpenVmmMode()
+                                ? GetSystemErrorString(E_ACCESSDENIED)
+                                : wsl::shared::Localization::MessageFailedToAttachDisk(path.wstring(), GetSystemErrorString(E_ACCESSDENIED)),
+                            LxsstuOpenVmmMode() ? L"Wsl/Service/CreateInstance/CreateVm/OpenVmm/E_ACCESSDENIED"
+                                                : L"Wsl/Service/CreateInstance/CreateVm/E_ACCESSDENIED"));
                 }
             }
         }
