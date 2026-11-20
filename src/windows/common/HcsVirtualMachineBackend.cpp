@@ -155,8 +155,10 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
     memory.AllowOvercommit = validation::ValidateFeature(Request.AllowOvercommit, L"memory overcommit", true);
     memory.DeferredCommit = validation::ValidateFeature(Request.DeferredCommit, L"deferred memory commit", true);
     memory.ColdDiscard = validation::ValidateFeature(Request.ColdDiscard, L"cold discard", true);
+    THROW_HR_IF(E_INVALIDARG, Request.SmallPageBacking != VmFeatureRequest::Disabled && Request.LargePageBacking != VmFeatureRequest::Disabled);
     memory.SmallPageBacking =
         validation::ValidateFeature(Request.SmallPageBacking, L"small-page memory", schema::IsSmallPageMemorySupported());
+    memory.LargePageBacking = validation::ValidateFeature(Request.LargePageBacking, L"large-page memory", true);
     THROW_HR_IF(
         E_INVALIDARG,
         (memory.SmallPageBacking || Request.FaultClusterSizeShift.has_value() || Request.DirectMapFaultClusterSizeShift.has_value()) &&
@@ -175,6 +177,10 @@ VmEffectiveMemory ConfigureMemory(const VmMemoryRequest& Request, const VmMmioRe
     if (memory.SmallPageBacking)
     {
         Settings.BackingPageSize = schema::MemoryBackingPageSize::Small;
+    }
+    else if (memory.LargePageBacking)
+    {
+        Settings.BackingPageSize = schema::MemoryBackingPageSize::Large;
     }
     Settings.FaultClusterSizeShift = memory.FaultClusterSizeShift;
     Settings.DirectMapFaultClusterSizeShift = memory.DirectMapFaultClusterSizeShift;
@@ -585,6 +591,7 @@ VmPlatformCapabilities HcsVirtualMachineBackend::QueryCapabilities()
          {VmFeature::DeferredMemoryCommit,
           VmFeature::ColdDiscard,
           VmFeature::SmallPageMemory,
+          VmFeature::LargePageMemory,
           VmFeature::SerialConsole,
           VmFeature::VirtioConsole,
           VmFeature::PhysicalDisk,

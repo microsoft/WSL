@@ -15,6 +15,7 @@ Abstract:
 
 #include "precomp.h"
 #include "hcs.hpp"
+#include "helpers.hpp"
 #include <ComputeCore.h>
 #include "WslCoreNetworkEndpointSettings.h"
 #include "wslutil.h"
@@ -189,6 +190,28 @@ void wsl::windows::common::hcs::AddVhdWithAccess(
     {
         THROW_IF_FAILED(result);
     }
+}
+
+bool wsl::windows::common::hcs::IsSmallMemoryBackingPagesSupported(_In_ ULONG buildNumber, _In_ DWORD updateBuildRevision)
+{
+    using helpers::WindowsBuildNumbers;
+    if (buildNumber >= WindowsBuildNumbers::Germanium)
+    {
+        return true;
+    }
+
+    // Revision numbers are only comparable within the same release range.
+    if (buildNumber >= WindowsBuildNumbers::Cobalt)
+    {
+        return updateBuildRevision >= 2360;
+    }
+
+    if (buildNumber >= WindowsBuildNumbers::Iron)
+    {
+        return updateBuildRevision >= 1970;
+    }
+
+    return buildNumber >= WindowsBuildNumbers::Vibranium_22H2 && updateBuildRevision >= 3393;
 }
 
 wsl::windows::common::hcs::unique_hcs_operation wsl::windows::common::hcs::CreateOperation()
@@ -600,9 +623,5 @@ bool wsl::windows::common::hcs::IsDisableVgpuSettingsSupported()
 bool wsl::windows::common::hcs::IsSmallPageMemorySupported()
 {
     const auto version = wsl::windows::common::helpers::GetWindowsVersion();
-    using wsl::windows::common::helpers::WindowsBuildNumbers;
-    return (version.BuildNumber >= WindowsBuildNumbers::Germanium) ||
-           (version.BuildNumber >= WindowsBuildNumbers::Cobalt && version.UpdateBuildRevision >= 2360) ||
-           (version.BuildNumber >= WindowsBuildNumbers::Iron && version.UpdateBuildRevision >= 1970) ||
-           (version.BuildNumber >= WindowsBuildNumbers::Vibranium_22H2 && version.UpdateBuildRevision >= 3393);
+    return IsSmallMemoryBackingPagesSupported(version.BuildNumber, version.UpdateBuildRevision);
 }
