@@ -558,15 +558,6 @@ Return Value:
     }
 
     //
-    // Get the current working directory for relative path translations.
-    //
-
-    if (getcwd(UnixCwd, sizeof(UnixCwd)) == NULL)
-    {
-        goto WslPathTranslateExit;
-    }
-
-    //
     // Get the canonical path.
     //
 
