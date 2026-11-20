@@ -209,7 +209,7 @@ Return Value:
         }
         else
         {
-            if (RemoveSegmentCount == 0 && (SegmentLength == 0 || (SegmentLength == 1 && Segment[0] == '.')))
+            if (SegmentLength == 0 || (SegmentLength == 1 && Segment[0] == '.'))
             {
                 RemoveSegmentCount++;
             }
@@ -554,15 +554,6 @@ Return Value:
         break;
 
     default:
-        goto WslPathTranslateExit;
-    }
-
-    //
-    // Get the current working directory for relative path translations.
-    //
-
-    if (getcwd(UnixCwd, sizeof(UnixCwd)) == NULL)
-    {
         goto WslPathTranslateExit;
     }
 
