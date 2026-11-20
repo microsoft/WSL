@@ -47,6 +47,9 @@ _(CapAdd,           "cap-add",              NO_ALIAS,         Kind::Value,      
 _(CapDrop,          "cap-drop",             NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CapDropArgDescription()) \
 _(CIDFile,          "cidfile",              NO_ALIAS,         Kind::Value,      NoConversion, Localization::WSLCCLI_CIDFileArgDescription()) \
 _(Command,          "command",              NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_CommandArgDescription()) \
+_(ComposeFile,      "file",                 L"f",             Kind::Value,      NoConversion, Localization::WSLCCLI_ComposeFileArgDescription()) \
+_(ComposeProjectDirectory, "project-directory", NO_ALIAS,     Kind::Value,      NoConversion, Localization::WSLCCLI_ComposeProjectDirectoryArgDescription()) \
+_(ComposeProjectName, "project-name",       L"p",             Kind::Value,      NoConversion, Localization::WSLCCLI_ComposeProjectNameArgDescription()) \
 _(ContainerId,      "container-id",         NO_ALIAS,         Kind::Positional, NoConversion, Localization::WSLCCLI_ContainerIdArgDescription()) \
 _(Cpus,             "cpus",                 NO_ALIAS,         Kind::Value,      int64_t,      Localization::WSLCCLI_CpusArgDescription()) \
 _(Force,            "force",                L"f",             Kind::Flag,       NoConversion, Localization::WSLCCLI_ForceArgDescription()) \

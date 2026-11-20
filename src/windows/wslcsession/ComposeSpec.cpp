@@ -94,7 +94,8 @@ namespace {
         return result;
     }
 
-    ComposeContainerDefinition::Volume ParseComposeVolume(const std::filesystem::path& path, const std::string& serviceName, const YAML::Node& node)
+    ComposeContainerDefinition::Volume ParseComposeVolume(
+        const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& serviceName, const YAML::Node& node)
     {
         if (!node.IsScalar())
         {
@@ -135,7 +136,7 @@ namespace {
             };
         }
 
-        const auto resolvedPath = sourcePath.is_absolute() ? sourcePath : std::filesystem::absolute(path.parent_path() / sourcePath);
+        const auto resolvedPath = sourcePath.is_absolute() ? sourcePath : std::filesystem::absolute(baseDirectory / sourcePath);
         return {
             .HostPath = resolvedPath.lexically_normal().wstring(),
             .ContainerPath = std::move(destination),
@@ -174,7 +175,7 @@ namespace {
         };
     }
 
-    ComposeSpec ParseComposeFile(const std::filesystem::path& path, const std::string& content)
+    ComposeSpec ParseComposeFile(const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& content)
     {
         const auto root = YAML::Load(content);
         if (!root.IsMap())
@@ -298,7 +299,7 @@ namespace {
                 definition.Volumes.reserve(volumes.size());
                 for (const auto& volume : volumes)
                 {
-                    definition.Volumes.emplace_back(ParseComposeVolume(path, serviceName, volume));
+                    definition.Volumes.emplace_back(ParseComposeVolume(path, baseDirectory, serviceName, volume));
                 }
             }
 
@@ -325,11 +326,11 @@ namespace {
 
 } // namespace
 
-ComposeSpec ComposeSpec::Parse(const std::filesystem::path& path, const std::string& content)
+ComposeSpec ComposeSpec::Parse(const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& content)
 {
     try
     {
-        return ParseComposeFile(path, content);
+        return ParseComposeFile(path, baseDirectory, content);
     }
     catch (const YAML::Exception& exception)
     {
