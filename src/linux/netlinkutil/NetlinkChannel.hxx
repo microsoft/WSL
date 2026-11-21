@@ -4,7 +4,9 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <linux/netlink.h>
+#include <linux/inet_diag.h>
 #include <linux/rtnetlink.h>
+#include <linux/sock_diag.h>
 #include <unistd.h>
 #include <string.h>
 #include <atomic>
@@ -12,7 +14,7 @@
 #include "NetlinkChannel.h"
 #include "Syscall.h"
 
-inline NetlinkChannel::NetlinkChannel(int socketType, int netlinkFamily, int groups)
+inline NetlinkChannel::NetlinkChannel(int socketType, int netlinkFamily, int groups) : m_netlinkFamily(netlinkFamily)
 {
     m_socket.reset(Syscall(::socket, AF_NETLINK, socketType, netlinkFamily));
 
@@ -31,6 +33,7 @@ inline NetlinkChannel::NetlinkChannel(NetlinkChannel&& other)
 inline const NetlinkChannel& NetlinkChannel::operator=(NetlinkChannel&& other)
 {
     m_socket = std::move(other.m_socket);
+    m_netlinkFamily = other.m_netlinkFamily;
 
     return *this;
 }
@@ -43,14 +46,32 @@ inline NetlinkChannel::~NetlinkChannel()
 {
 }
 
-inline NetlinkChannel NetlinkChannel::FromFd(int fd)
+inline NetlinkChannel NetlinkChannel::FromFd(int fd, int netlinkFamily)
 {
     assert(fd != -1);
 
     NetlinkChannel channel(Tag{});
     channel.m_socket.reset(fd);
+    channel.m_netlinkFamily = netlinkFamily;
 
     return channel;
+}
+
+inline bool NetlinkChannel::IsDumpRequest(const nlmsghdr& request) const
+{
+    if (m_netlinkFamily == NETLINK_ROUTE)
+    {
+        // Routing message kinds repeat in groups of four: NEW, DEL, GET, SET.
+        const bool get = request.nlmsg_type >= RTM_BASE && (request.nlmsg_type - RTM_BASE) % 4 == RTM_GETLINK - RTM_BASE;
+        return get && (request.nlmsg_flags & NLM_F_DUMP) != 0;
+    }
+    if (m_netlinkFamily == NETLINK_SOCK_DIAG)
+    {
+        const bool get = request.nlmsg_type == SOCK_DIAG_BY_FAMILY || request.nlmsg_type == TCPDIAG_GETSOCK ||
+                         request.nlmsg_type == DCCPDIAG_GETSOCK;
+        return get && (request.nlmsg_flags & NLM_F_DUMP) != 0;
+    }
+    return (request.nlmsg_flags & NLM_F_DUMP) == NLM_F_DUMP;
 }
 
 inline NetlinkTransaction NetlinkChannel::CreateTransactionImpl(std::vector<char>&& message, int type, int flags)
