@@ -107,6 +107,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_DISTRIBUTION_NAME_NEEDED),
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
+    X(WSL_E_HYPERVISOR_PLATFORM_NOT_INSTALLED),
+    X(WSL_E_OPENVMM_REQUIRES_WINDOWS_11),
     X(WSL_E_NOT_A_LINUX_DISTRO),
     X(WSLC_E_CONTAINER_DISABLED),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
@@ -915,6 +917,12 @@ std::wstring wsl::windows::common::wslutil::GetErrorString(HRESULT result)
     case WSL_E_DISK_CORRUPTED:
         return Localization::MessageDiskCorrupted();
 
+    case WSL_E_HYPERVISOR_PLATFORM_NOT_INSTALLED:
+        return Localization::MessageOpenVmmHypervisorPlatformNotInstalled();
+
+    case WSL_E_OPENVMM_REQUIRES_WINDOWS_11:
+        return Localization::MessageOpenVmmRequiresWindows11();
+
     case WSL_E_NOT_A_LINUX_DISTRO:
         return Localization::MessageInvalidDistributionTar();
 
@@ -1403,6 +1411,17 @@ bool wsl::windows::common::wslutil::IsVirtualMachinePlatformInstalled()
     try
     {
         return WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameVmp);
+    }
+    CATCH_LOG()
+
+    return true;
+}
+
+bool wsl::windows::common::wslutil::IsHypervisorPlatformInstalled()
+{
+    try
+    {
+        return WslInstall::IsOptionalComponentInstalled(WslInstall::c_optionalFeatureNameWhp);
     }
     CATCH_LOG()
 

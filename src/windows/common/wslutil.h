@@ -269,6 +269,9 @@ bool IsVhdFile(_In_ const std::filesystem::path& path);
 
 bool IsVirtualMachinePlatformInstalled();
 
+// Returns true if the Windows Hypervisor Platform is enabled, or if its state can't be queried.
+bool IsHypervisorPlatformInstalled();
+
 std::vector<DWORD> ListRunningProcesses();
 
 // An immutable container repository reference. Holds the original repository token together with its normalized

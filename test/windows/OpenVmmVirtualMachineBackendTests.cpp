@@ -1134,13 +1134,13 @@ class OpenVmmVirtualMachineBackendTests
     }
 };
 
-// Runs in the HCS WSL2 pass of every image, including images without the Windows Hypervisor Platform, to verify that
-// OpenVMM either boots or reports that no hypervisor is available instead of failing with an unrelated error.
+// Runs in the HCS WSL2 pass of every image, including Windows 10 and images without the Windows Hypervisor Platform, to
+// verify that OpenVMM either boots or reports the unmet host requirement instead of failing with an unrelated error.
 class OpenVmmHypervisorAvailabilityTests
 {
     WSL_TEST_CLASS(OpenVmmHypervisorAvailabilityTests)
 
-    TEST_METHOD(BootsOrReportsMissingHypervisor)
+    TEST_METHOD(BootsOrReportsUnsupportedHost)
     {
         SKIP_TEST_ARM64();
         if (!LxsstuVmMode())
@@ -1177,7 +1177,15 @@ class OpenVmmHypervisorAvailabilityTests
             backend->Terminate();
         }
 
-        if (FAILED(result))
+        if (!helpers::IsWindows11OrAbove())
+        {
+            VERIFY_ARE_EQUAL(WSL_E_OPENVMM_REQUIRES_WINDOWS_11, result);
+        }
+        else if (whpInstalled == false)
+        {
+            VERIFY_ARE_EQUAL(WSL_E_HYPERVISOR_PLATFORM_NOT_INSTALLED, result);
+        }
+        else if (FAILED(result))
         {
             VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_HV_NOT_PRESENT), result);
         }

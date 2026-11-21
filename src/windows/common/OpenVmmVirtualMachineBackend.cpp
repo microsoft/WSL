@@ -327,6 +327,17 @@ std::unique_ptr<OpenVmmVirtualMachineBackend> OpenVmmVirtualMachineBackend::Crea
     {
         auto description = wsl::windows::common::vm::openvmm::ValidateCreateRequest(Request);
 
+        // OpenVMM needs the Windows Hypervisor Platform as it is in Windows 11, which 'wsl --install' doesn't enable because
+        // OpenVMM is opt-in. Check both here, since OpenVMM's own failures don't reliably identify the cause.
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSL_E_OPENVMM_REQUIRES_WINDOWS_11,
+            wsl::shared::Localization::MessageOpenVmmRequiresWindows11(),
+            !wsl::windows::common::helpers::IsWindows11OrAbove());
+        THROW_HR_WITH_USER_ERROR_IF(
+            WSL_E_HYPERVISOR_PLATFORM_NOT_INSTALLED,
+            wsl::shared::Localization::MessageOpenVmmHypervisorPlatformNotInstalled(),
+            !wsl::windows::common::wslutil::IsHypervisorPlatformInstalled());
+
         backend.reset(new OpenVmmVirtualMachineBackend{});
         backend->m_description = std::move(description);
         backend->Initialize(Request);
@@ -518,7 +529,7 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         THROW_HR_WITH_USER_ERROR(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed());
     }
 
-    // OpenVMM runs on the Windows Hypervisor Platform, which 'wsl --install' doesn't enable because OpenVMM is opt-in.
+    // The platform can still report no hypervisor, for instance when virtualization is turned off in firmware.
     THROW_HR_WITH_USER_ERROR_IF(
         createResult, wsl::shared::Localization::MessageOpenVmmHypervisorNotPresent(), createResult == HRESULT_FROM_WIN32(ERROR_HV_NOT_PRESENT));
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");

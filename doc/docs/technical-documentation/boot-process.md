@@ -58,7 +58,7 @@ To start a WSL2 distribution, [wslservice.exe](wslservice.exe.md) needs a virtua
 
 By default, the WSL2 virtual machine is created via the [Host Compute System (HCS) service](https://learn.microsoft.com/virtualization/api/hcs/overview). `src/windows/service/exe/WslCoreVm.cpp` owns WSL-specific policy and guest startup. It passes a `VmCreateRequest` to the selected backend, which owns the virtual machine configuration and lifetime.
 
-The experimental OpenVMM configuration requires the following `.wslconfig` profile. Backend selection is not yet wired up on this branch:
+The experimental OpenVMM backend requires Windows 11 or later with the Windows Hypervisor Platform optional component enabled. `wsl --install` doesn't enable it, since OpenVMM is opt-in. It also requires the following `.wslconfig` profile:
 
 ```ini
 [wsl2]
@@ -70,7 +70,6 @@ nestedVirtualization=false
 hardwarePerformanceCounters=false
 firewall=false
 dnsTunneling=false
-ipv6=false
 
 [experimental]
 openVmm=true
