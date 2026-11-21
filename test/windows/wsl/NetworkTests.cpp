@@ -6001,6 +6001,21 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
+        if (LxsstuOpenVmmMode())
+        {
+            // OpenVMM's NAT uses wsl2.macAddress.
+            m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode(), .macAddress = L"02:11:22:33:44:56"}));
+            VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"02:11:22:33:44:56"));
+
+            // Without one, WSL generates a locally administered unicast address that persists across restarts.
+            m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
+            const auto generated = GetMacAddress(L"eth0");
+            VERIFY_ARE_EQUAL(0x02ul, std::stoul(generated.substr(0, 2), nullptr, 16) & 0x03);
+            RestartWslService();
+            VERIFY_ARE_EQUAL(generated, GetMacAddress(L"eth0"));
+            return;
+        }
+
         m_config->Update(LxssGenerateTestConfig({.networkingMode = ConsommeMode()}));
 
         // eth0 should have wsldevicehost's default client MAC. Update if that default changes.

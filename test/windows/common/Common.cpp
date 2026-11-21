@@ -1607,6 +1607,11 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     {
     case wsl::core::NetworkingMode::Nat:
     {
+        if (Default.macAddress.has_value())
+        {
+            newConfig += L"macAddress=" + *Default.macAddress + L"\n";
+        }
+
         if (Default.dnsProxy.has_value())
         {
             newConfig += boolOptionToString(L"dnsProxy", Default.dnsProxy, false);
