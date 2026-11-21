@@ -1104,6 +1104,12 @@ class UnitTests
 
             for (const auto enabled : {true, false})
             {
+                // OpenVMM doesn't support GUI applications.
+                if (enabled && LxsstuOpenVmmMode())
+                {
+                    continue;
+                }
+
                 config.Update(LxssGenerateTestConfig({.guiApplications = enabled}));
 
 #ifdef WSL_DEV_INSTALL_PATH
@@ -4073,7 +4079,8 @@ EOF
             VERIFY_IS_TRUE(output.find(L"experimental.openVmm=true") != std::wstring::npos);
             VERIFY_IS_TRUE(output.find(L"wsl2.nestedVirtualization=true") != std::wstring::npos);
             VERIFY_IS_TRUE(output.find(L"wsl2.nestedVirtualization=false") != std::wstring::npos);
-            VERIFY_IS_TRUE(output.find(L"OpenVmm/ERROR_NOT_SUPPORTED") != std::wstring::npos);
+            // The configuration is rejected before the OpenVMM backend is created.
+            VERIFY_IS_TRUE(output.find(L"Wsl/Service/CreateInstance/CreateVm/ERROR_NOT_SUPPORTED") != std::wstring::npos);
         }
 
         WslConfigChange config(LxssGenerateTestConfig());
@@ -9055,14 +9062,18 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         VERIFY_ARE_NOT_EQUAL(cgroupNamespace1, cgroupNamespace2);
 
-        const auto systemDistroArguments = std::format(L"-d {} --system ", LXSS_DISTRO_NAME_TEST_L);
-        const auto systemDistroCgroup = getOutput(systemDistroArguments + L"cat -e /proc/self/cgroup");
-        const auto systemDistroCgroupNamespace = getOutput(systemDistroArguments + L"readlink /proc/self/ns/cgroup");
-        const auto systemDistroCgroupRoot = getOutput(systemDistroArguments + L"findmnt -n -o FSROOT /sys/fs/cgroup");
+        // The system distribution only runs with GUI applications, which OpenVMM doesn't support.
+        if (!LxsstuOpenVmmMode())
+        {
+            const auto systemDistroArguments = std::format(L"-d {} --system ", LXSS_DISTRO_NAME_TEST_L);
+            const auto systemDistroCgroup = getOutput(systemDistroArguments + L"cat -e /proc/self/cgroup");
+            const auto systemDistroCgroupNamespace = getOutput(systemDistroArguments + L"readlink /proc/self/ns/cgroup");
+            const auto systemDistroCgroupRoot = getOutput(systemDistroArguments + L"findmnt -n -o FSROOT /sys/fs/cgroup");
 
-        VERIFY_ARE_EQUAL(systemDistroCgroup, cgroup1);
-        VERIFY_ARE_EQUAL(systemDistroCgroupNamespace, cgroupNamespace1);
-        VERIFY_ARE_EQUAL(systemDistroCgroupRoot, std::wstring(L"/\n"));
+            VERIFY_ARE_EQUAL(systemDistroCgroup, cgroup1);
+            VERIFY_ARE_EQUAL(systemDistroCgroupNamespace, cgroupNamespace1);
+            VERIFY_ARE_EQUAL(systemDistroCgroupRoot, std::wstring(L"/\n"));
+        }
 
         const auto cgroupRoot = getOutput(L"findmnt -n -o FSROOT /sys/fs/cgroup");
         VERIFY_ARE_EQUAL(cgroupRoot, std::wstring(L"/\n"));

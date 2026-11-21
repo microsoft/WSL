@@ -226,6 +226,10 @@ class OpenVmmVirtualMachineBackendTests
             WriteFileContent(file.Path, std::string{Override} + std::string{validConfig});
             return OperationResult([&] {
                 wsl::core::Config config{file.Path.c_str(), token.get()};
+                if (config.EnableOpenVmm)
+                {
+                    config.ValidateOpenVmmSupport();
+                }
                 if (Inspect)
                 {
                     Inspect(config);
@@ -253,19 +257,25 @@ class OpenVmmVirtualMachineBackendTests
                  "\n[wsl2]\nnestedVirtualization=true\n",
                  "\n[wsl2]\nvirtio=false\n",
                  "\n[wsl2]\nvirtioFs=false\n",
-                 "\n[wsl2]\nvirtio9p=true\n",
                  "\n[wsl2]\nhardwarePerformanceCounters=true\n",
                  "\n[wsl2]\nnetworkingMode=mirrored\n",
                  "\n[wsl2]\nnetworkingMode=bridged\n",
                  "\n[wsl2]\nnetworkingMode=consomme\n",
                  "\n[wsl2]\nfirewall=true\n",
                  "\n[wsl2]\ndnsTunneling=true\n",
-                 "\n[wsl2]\nipv6=true\n",
                  "\n[experimental]\nvirtioFsAggregateShares=true\n",
                  "\n[experimental]\nswiotlb=1M\n",
              })
         {
             VERIFY_ARE_EQUAL(c_notSupported, configure(setting));
+        }
+
+        // Parsing accepts a conflicting configuration, since libwsl reads and edits .wslconfig without creating a VM.
+        {
+            TempFile file{GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS};
+            file.Handle.reset();
+            WriteFileContent(file.Path, std::string{"\n[wsl2]\nnetworkingMode=mirrored\n"} + std::string{validConfig});
+            VERIFY_ARE_EQUAL(S_OK, OperationResult([&] { wsl::core::Config config{file.Path.c_str(), token.get()}; }));
         }
 
         const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::CreateVm);

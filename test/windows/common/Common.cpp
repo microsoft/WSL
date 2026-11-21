@@ -1564,8 +1564,13 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         L"telemetry=false\n" +
         boolOptionToString(L"safeMode", Default.safeMode, false) + boolOptionToString(L"guiApplications", Default.guiApplications, true) +
         boolOptionToString(L"earlyBootLogging", Default.earlyBootLogging, false) +
-        boolOptionToString(L"localhostForwarding", Default.localhostForwarding, true) +
         networkingModeToString(Default.networkingMode) + drvFsModeToString(Default.drvFsMode);
+
+    // Only written when set: WSL warns that localhostForwarding has no effect in mirrored mode.
+    if (Default.localhostForwarding.has_value())
+    {
+        newConfig += boolOptionToString(L"localhostForwarding", Default.localhostForwarding, true);
+    }
 
     if (Default.kernel.has_value())
     {

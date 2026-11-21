@@ -167,6 +167,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
     const auto backendKind = m_vmConfig.EnableOpenVmm ? BackendKind::OpenVmm : BackendKind::Hcs;
+    if (backendKind == BackendKind::OpenVmm)
+    {
+        m_vmConfig.ValidateOpenVmmSupport();
+    }
 
     // create a restricted version of the token.
     m_userToken = UserToken;
