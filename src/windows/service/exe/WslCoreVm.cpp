@@ -21,6 +21,7 @@ Abstract:
 #include "disk.hpp"
 #include "WslCoreInstance.h"
 #include "NatNetworking.h"
+#include "OpenVmmNatNetworking.h"
 #include "BridgedNetworking.h"
 #include "MirroredNetworking.h"
 #include "WslCoreFirewallSupport.h"
@@ -165,6 +166,11 @@ std::unique_ptr<WslCoreVm> WslCoreVm::Create(
 void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken)
 {
     auto signalEarlyTermination = wil::scope_exit([&] { m_terminatingEvent.SetEvent(); });
+    const auto backendKind = m_vmConfig.EnableOpenVmm ? BackendKind::OpenVmm : BackendKind::Hcs;
+    if (backendKind == BackendKind::OpenVmm)
+    {
+        m_vmConfig.ValidateOpenVmmSupport();
+    }
 
     // create a restricted version of the token.
     m_userToken = UserToken;
@@ -302,15 +308,18 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
     // If the system supports virtio console serial ports, use dmesg capture for telemetry and/or debug output.
     // Legacy serial is much slower, so this is not enabled without virtio console support.
-    auto enableVirtioSerial = m_vmConfig.EnableVirtio && helpers::IsVirtioSerialConsoleSupported();
+    // OpenVMM always provides virtio console ports.
+    const auto enableVirtioSerial =
+        m_vmConfig.EnableVirtio && (backendKind != BackendKind::Hcs || helpers::IsVirtioSerialConsoleSupported());
     m_vmConfig.EnableDebugShell &= enableVirtioSerial;
     if (enableVirtioSerial)
     {
         try
         {
             bool enableTelemetry = TraceLoggingProviderEnabled(g_hTraceLoggingProvider, WINEVENT_LEVEL_INFO, 0);
+            const auto consolePipeClientSid = GetConsolePipeClientSid(backendKind);
             m_dmesgCollector = DmesgCollector::Create(
-                VmId, m_vmExitEvent.get(), enableTelemetry, m_vmConfig.EnableDebugConsole, m_comPipe0, m_vmConfig.EnableEarlyBootLogging, {});
+                VmId, m_vmExitEvent.get(), enableTelemetry, m_vmConfig.EnableDebugConsole, m_comPipe0, m_vmConfig.EnableEarlyBootLogging, {}, consolePipeClientSid);
 
             WSL_LOG("DMESG collector created");
 
@@ -320,7 +329,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
 
             // Initialize the guest telemetry logger.
-            m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent);
+            m_gnsTelemetryLogger = GuestTelemetryLogger::Create(VmId, m_vmExitEvent, consolePipeClientSid);
         }
         CATCH_LOG()
     }
@@ -351,12 +360,12 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         CATCH_LOG()
     }
 
-    // Create the utility VM through the backend. WslCoreVm owns WSL protocol and product policy;
-    // the backend owns HCS configuration and the compute-system lifetime.
-    auto backendRequest = GenerateBackendRequest(VmId);
+    // Create the utility VM through the selected backend. WslCoreVm owns WSL protocol and
+    // product policy; the backend owns the platform-specific virtual machine lifetime.
+    auto backendRequest = GenerateBackendRequest(VmId, backendKind);
     {
-        SlowOperationWatcher slowOperation{"HcsCreateSystem"};
-        m_backend = HcsVirtualMachineBackend::Create(backendRequest);
+        SlowOperationWatcher slowOperation{"CreateVirtualMachineBackend"};
+        m_backend = CreateVirtualMachineBackend(backendKind, backendRequest);
     }
     m_vmCrashEvent = m_backend->GetCrashEvent();
     m_runtimeId = m_backend->GetDescription().Identity.VmId;
@@ -498,7 +507,10 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     // requested via the kernel command line; otherwise the kernel correctly doesn't allocate.
     if (m_hvPciSwiotlbBase != 0 && m_hvPciSwiotlbSize != 0)
     {
-        m_backend->ConfigureGuestDma({m_hvPciSwiotlbBase, m_hvPciSwiotlbSize});
+        if (m_backend->GetCapabilities().Features.test(static_cast<size_t>(VmFeature::GuestDmaWindow)))
+        {
+            m_backend->ConfigureGuestDma({m_hvPciSwiotlbBase, m_hvPciSwiotlbSize});
+        }
     }
     else if (m_vmConfig.SwiotlbSizeBytes != 0)
     {
@@ -617,7 +629,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
     message->EnableDebugShell = m_vmConfig.EnableDebugShell;
     message->EnableSafeMode = m_vmConfig.EnableSafeMode;
     // Consomme forwards DNS via the host proxy, so the dedicated DNS hvsocket is only used by NAT and Mirrored modes.
-    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::Consomme;
+    message->EnableDnsTunneling = m_vmConfig.EnableDnsTunneling && m_vmConfig.NetworkingMode != NetworkingMode::Consomme &&
+                                  backendKind != BackendKind::OpenVmm;
     message->DefaultKernel = m_defaultKernel;
     message->IsolateDistroCgroup = m_vmConfig.IsolateDistroCgroup;
     message->KernelModulesDeviceId = m_kernelModulesDeviceId;
@@ -651,7 +664,7 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
         // For NAT networking, ensure the network can be created. If creating the network fails, fall back to
         // Consomme networking mode.
         wsl::windows::common::hcs::unique_hcn_network natNetwork;
-        if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+        if (backendKind == BackendKind::Hcs && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
         {
             {
                 SlowOperationWatcher slowOperation{"CreateNatNetwork"};
@@ -668,6 +681,31 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
         // Create and initialize the networking engine.
         const auto result = wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
+            if (backendKind == BackendKind::OpenVmm)
+            {
+                // OpenVMM serves its NIC with a built-in user-mode NAT; configuration validation limits it to NAT or no networking.
+                if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+                {
+                    const auto description = m_backend->GetDescription();
+                    const auto loopbackAdapter = description.NetworkAdapters.find(L"loopback0");
+                    m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
+                        *m_backend,
+                        description.NetworkAdapters.at(L"eth0"),
+                        loopbackAdapter == description.NetworkAdapters.end() ? std::optional<VmNetworkAttachment>{}
+                                                                             : loopbackAdapter->second,
+                        std::move(gnsChannel),
+                        m_vmConfig.EnableLocalhostRelay,
+                        m_vmConfig.EnableDnsTunneling);
+                    m_networkingEngine->Initialize();
+                }
+                else
+                {
+                    WI_ASSERT(m_vmConfig.NetworkingMode == NetworkingMode::None);
+                }
+
+                return;
+            }
+
             // N.B. The existing networking engines still manage HCS resources directly. Keep this
             // concrete escape hatch localized here until they are moved onto IVirtualMachineBackend.
             auto& hcsBackend = static_cast<HcsVirtualMachineBackend&>(*m_backend);
@@ -948,17 +986,21 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
 {
     THROW_HR_IF(HCS_E_TERMINATED, !m_backend || m_backend->GetState() == VmState::Stopped);
 
-    // Allow the Plan 9 server to create NT symlinks.
-    //
-    // N.B. This may fail for unelevated users, however symlink creation will
-    //      succeed even without this privilege if developer mode is enabled.
-    wsl::windows::common::security::EnableTokenPrivilege(UserToken, SE_CREATE_SYMBOLIC_LINK_NAME);
+    // OpenVMM serves DrvFs only over virtio-fs, which configuration validation requires.
+    if (m_backend->GetDescription().Backend == BackendKind::Hcs)
+    {
+        // Allow the Plan 9 server to create NT symlinks.
+        //
+        // N.B. This may fail for unelevated users, however symlink creation will
+        //      succeed even without this privilege if developer mode is enabled.
+        wsl::windows::common::security::EnableTokenPrivilege(UserToken, SE_CREATE_SYMBOLIC_LINK_NAME);
 
-    // Set the 9p port and virtio tag.
-    const UINT32 port = Admin ? LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT : LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT;
-    const PCWSTR tag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
-    AddPlan9Share(
-        TEXT(LX_INIT_UTILITY_VM_DRVFS_SHARE_NAME), L"\\\\?", port, (hcs::Plan9ShareFlags::AllowOptions | hcs::Plan9ShareFlags::AllowSubPaths), UserToken, tag);
+        // Set the 9p port and virtio tag.
+        const UINT32 port = Admin ? LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT : LX_INIT_UTILITY_VM_PLAN9_DRVFS_PORT;
+        const PCWSTR tag = Admin ? TEXT(LX_INIT_DRVFS_ADMIN_VIRTIO_TAG) : TEXT(LX_INIT_DRVFS_VIRTIO_TAG);
+        AddPlan9Share(
+            TEXT(LX_INIT_UTILITY_VM_DRVFS_SHARE_NAME), L"\\\\?", port, (hcs::Plan9ShareFlags::AllowOptions | hcs::Plan9ShareFlags::AllowSubPaths), UserToken, tag);
+    }
 
     const auto virtiofsInitialized = Admin ? m_adminDrvfsToken.is_valid() : m_drvfsToken.is_valid();
     if (m_vmConfig.EnableVirtioFs && !virtiofsInitialized)
@@ -1298,6 +1340,26 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         DefaultUid,
         ClientLifetimeId,
         m_initializeDrvFs,
+        [this](ULONG Port, HANDLE ExitHandle) { return m_backend->ConnectGuest(GuestServicePort{Port}, ExitHandle); },
+        m_backend->GetGuestConnector(),
+        [this](ULONG Port) -> std::shared_ptr<const std::filesystem::path> {
+            auto socket = m_backend->CreateHostSocket(GuestServicePort{Port});
+            if (!socket)
+            {
+                return nullptr;
+            }
+
+            // N.B. Instances are stopped, releasing the socket, before the VM is terminated.
+            return {new std::filesystem::path{socket->Path}, [this, id = socket->Id](const std::filesystem::path* Path) {
+                        try
+                        {
+                            m_backend->CloseHostSocket(id);
+                        }
+                        CATCH_LOG()
+
+                        delete Path;
+                    }};
+        },
         featureFlags,
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
@@ -1320,6 +1382,12 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
             return false;
         }
 
+        // Matching paths don't need the VHD reopened, which fails if the backend holds it exclusively.
+        if (TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath))
+        {
+            return true;
+        }
+
         if (!disk.PassThrough)
         {
             if (TargetPath == nullptr)
@@ -1334,7 +1402,7 @@ std::pair<int, LX_MINI_MOUNT_STEP> WslCoreVm::DetachDisk(_In_opt_ PCWSTR Disk)
             return std::filesystem::equivalent(disk.Path, TargetPath, error);
         }
 
-        return TargetPath == nullptr || wsl::windows::common::string::IsPathComponentEqual(disk.Path, TargetPath);
+        return false;
     };
 
     auto lock = m_lock.lock_exclusive();
@@ -1407,7 +1475,14 @@ std::optional<VmFileSystemShare> WslCoreVm::FindVirtioFsShare(_In_ PCWSTR Tag, _
     });
 }
 
-VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
+PSID WslCoreVm::GetConsolePipeClientSid(BackendKind Backend)
+{
+    // The OpenVMM process runs as the user and connects to the console pipes the service creates. The default pipe
+    // security only grants non-elevated users read access, so those pipes must explicitly grant the user access.
+    return Backend == BackendKind::OpenVmm ? &m_userSid.Sid : nullptr;
+}
+
+VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind Backend)
 {
     VmCreateRequest request{};
     request.Identity = {VmId, m_userToken};
@@ -1419,10 +1494,13 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     request.Processor.PerfmonLbr = request.Processor.PerfmonPmu;
 
     request.Memory.SizeBytes = (m_vmConfig.MemorySizeBytes / (2 * _1MB)) * (2 * _1MB);
-    request.Memory.AllowOvercommit = VmFeatureRequest::Required;
-    request.Memory.DeferredCommit = VmFeatureRequest::Required;
-    request.Memory.ColdDiscard = VmFeatureRequest::Required;
-    const auto backendCapabilities = QueryVirtualMachineBackendCapabilities(BackendKind::Hcs);
+    const auto backendCapabilities = QueryVirtualMachineBackendCapabilities(Backend);
+    const auto requestFeature = [&](VmFeature Feature) {
+        return backendCapabilities.Features.test(static_cast<size_t>(Feature)) ? VmFeatureRequest::Required : VmFeatureRequest::Disabled;
+    };
+    request.Memory.AllowOvercommit = requestFeature(VmFeature::MemoryOvercommit);
+    request.Memory.DeferredCommit = requestFeature(VmFeature::DeferredMemoryCommit);
+    request.Memory.ColdDiscard = requestFeature(VmFeature::ColdDiscard);
     if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::SmallPageMemory)))
     {
         request.Memory.SmallPageBacking = VmFeatureRequest::Required;
@@ -1436,7 +1514,7 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
         m_pageReportingOrder = 9;
     }
 
-    if (helpers::IsVmemmSuffixSupported())
+    if (backendCapabilities.Features.test(static_cast<size_t>(VmFeature::HostingProcessNameSuffix)))
     {
         request.Memory.HostingProcessNameSuffix = wsl::windows::common::wslutil::c_vmOwner;
     }
@@ -1532,14 +1610,16 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
             m_vmConfig.KernelDebugPort,
             m_terminatingEvent.get(),
             !m_vmConfig.EnableTelemetry,
-            m_processJobObject.get());
+            m_processJobObject.get(),
+            GetConsolePipeClientSid(Backend));
     }
     else
     {
         kernelCmdLine += L" pty.legacy_count=0";
     }
 
-    if (!m_comPipe0.empty() && (!m_dmesgCollector || !m_vmConfig.EnableEarlyBootLogging))
+    // OpenVMM reports the kernel console over virtio console, which the dmesg collector always provides.
+    if (Backend != BackendKind::OpenVmm && !m_comPipe0.empty() && (!m_dmesgCollector || !m_vmConfig.EnableEarlyBootLogging))
     {
         request.Consoles.push_back({VmConsoleRole::KernelConsole, VmSerialConsole{0, m_comPipe0}});
     }
@@ -1548,6 +1628,13 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
         kernelCmdLine += L" " WSL_ENABLE_CRASH_DUMP_ENV L"=1";
         request.CrashCapture =
             VmCrashCaptureRequest{m_vmConfig.CrashDumpFolder, gsl::narrow_cast<std::uint32_t>(m_vmConfig.MaxCrashDumpCount)};
+
+        // HCS pre-creates an empty saved-state file that lives in the folder for the VM's lifetime, so only OpenVMM,
+        // which writes its dump when the guest crashes, captures saved state into the user's crash dump folder.
+        if (Backend == BackendKind::OpenVmm)
+        {
+            request.CrashCapture->SavedStateFolder = m_vmConfig.CrashDumpFolder;
+        }
     }
     if (!m_vmConfig.KernelCommandLine.empty())
     {
@@ -1579,6 +1666,17 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     if (!m_vmConfig.KernelModulesPath.empty())
     {
         addBootDisk(L"kernel-modules", m_vmConfig.KernelModulesPath, m_privateKernelModules);
+    }
+
+    // OpenVMM NICs can only be added at creation time.
+    if (Backend == BackendKind::OpenVmm && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+    {
+        request.NetworkAdapters.emplace_back(
+            wsl::core::CreateOpenVmmNatNetworkAdapterRequest(m_vmConfig.EnableDnsTunneling, m_vmConfig.MacAddress));
+        if (m_vmConfig.EnableLocalhostRelay)
+        {
+            request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
+        }
     }
 
     return request;
@@ -1720,6 +1818,18 @@ bool WslCoreVm::InitializeDrvFsLockHeld(_In_ HANDLE UserToken)
     VerifyPlan9Servers();
 
     const auto elevated = wsl::windows::common::security::IsTokenElevated(UserToken);
+    if (m_backend->GetDescription().Backend == BackendKind::OpenVmm)
+    {
+        // OpenVMM serves DrvFs by impersonating the session's token from a process running under the
+        // VM owner's token, which Windows allows only for a token of no higher integrity level.
+        const auto tokenUser = wil::get_token_information<TOKEN_USER>(UserToken);
+        THROW_HR_IF(E_ACCESSDENIED, !EqualSid(&m_userSid.Sid, tokenUser->User.Sid));
+        THROW_HR_IF_MSG(
+            E_ACCESSDENIED,
+            elevated && !wsl::windows::common::security::IsTokenElevated(m_userToken.get()),
+            "An unelevated OpenVMM VM cannot serve elevated DrvFs");
+    }
+
     if (elevated)
     {
         if (!m_adminDrvfsToken)
@@ -1839,17 +1949,40 @@ wil::unique_socket WslCoreVm::CreateRootNamespaceProcess(_In_ LPCSTR Path, _In_ 
     auto lock = m_lock.lock_exclusive();
 
     return LxssCreateProcess::CreateLinuxProcess(
-        Path, Arguments, m_runtimeId, m_miniInitChannel, m_terminatingEvent.get(), m_vmConfig.DistributionStartTimeout, PluginId);
+        Path,
+        Arguments,
+        [this](ULONG Port, HANDLE ExitHandle) { return m_backend->ConnectGuest(GuestServicePort{Port}, ExitHandle); },
+        m_miniInitChannel,
+        m_terminatingEvent.get(),
+        m_vmConfig.DistributionStartTimeout,
+        PluginId);
 }
 
 void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR GuestPath, _In_ bool ReadOnly, _In_ LPCWSTR Name)
 {
     auto lock = m_lock.lock_exclusive();
+    const bool useVirtioFs = m_backend->GetDescription().Backend == BackendKind::OpenVmm;
+    std::wstring mountSource = Name;
 
-    const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
     wsl::windows::common::security::EnableTokenPrivilege(m_userToken.get(), SE_CREATE_SYMBOLIC_LINK_NAME);
-
+    if (useVirtioFs)
     {
+        // OpenVMM has no Plan 9 server, so plugin folders are served as single-share virtio-fs devices.
+        auto guestDeviceLock = m_guestDeviceLock.lock_exclusive();
+        auto options = std::wstring{TEXT(LX_INIT_DEFAULT_PLAN9_MOUNT_OPTIONS)};
+        if (ReadOnly)
+        {
+            options += L";ro";
+        }
+
+        std::wstring childName;
+        std::tie(mountSource, childName, std::ignore) = AddVirtioFsShare(
+            wsl::windows::common::security::IsTokenElevated(m_userToken.get()), HostPath, options.c_str(), m_userToken.get());
+        THROW_HR_IF_MSG(E_UNEXPECTED, !childName.empty(), "OpenVMM plugin shares must use a single-share virtio-fs device");
+    }
+    else
+    {
+        const auto flags = (ReadOnly ? hcs::Plan9ShareFlags::ReadOnly : hcs::Plan9ShareFlags::None) | hcs::Plan9ShareFlags::AllowOptions;
         auto runAsUser = wil::impersonate_token(m_userToken.get());
         if (!m_pluginPlan9Server || m_pluginPlan9Server->IsRunning() != S_OK)
         {
@@ -1872,8 +2005,9 @@ void WslCoreVm::MountRootNamespaceFolder(_In_ LPCWSTR HostPath, _In_ LPCWSTR Gue
 
     wsl::shared::MessageWriter<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE> message(LxMiniInitMountFolder);
     message.WriteString(message->PathIndex, GuestPath);
-    message.WriteString(message->NameIndex, Name);
+    message.WriteString(message->NameIndex, mountSource);
     message->ReadOnly = ReadOnly;
+    message->VirtioFs = useVirtioFs;
 
     const auto& ResultMessage = m_miniInitChannel.Transaction<LX_MINI_INIT_MOUNT_FOLDER_MESSAGE>(message.Span());
 
@@ -1950,6 +2084,9 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     // Ensure that the path has a trailing path separator.
     std::wstring sharePath;
     const auto mountOptions = ParseVirtioFsMountOptions(Options);
+    const bool openVmm = m_backend->GetDescription().Backend == BackendKind::OpenVmm;
+    // OpenVMM enforces read-only shares on the host; HCS shares are read-only only through guest mount options.
+    const bool readOnly = openVmm && mountOptions.contains(L"ro");
 
     {
         const auto runAsUser = wil::impersonate_token(UserToken);
@@ -1959,7 +2096,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
     bool created = false;
     auto share = m_backend->GetFileSystemShare([&](const VmFileSystemShare& candidate) {
         return std::holds_alternative<VmVirtioFsShareAddress>(candidate.GuestAddress) && candidate.Elevated == Admin &&
-               !candidate.ReadOnly && candidate.EffectiveHostPath.native() == sharePath && candidate.MountOptions == mountOptions;
+               candidate.ReadOnly == readOnly && candidate.EffectiveHostPath.native() == sharePath && candidate.MountOptions == mountOptions;
     });
     if (!share)
     {
@@ -2008,7 +2145,7 @@ std::tuple<std::wstring, std::wstring, std::wstring> WslCoreVm::AddVirtioFsShare
 
             VmFileSystemShareRequest request{};
             request.HostPath = sharePath;
-            request.ReadOnly = false;
+            request.ReadOnly = readOnly;
             request.Options = VmVirtioFsShareOptions{mountOptions};
             share = m_backend->AddFileSystemShare(device.Id, request);
         }

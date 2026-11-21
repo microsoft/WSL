@@ -307,6 +307,11 @@ struct Config
     ~Config() = default;
 
     void Initialize(_In_opt_ HANDLE UserToken = nullptr);
+
+    // Throws if the configuration has settings that the OpenVMM backend doesn't support. This isn't part of parsing, so that
+    // libwsl can read and edit such a configuration.
+    void ValidateOpenVmmSupport() const;
+
     void ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt_ HANDLE UserToken);
     void SaveNetworkingSettings(_In_opt_ HANDLE UserToken) const;
     static unsigned long WriteConfigFile(_In_ LPCWSTR ConfigFilePath, _In_ ConfigKey KeyToWrite, _In_ bool RemoveKey = false);
