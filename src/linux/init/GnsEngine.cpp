@@ -341,16 +341,19 @@ void GnsEngine::ProcessMacAddressChange(Interface& interface, const wsl::shared:
 
 void GnsEngine::ProcessLinkChange(Interface& interface, const wsl::shared::hns::NetworkInterface& link, wsl::shared::hns::ModifyRequestType type)
 {
-    GNS_LOG_INFO(
-        "Setting link state to {} on interfaceName {}",
-        link.Connected ? "InterfaceState::Up" : "InterfaceState::Down",
-        interface.Name().c_str());
-    manager.SetInterfaceState(interface, link.Connected ? NetworkManager::InterfaceState::Up : NetworkManager::InterfaceState::Down);
-
-    if (link.Connected && link.NlMtu != 0)
+    if (!link.MetricOnly)
     {
-        GNS_LOG_INFO("Setting MTU to {} on interfaceName {} ", link.NlMtu, interface.Name().c_str());
-        interface.SetMtu(link.NlMtu);
+        GNS_LOG_INFO(
+            "Setting link state to {} on interfaceName {}",
+            link.Connected ? "InterfaceState::Up" : "InterfaceState::Down",
+            interface.Name().c_str());
+        manager.SetInterfaceState(interface, link.Connected ? NetworkManager::InterfaceState::Up : NetworkManager::InterfaceState::Down);
+
+        if (link.Connected && link.NlMtu != 0)
+        {
+            GNS_LOG_INFO("Setting MTU to {} on interfaceName {} ", link.NlMtu, interface.Name().c_str());
+            interface.SetMtu(link.NlMtu);
+        }
     }
 
     if (link.Connected && link.Metric != 0)

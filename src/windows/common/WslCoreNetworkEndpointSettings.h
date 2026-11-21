@@ -330,6 +330,7 @@ struct NetworkSettings
     bool DisableIpv6DefaultRoutes = false;
     bool PendingUpdateToReconnectForMetered = false;
     bool PendingIPInterfaceUpdate = false;
+    bool PendingAddressRefresh = false;
 
     auto operator<=>(const NetworkSettings&) const = default;
 
@@ -423,6 +424,7 @@ std::shared_ptr<NetworkSettings> GetHostEndpointSettings();
         TraceLoggingValue((settings)->IPv4InterfaceMetric.value_or(0xffffffff), "IPv4InterfaceMetric"), \
         TraceLoggingValue((settings)->IPv6InterfaceMetric.value_or(0xffffffff), "IPv6InterfaceMetric"), \
         TraceLoggingValue((settings)->PendingIPInterfaceUpdate, "PendingIPInterfaceUpdate"), \
+        TraceLoggingValue((settings)->PendingAddressRefresh, "PendingAddressRefresh"), \
         TraceLoggingValue((settings)->PendingUpdateToReconnectForMetered, "PendingUpdateToReconnectForMetered")
 
 } // namespace wsl::core::networking
