@@ -1597,11 +1597,21 @@ class UnitTests
         {
             if (!wsl::shared::Arm64 && wsl::windows::common::helpers::GetWindowsVersion().BuildNumber >= 27653)
             {
-                ValidateErrorMessage(
-                    L"--mount DoesNotExist",
-                    L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. ",
-                    LxsstuOpenVmmMode() ? L"Wsl/Service/AttachDisk/MountDisk/OpenVmm/ERROR_FILE_NOT_FOUND"
-                                        : L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND");
+                // A path that isn't a VHD is mounted as a physical disk, which OpenVMM doesn't support.
+                if (LxsstuOpenVmmMode())
+                {
+                    ValidateErrorMessage(
+                        L"--mount DoesNotExist",
+                        L"Failed to attach disk 'DoesNotExist' to WSL2: The request is not supported. ",
+                        L"Wsl/Service/AttachDisk/MountDisk/OpenVmm/ERROR_NOT_SUPPORTED");
+                }
+                else
+                {
+                    ValidateErrorMessage(
+                        L"--mount DoesNotExist",
+                        L"Failed to attach disk 'DoesNotExist' to WSL2: The system cannot find the file specified. ",
+                        L"Wsl/Service/AttachDisk/MountDisk/HCS/ERROR_FILE_NOT_FOUND");
+                }
             }
 
             ValidateErrorMessage(
@@ -2522,7 +2532,8 @@ Usage:
         }
         else
         {
-            if (TryLoadDnsResolverMethods())
+            // OpenVMM doesn't support DNS tunneling, and its test configuration already sets experimental.dnsTunneling.
+            if (TryLoadDnsResolverMethods() && !LxsstuOpenVmmMode())
             {
                 // Verify DNS tunneling settings are parsed correctly
                 validateWarnings(L"[experimental]\ndnsTunneling=true\nbestEffortDnsParsing=true", dnsTunnelingDisabledWarning);
@@ -2932,14 +2943,15 @@ Usage:
         };
 
         // Attempt to import a vhd with an open handle.
-        // TODO: OpenVMM needs proper gRPC error marshalling to preserve ERROR_SHARING_VIOLATION instead of E_FAIL.
-        const bool openVmm = LxsstuOpenVmmMode();
         validateOutput(
             std::format(L"--import-in-place test-distro-corrupted \"{}\"", vhdPath.wstring()),
             FormatErrorMessage(
-                std::format(L"Failed to attach disk '\\\\?\\{}' to WSL2: {} ", vhdPath.wstring(), openVmm ? L"Unspecified error" : L"The process cannot access the file because it is being used by another process."),
-                openVmm ? L"Wsl/Service/RegisterDistro/MountDisk/OpenVmm/E_FAIL"
-                        : L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
+                std::format(
+                    L"Failed to attach disk '\\\\?\\{}' to WSL2: The process cannot access the file because it is being used by "
+                    L"another process. ",
+                    vhdPath.wstring()),
+                LxsstuOpenVmmMode() ? L"Wsl/Service/RegisterDistro/MountDisk/OpenVmm/ERROR_SHARING_VIOLATION"
+                                    : L"Wsl/Service/RegisterDistro/MountDisk/HCS/ERROR_SHARING_VIOLATION"));
 
         vhd.reset();
 
