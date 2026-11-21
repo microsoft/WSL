@@ -35,6 +35,8 @@ class WSLCCLIResourceLimitsParserUnitTests
             {L"1.5", 1'500'000'000LL},
             {L"2.5", 2'500'000'000LL},
             {L"0.001", 1'000'000LL},
+            {L"0.000000001", 1LL},
+            {L"9223372036", 9'223'372'036'000'000'000LL},
         };
 
         for (const auto& [input, expected] : valid)
@@ -49,17 +51,23 @@ class WSLCCLIResourceLimitsParserUnitTests
         // Each value should be rejected as an invalid --cpus value.
         const std::vector<std::wstring> invalid = {
             L"",
-            L"0",          // not positive
-            L"-1",         // sign char rejected
-            L"-0.5",       // sign char rejected
-            L"abc",        // not numeric
-            L"1.5x",       // trailing garbage
-            L" 1",         // leading whitespace
-            L"1 ",         // trailing whitespace
-            L"1e3",        // exponent not allowed
-            L"+1",         // sign char rejected
-            L"1.2.3",      // multiple dots (rejected by strtod's strict end check)
-            L"99999999999" // overflow when multiplied by 1e9
+            L"0",           // not positive
+            L"-1",          // sign char rejected
+            L"-0.5",        // sign char rejected
+            L"abc",         // not numeric
+            L"1.5x",        // trailing garbage
+            L" 1",          // leading whitespace
+            L"1 ",          // trailing whitespace
+            L"1e3",         // exponent not allowed
+            L"+1",          // sign char rejected
+            L"1.2.3",       // multiple dots (rejected by strtod's strict end check)
+            L"99999999999", // overflow when multiplied by 1e9
+            L"nan",
+            L"NaN",
+            L"nan(payload)",
+            L"inf",
+            L"0.0000000001",      // truncates to zero nanoCPUs
+            L"9223372036.854776", // rounds to 2^63 nanoCPUs
         };
 
         for (const auto& input : invalid)

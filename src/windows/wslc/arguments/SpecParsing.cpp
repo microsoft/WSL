@@ -844,7 +844,8 @@ int64_t GetDurationNanosFromString(const std::wstring& input, const std::wstring
 int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& argName)
 {
     constexpr double NanosPerCpu = 1'000'000'000.0;
-    constexpr double MaxCpus = static_cast<double>(std::numeric_limits<int64_t>::max()) / NanosPerCpu;
+    // INT64_MAX rounds up to 2^63 as a double, so this bound is exclusive.
+    constexpr double MaxNanoCpus = static_cast<double>(std::numeric_limits<int64_t>::max());
 
     const std::string narrow = WideToMultiByte(input);
     const char* begin = narrow.c_str();
@@ -852,12 +853,13 @@ int64_t GetNanoCpusFromString(const std::wstring& input, const std::wstring& arg
 
     double cpus{};
     const auto result = std::from_chars(begin, end, cpus, std::chars_format::fixed);
-    if (result.ec != std::errc() || result.ptr != end || cpus <= 0.0 || cpus > MaxCpus)
+    const double nanoCpus = cpus * NanosPerCpu;
+    if (result.ec != std::errc() || result.ptr != end || !std::isfinite(nanoCpus) || nanoCpus < 1.0 || nanoCpus >= MaxNanoCpus)
     {
         throw ArgumentException(Localization::WSLCCLI_InvalidCpusError(argName, input));
     }
 
-    return static_cast<int64_t>(cpus * NanosPerCpu);
+    return static_cast<int64_t>(nanoCpus);
 }
 
 } // namespace wsl::windows::wslc::validation
