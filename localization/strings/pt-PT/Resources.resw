@@ -2273,6 +2273,9 @@ Utilização:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Os mapeamentos de portas não são suportados com o modo de rede de contentores; As portas são propriedade do contentor de destino.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Os mapeamentos de portas não são suportados quando a rede do contentor está desativada. Ative a rede ou remova os mapeamentos de portas.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>O nome do contentor de destino é necessário para o modo de rede de contentor.</value>
   </data>
