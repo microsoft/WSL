@@ -73,7 +73,9 @@ HRESULT WslInstall::InstallDistribution(
     _In_ bool fixedVhd,
     _In_ const std::optional<std::wstring>& localName,
     _In_ const std::optional<std::wstring>& location,
-    _In_ const std::optional<uint64_t>& vhdSize)
+    _In_ const std::optional<uint64_t>& vhdSize,
+    _In_ const std::optional<std::wstring>& fsType,
+    _In_ const std::optional<std::wstring>& fsMountOptions)
 try
 {
     wsl::windows::common::ExecutionContext context(wsl::windows::common::InstallDistro);
@@ -115,7 +117,7 @@ try
         if (const auto* distro = std::get_if<ModernDistributionVersion>(&*installResult.Distribution))
         {
             std::tie(installResult.Name, installResult.Id) =
-                InstallModernDistribution(*distro, version, localName, location, vhdSize, fixedVhd);
+                InstallModernDistribution(*distro, version, localName, location, vhdSize, fixedVhd, fsType, fsMountOptions);
 
             installResult.InstalledViaGitHub = true;
         }
@@ -125,7 +127,9 @@ try
                 {localName.has_value(), WSL_INSTALL_ARG_NAME_LONG},
                 {location.has_value(), WSL_INSTALL_ARG_LOCATION_LONG},
                 {vhdSize.has_value(), WSL_INSTALL_ARG_VHD_SIZE},
-                {fixedVhd, WSL_INSTALL_ARG_FIXED_VHD}};
+                {fixedVhd, WSL_INSTALL_ARG_FIXED_VHD},
+                {fsType.has_value(), WSL_INSTALL_ARG_FS_TYPE},
+                {fsMountOptions.has_value(), WSL_INSTALL_ARG_FS_MOUNT_OPTIONS}};
 
             for (const auto& [condition, argument] : unsupportedArguments)
             {
@@ -274,7 +278,9 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
     const std::optional<std::wstring>& name,
     const std::optional<std::wstring>& location,
     const std::optional<uint64_t>& vhdSize,
-    const bool fixedVhd)
+    const bool fixedVhd,
+    const std::optional<std::wstring>& fsType,
+    const std::optional<std::wstring>& fsMountOptions)
 {
     wsl::windows::common::SvcComm service;
 
@@ -324,7 +330,9 @@ std::pair<std::wstring, GUID> WslInstall::InstallModernDistribution(
         file.get(),
         location.has_value() ? location->c_str() : nullptr,
         fixedVhd ? LXSS_IMPORT_DISTRO_FLAGS_FIXED_VHD : 0,
-        vhdSize);
+        vhdSize,
+        fsType.has_value() ? fsType->c_str() : nullptr,
+        fsMountOptions.has_value() ? fsMountOptions->c_str() : nullptr);
 
     return {installedName.get(), id};
 }
