@@ -64,11 +64,10 @@ The experimental OpenVMM backend requires Windows 11 or later with the Windows H
 [wsl2]
 gpuSupport=false
 guiApplications=false
-networkingMode=nat
+networkingMode=consomme
 virtioFs=true
 nestedVirtualization=false
 hardwarePerformanceCounters=false
-firewall=false
 dnsTunneling=false
 
 [experimental]
@@ -76,14 +75,14 @@ openVmm=true
 virtioFsAggregateShares=false
 ```
 
-`networkingMode=none` is also supported. Incompatible settings are rejected with an error.
+OpenVMM's networking is its built-in [Consomme](localhost.md), so `consomme` is the default networking mode when OpenVMM is enabled. `networkingMode=none` is also supported. Incompatible settings are rejected with an error.
 
 OpenVMM currently does not support:
 
 - ARM64 or UEFI boot
 - GPU assignment
 - Physical-disk devices
-- Mirrored or bridged networking, custom NAT addressing, Hyper-V firewall, DNS tunneling, or IPv6
+- NAT, mirrored, or bridged networking, or DNS tunneling
 - Nested virtualization, performance counters, or advanced memory controls
 - Plan 9 file sharing, aggregate virtio-fs devices, or switching user/elevation context after VM creation
 

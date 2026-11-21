@@ -1,11 +1,11 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #include "precomp.h"
-#include "OpenVmmNatNetworking.h"
+#include "OpenVmmConsommeNetworking.h"
 #include "WslCoreHostDnsInfo.h"
 #include "WslCoreNetworkingSupport.h"
 
-using wsl::core::OpenVmmNatNetworking;
+using wsl::core::OpenVmmConsommeNetworking;
 using namespace wsl::shared;
 
 namespace {
@@ -16,7 +16,7 @@ constexpr auto c_gatewayIpv4Address = L"10.0.0.1";
 
 } // namespace
 
-VmNetworkAdapterRequest wsl::core::CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac)
+VmNetworkAdapterRequest wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac)
 {
     VmUserModeNatNetwork network;
     network.InternalDns = EnableDnsTunneling;
@@ -78,19 +78,21 @@ void wsl::core::MapHostLoopbackDnsServers(networking::DnsInfo& Dns, IVirtualMach
     }
 }
 
-OpenVmmNatNetworking::OpenVmmNatNetworking(
+OpenVmmConsommeNetworking::OpenVmmConsommeNetworking(
     IVirtualMachineBackend& Backend,
     const VmNetworkAttachment& Adapter,
     std::optional<VmNetworkAttachment> LoopbackAdapter,
     GnsChannel&& GnsChannel,
     bool EnableLocalhostRelay,
-    bool EnableDnsTunneling) :
+    bool EnableDnsTunneling,
+    bool EnableIpv6) :
     m_backend(Backend),
     m_device(Adapter.Id),
     m_adapterId(Adapter.GuestInstanceId.value()),
     m_gnsChannel(std::move(GnsChannel)),
     m_enableLocalhostRelay(EnableLocalhostRelay),
-    m_enableDnsTunneling(EnableDnsTunneling)
+    m_enableDnsTunneling(EnableDnsTunneling),
+    m_enableIpv6(EnableIpv6)
 {
     THROW_HR_IF(E_UNEXPECTED, EnableLocalhostRelay && !LoopbackAdapter.has_value());
     if (LoopbackAdapter.has_value())
@@ -100,13 +102,13 @@ OpenVmmNatNetworking::OpenVmmNatNetworking(
     }
 }
 
-OpenVmmNatNetworking::~OpenVmmNatNetworking()
+OpenVmmConsommeNetworking::~OpenVmmConsommeNetworking()
 {
     m_gnsChannel.Stop();
     m_networkNotifyHandle.reset();
 }
 
-void OpenVmmNatNetworking::Initialize()
+void OpenVmmConsommeNetworking::Initialize()
 {
     auto lock = m_dnsLock.lock_exclusive();
     if (m_enableLocalhostRelay)
@@ -149,16 +151,17 @@ void OpenVmmNatNetworking::Initialize()
     UpdateDns();
     if (!m_enableDnsTunneling)
     {
-        THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&OpenVmmNatNetworking::OnNetworkConnectivityChange, this, true, &m_networkNotifyHandle));
+        THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(
+            &OpenVmmConsommeNetworking::OnNetworkConnectivityChange, this, true, &m_networkNotifyHandle));
     }
 }
 
-void NETIOAPI_API_ OpenVmmNatNetworking::OnNetworkConnectivityChange(PVOID Context, NL_NETWORK_CONNECTIVITY_HINT)
+void NETIOAPI_API_ OpenVmmConsommeNetworking::OnNetworkConnectivityChange(PVOID Context, NL_NETWORK_CONNECTIVITY_HINT)
 {
-    static_cast<OpenVmmNatNetworking*>(Context)->RefreshDns();
+    static_cast<OpenVmmConsommeNetworking*>(Context)->RefreshDns();
 }
 
-void OpenVmmNatNetworking::RefreshDns() noexcept
+void OpenVmmConsommeNetworking::RefreshDns() noexcept
 try
 {
     auto lock = m_dnsLock.lock_exclusive();
@@ -166,7 +169,7 @@ try
 }
 CATCH_LOG()
 
-void OpenVmmNatNetworking::UpdateDns()
+void OpenVmmConsommeNetworking::UpdateDns()
 {
     networking::DnsInfo dns;
     if (m_enableDnsTunneling)
@@ -186,15 +189,16 @@ void OpenVmmNatNetworking::UpdateDns()
     m_gnsChannel.SendHnsNotification(ToJsonW(dnsNotification).c_str(), m_adapterId);
 }
 
-void OpenVmmNatNetworking::TraceLoggingRundown() noexcept
+void OpenVmmConsommeNetworking::TraceLoggingRundown() noexcept
 {
     WSL_LOG(
-        "OpenVmmNatNetworking::TraceLoggingRundown",
+        "OpenVmmConsommeNetworking::TraceLoggingRundown",
         TraceLoggingValue(m_enableLocalhostRelay, "localhostRelay"),
-        TraceLoggingValue(m_enableDnsTunneling, "dnsTunneling"));
+        TraceLoggingValue(m_enableDnsTunneling, "dnsTunneling"),
+        TraceLoggingValue(m_enableIpv6, "ipv6"));
 }
 
-void OpenVmmNatNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& Message)
+void OpenVmmConsommeNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& Message)
 {
     Message.NetworkingMode = LxMiniInitNetworkingModeNat;
     Message.DisableIpv6 = false;
@@ -202,7 +206,7 @@ void OpenVmmNatNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONF
     Message.PortTrackerType = LxMiniInitPortTrackerTypeMirrored;
 }
 
-void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)
+void OpenVmmConsommeNetworking::StartPortTracker(wil::unique_socket&& Socket)
 {
     WI_ASSERT(!m_gnsPortTrackerChannel.has_value());
 
@@ -236,7 +240,7 @@ void OpenVmmNatNetworking::StartPortTracker(wil::unique_socket&& Socket)
         [](const std::string&, bool) {});
 }
 
-void OpenVmmNatNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, bool allocate)
+void OpenVmmConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, bool allocate)
 {
     THROW_HR_IF_MSG(
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
@@ -254,7 +258,8 @@ void OpenVmmNatNetworking::HandlePortNotification(SOCKADDR_INET addr, int protoc
         addr.Ipv4 = ipv4Address;
     }
 
-    if (addr.si_family != AF_INET && addr.si_family != AF_INET6)
+    // Binds that reserve nothing on the host stay in the guest; returning success lets Linux validate them itself.
+    if ((addr.si_family != AF_INET && addr.si_family != AF_INET6) || (addr.si_family == AF_INET6 && !m_enableIpv6))
     {
         return;
     }
@@ -263,25 +268,41 @@ void OpenVmmNatNetworking::HandlePortNotification(SOCKADDR_INET addr, int protoc
     const bool loopback = ipv4 ? IN4_IS_ADDR_LOOPBACK(&addr.Ipv4.sin_addr) : IN6_IS_ADDR_LOOPBACK(&addr.Ipv6.sin6_addr);
     const bool unspecified = ipv4 ? IN4_IS_ADDR_UNSPECIFIED(&addr.Ipv4.sin_addr) : IN6_IS_ADDR_UNSPECIFIED(&addr.Ipv6.sin6_addr);
 
-    // Only 127.0.0.1 and 0.0.0.0 are forwarded, and only to host 127.0.0.1 through loopback0; no other bind ever
-    // reserves a host port. Returning success for everything else lets Linux validate guest-only binds itself.
-    if (!loopback && !unspecified)
-    {
-        return;
-    }
-
-    // Linux drops inbound packets addressed to ::1 on non-loopback interfaces, so IPv6 binds stay in the guest.
-    if (!m_enableLocalhostRelay || !ipv4 || (loopback && addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK)))
+    // As with Consomme on HCS, only 127.0.0.1 is relayed among the loopback addresses. Unlike it, binds to specific
+    // addresses also stay in the guest, since the guest's address isn't one of the host's.
+    if ((loopback && (!ipv4 || addr.Ipv4.sin_addr.s_addr != htonl(INADDR_LOOPBACK))) || (!loopback && !unspecified))
     {
         return;
     }
 
     auto lock = m_lock.lock_exclusive();
-    addr.Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    ModifyPort(true, addr, protocol, allocate);
+
+    // Relay host 127.0.0.1 to the guest through loopback0. Linux drops inbound packets addressed to ::1 on non-loopback
+    // interfaces, so IPv6 binds aren't relayed.
+    std::optional<SOCKADDR_INET> relayAddress;
+    if (m_enableLocalhostRelay && ipv4)
+    {
+        relayAddress = addr;
+        relayAddress->Ipv4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        ModifyPort(true, *relayAddress, protocol, allocate);
+    }
+
+    // As with Consomme on HCS, a wildcard bind also reserves the port on the host's addresses, and forwards it to the guest.
+    if (unspecified)
+    {
+        auto revertRelay = wil::scope_exit([&] {
+            if (relayAddress && allocate)
+            {
+                LOG_IF_FAILED(wil::ResultFromException([&] { ModifyPort(true, *relayAddress, protocol, false); }));
+            }
+        });
+
+        ModifyPort(false, addr, protocol, allocate);
+        revertRelay.release();
+    }
 }
 
-void OpenVmmNatNetworking::ModifyPort(bool loopbackDevice, const SOCKADDR_INET& hostAddress, int protocol, bool allocate)
+void OpenVmmConsommeNetworking::ModifyPort(bool loopbackDevice, const SOCKADDR_INET& hostAddress, int protocol, bool allocate)
 {
     // The GNS channel stores the port in host byte order, so no conversion is needed.
     const bool ipv4 = hostAddress.si_family == AF_INET;

@@ -3,7 +3,7 @@
 #include "precomp.h"
 #include <fstream>
 #include "Common.h"
-#include "OpenVmmNatNetworking.h"
+#include "OpenVmmConsommeNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
 #include "WslInstall.h"
 #include "VirtualMachineBackendTestHelpers.h"
@@ -55,6 +55,27 @@ bool CanBindPort(std::uint16_t Port, ULONG Address, int Protocol)
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(Address);
     address.sin_port = htons(Port);
+    if (bind(socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0)
+    {
+        return true;
+    }
+
+    const auto error = WSAGetLastError();
+    THROW_WIN32_IF(static_cast<DWORD>(error), error != WSAEADDRINUSE && error != WSAEACCES);
+    return false;
+}
+
+bool CanBindPortIpv6Any(std::uint16_t Port, int Protocol)
+{
+    wil::unique_socket socket{::socket(AF_INET6, Protocol == IPPROTO_TCP ? SOCK_STREAM : SOCK_DGRAM, Protocol)};
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
+    BOOL exclusive = TRUE;
+    THROW_WIN32_IF(
+        static_cast<DWORD>(WSAGetLastError()),
+        setsockopt(socket.get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR);
+    SOCKADDR_IN6 address{};
+    address.sin6_family = AF_INET6;
+    address.sin6_port = htons(Port);
     if (bind(socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0)
     {
         return true;
@@ -211,8 +232,7 @@ class OpenVmmVirtualMachineBackendTests
             "virtioFs=true\n"
             "virtio9p=false\n"
             "hardwarePerformanceCounters=false\n"
-            "networkingMode=nat\n"
-            "firewall=false\n"
+            "networkingMode=consomme\n"
             "dnsTunneling=false\n"
             "ipv6=false\n"
             "[experimental]\n"
@@ -246,6 +266,8 @@ class OpenVmmVirtualMachineBackendTests
                              VERIFY_IS_TRUE((wsl::shared::string::MacAddress{0x02, 0x11, 0x22, 0x33, 0x44, 0x56}) == Config.MacAddress);
                          }));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nnetworkingMode=none\nfirewall=true\ndnsTunneling=true\nipv6=true\n"));
+        // As with Consomme on HCS, the Hyper-V firewall settings don't apply.
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nfirewall=true\n"));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[experimental]\nopenVmm=false\n[wsl2]\ngpuSupport=true\n"));
         bool openVmmEnabled = true;
         VERIFY_ARE_EQUAL(
@@ -260,8 +282,7 @@ class OpenVmmVirtualMachineBackendTests
                  "\n[wsl2]\nhardwarePerformanceCounters=true\n",
                  "\n[wsl2]\nnetworkingMode=mirrored\n",
                  "\n[wsl2]\nnetworkingMode=bridged\n",
-                 "\n[wsl2]\nnetworkingMode=consomme\n",
-                 "\n[wsl2]\nfirewall=true\n",
+                 "\n[wsl2]\nnetworkingMode=nat\n",
                  "\n[wsl2]\ndnsTunneling=true\n",
                  "\n[experimental]\nvirtioFsAggregateShares=true\n",
                  "\n[experimental]\nswiotlb=1M\n",
@@ -456,13 +477,13 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
     }
 
-    TEST_METHOD(OpenVmmNatUsesCreationTimeAdaptersAndStaticConfiguration)
+    TEST_METHOD(OpenVmmConsommeUsesCreationTimeAdaptersAndStaticConfiguration)
     {
         SKIP_TEST_ARM64();
         constexpr wsl::shared::string::MacAddress clientMac{0x02, 0x15, 0x5d, 0x01, 0x02, 0x03};
         VERIFY_IS_TRUE(
-            std::get<VmUserModeNatNetwork>(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(true, clientMac).Configuration).InternalDns);
-        const auto request = wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, clientMac);
+            std::get<VmUserModeNatNetwork>(wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(true, clientMac).Configuration).InternalDns);
+        const auto request = wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(false, clientMac);
         const auto& network = std::get<VmUserModeNatNetwork>(request.Configuration);
         VERIFY_IS_FALSE(network.InternalDns);
         VERIFY_ARE_EQUAL(std::wstring{L"eth0"}, request.Tag);
@@ -474,13 +495,14 @@ class OpenVmmVirtualMachineBackendTests
         auto backend = OpenVmmVirtualMachineBackend::Create(backendRequest);
         const auto description = backend->GetDescription();
         auto [client, server] = MakeSocketPair();
-        wsl::core::OpenVmmNatNetworking networking(
+        wsl::core::OpenVmmConsommeNetworking networking(
             *backend,
             description.NetworkAdapters.at(L"eth0"),
             description.NetworkAdapters.at(L"loopback0"),
             wsl::core::GnsChannel(std::move(server)),
             true,
-            false);
+            false,
+            true);
         LX_MINI_INIT_NETWORKING_CONFIGURATION configuration{};
         networking.FillInitialConfiguration(configuration);
 
@@ -906,11 +928,13 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(ForwardsOnlySupportedLocalhostBindings)
+    // As with Consomme on HCS, binds to 127.0.0.1 are relayed from the host's 127.0.0.1, and wildcard binds also reserve
+    // the port on the host's addresses. Other binds stay in the guest.
+    TEST_METHOD(ForwardsLoopbackAndWildcardBindings)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
         request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         auto guest = StartGuest(*backend);
@@ -919,57 +943,84 @@ class OpenVmmVirtualMachineBackendTests
         {
             int Family;
             const char* Address;
-            bool Forwarded;
+            bool Relayed;
+            bool Ipv4Wildcard;
+            bool Ipv6Wildcard;
         };
         constexpr PortCase cases[] = {
-            {AF_INET, "0.0.0.0", true},
-            {AF_INET, "127.0.0.1", true},
-            {AF_INET6, "::ffff:0.0.0.0", true},
-            {AF_INET6, "::ffff:127.0.0.1", true},
-            {AF_INET6, "::", false},
-            {AF_INET6, "::1", false},
-            {AF_INET, "127.0.0.2", false},
-            {AF_INET, "10.0.0.2", false},
-            {AF_INET, "192.0.2.1", false},
-            {AF_INET6, "::ffff:192.0.2.1", false},
-            {AF_INET6, "2001:db8::1", false},
+            {AF_INET, "0.0.0.0", true, true, false},
+            {AF_INET, "127.0.0.1", true, false, false},
+            {AF_INET6, "::ffff:0.0.0.0", true, true, false},
+            {AF_INET6, "::ffff:127.0.0.1", true, false, false},
+            {AF_INET6, "::", false, false, true},
+            {AF_INET6, "::1", false, false, false},
+            {AF_INET, "127.0.0.2", false, false, false},
+            {AF_INET, "10.0.0.2", false, false, false},
+            {AF_INET, "192.0.2.1", false, false, false},
+            {AF_INET6, "::ffff:192.0.2.1", false, false, false},
+            {AF_INET6, "2001:db8::1", false, false, false},
         };
-        for (const bool enabled : {false, true})
+        for (const bool relay : {false, true})
         {
-            wsl::core::OpenVmmNatNetworking networking{
-                *backend,
-                adapters.at(L"eth0"),
-                enabled ? std::optional{adapters.at(L"loopback0")} : std::nullopt,
-                wsl::core::GnsChannel{wil::unique_socket{}},
-                enabled,
-                false};
-            auto [client, server] = MakeSocketPair();
-            networking.StartPortTracker(std::move(server));
-            wsl::shared::SocketChannel channel{std::move(client), "PortTrackerTest"};
-            for (const int protocol : {IPPROTO_TCP, IPPROTO_UDP})
+            for (const bool ipv6 : {false, true})
             {
-                for (const auto& test : cases)
+                wsl::core::OpenVmmConsommeNetworking networking{
+                    *backend,
+                    adapters.at(L"eth0"),
+                    relay ? std::optional{adapters.at(L"loopback0")} : std::nullopt,
+                    wsl::core::GnsChannel{wil::unique_socket{}},
+                    relay,
+                    false,
+                    ipv6};
+                auto [client, server] = MakeSocketPair();
+                networking.StartPortTracker(std::move(server));
+                wsl::shared::SocketChannel channel{std::move(client), "PortTrackerTest"};
+                for (const int protocol : {IPPROTO_TCP, IPPROTO_UDP})
                 {
-                    LX_GNS_PORT_ALLOCATION_REQUEST notification{};
-                    notification.Header.MessageType = LxGnsMessagePortMappingRequest;
-                    notification.Header.MessageSize = sizeof(notification);
-                    notification.Protocol = protocol;
-                    notification.Port = ReservePort(protocol);
-                    notification.Af = test.Family;
-                    THROW_HR_IF(E_FAIL, inet_pton(test.Family, test.Address, notification.Address32) != 1);
-                    notification.Allocate = true;
-                    VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
-                    VERIFY_ARE_EQUAL(!(enabled && test.Forwarded), CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
-                    VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK + 1, protocol));
-                    if (enabled && test.Family == AF_INET6 && test.Forwarded)
+                    for (const auto& test : cases)
                     {
-                        notification.Af = AF_INET;
-                        notification.Address32[0] = notification.Address32[3];
-                        VERIFY_ARE_NOT_EQUAL(0, channel.Transaction(notification).Result);
+                        const bool relayed = relay && test.Relayed;
+                        const bool ipv6Wildcard = ipv6 && test.Ipv6Wildcard;
+                        LX_GNS_PORT_ALLOCATION_REQUEST notification{};
+                        notification.Header.MessageType = LxGnsMessagePortMappingRequest;
+                        notification.Header.MessageSize = sizeof(notification);
+                        notification.Protocol = protocol;
+                        notification.Port = ReservePort(protocol);
+                        notification.Af = test.Family;
+                        THROW_HR_IF(E_FAIL, inet_pton(test.Family, test.Address, notification.Address32) != 1);
+                        notification.Allocate = true;
+                        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+                        VERIFY_ARE_EQUAL(!ipv6Wildcard, CanBindPortIpv6Any(notification.Port, protocol));
+                        if (test.Ipv4Wildcard)
+                        {
+                            VERIFY_IS_FALSE(CanBindPort(notification.Port, INADDR_ANY, protocol));
+                        }
+
+                        if (relayed)
+                        {
+                            VERIFY_IS_FALSE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
+                        }
+                        else if (!test.Ipv4Wildcard)
+                        {
+                            // Nothing is held on IPv4.
+                            VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
+                            VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_ANY, protocol));
+                        }
+
+                        // An IPv4-mapped bind reserves the same host ports as the IPv4 bind.
+                        if (test.Family == AF_INET6 && (relayed || test.Ipv4Wildcard))
+                        {
+                            notification.Af = AF_INET;
+                            notification.Address32[0] = notification.Address32[3];
+                            VERIFY_ARE_NOT_EQUAL(0, channel.Transaction(notification).Result);
+                        }
+
+                        notification.Allocate = false;
+                        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+                        VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_ANY, protocol));
+                        VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
+                        VERIFY_IS_TRUE(CanBindPortIpv6Any(notification.Port, protocol));
                     }
-                    notification.Allocate = false;
-                    VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
-                    VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
                 }
             }
         }
@@ -981,7 +1032,7 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         auto guest = StartGuest(*backend);
         const auto description = backend->GetDescription();
@@ -1015,7 +1066,8 @@ class OpenVmmVirtualMachineBackendTests
         });
         auto join = wil::scope_exit([&] { receiver.join(); });
         {
-            wsl::core::OpenVmmNatNetworking networking{*backend, adapter, std::nullopt, wsl::core::GnsChannel{std::move(host)}, false, false};
+            wsl::core::OpenVmmConsommeNetworking networking{
+                *backend, adapter, std::nullopt, wsl::core::GnsChannel{std::move(host)}, false, false, true};
             networking.Initialize();
             VERIFY_IS_TRUE(refreshed.wait(30000));
         }

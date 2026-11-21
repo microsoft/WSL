@@ -15,21 +15,22 @@ namespace networking {
 }
 
 // ClientMac should come from wsl::core::Config::MacAddress, which is generated when not configured.
-VmNetworkAdapterRequest CreateOpenVmmNatNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac);
+VmNetworkAdapterRequest CreateOpenVmmConsommeNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac);
 VmNetworkAdapterRequest CreateOpenVmmLoopbackNetworkAdapterRequest();
 void MapHostLoopbackDnsServers(networking::DnsInfo& Dns, IVirtualMachineBackend& Backend, VmDeviceId Adapter);
 
-class OpenVmmNatNetworking : public INetworkingEngine
+class OpenVmmConsommeNetworking : public INetworkingEngine
 {
 public:
-    OpenVmmNatNetworking(
+    OpenVmmConsommeNetworking(
         IVirtualMachineBackend& Backend,
         const VmNetworkAttachment& Adapter,
         std::optional<VmNetworkAttachment> LoopbackAdapter,
         GnsChannel&& GnsChannel,
         bool EnableLocalhostRelay,
-        bool EnableDnsTunneling);
-    ~OpenVmmNatNetworking() override;
+        bool EnableDnsTunneling,
+        bool EnableIpv6);
+    ~OpenVmmConsommeNetworking() override;
 
     void Initialize() override;
     void TraceLoggingRundown() noexcept override;
@@ -54,6 +55,7 @@ private:
     GnsChannel m_gnsChannel;
     bool m_enableLocalhostRelay;
     bool m_enableDnsTunneling;
+    bool m_enableIpv6;
     wil::srwlock m_dnsLock;
     networking::unique_notify_handle m_networkNotifyHandle;
     wil::srwlock m_lock;

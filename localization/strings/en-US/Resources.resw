@@ -920,8 +920,8 @@ For more information on Admin Protection, please visit https://aka.ms/apdevguide
     <comment>{FixedPlaceholder="{}"}{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated{Locked="experimental.openVmm=true"}</comment>
   </data>
   <data name="MessageOpenVmmNetworkingConflict" xml:space="preserve">
-    <value>OpenVMM requires 'wsl2.networkingMode=nat' or 'wsl2.networkingMode=none' in .wslconfig.</value>
-    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated{Locked="OpenVMM"}{Locked="wsl2.networkingMode=nat"}{Locked="wsl2.networkingMode=none"}</comment>
+    <value>OpenVMM requires 'wsl2.networkingMode=consomme' or 'wsl2.networkingMode=none' in .wslconfig.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated{Locked="OpenVMM"}{Locked="wsl2.networkingMode=consomme"}{Locked="wsl2.networkingMode=none"}</comment>
   </data>
   <data name="MessageFailedToCreateNetworkEndpoint" xml:space="preserve">
     <value>Failed to create network endpoint with address: '{}', assigned new address: '{}'</value>

@@ -21,7 +21,7 @@ Abstract:
 #include "disk.hpp"
 #include "WslCoreInstance.h"
 #include "NatNetworking.h"
-#include "OpenVmmNatNetworking.h"
+#include "OpenVmmConsommeNetworking.h"
 #include "BridgedNetworking.h"
 #include "MirroredNetworking.h"
 #include "WslCoreFirewallSupport.h"
@@ -681,21 +681,27 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
 
         // Create and initialize the networking engine.
         const auto result = wil::ResultFromException(WI_DIAGNOSTICS_INFO, [&] {
+            // For CONFIG_IPV6=m, the module-list fallback assumes the user does not disable IPv6
+            // while also requesting that the ipv6 module be loaded.
+            const auto kernelModules = wsl::shared::string::Split(m_vmConfig.KernelModulesList, L',');
+            const bool ipv6Available =
+                m_ipv6Available || std::find(kernelModules.begin(), kernelModules.end(), L"ipv6") != kernelModules.end();
             if (backendKind == BackendKind::OpenVmm)
             {
-                // OpenVMM serves its NIC with a built-in user-mode NAT; configuration validation limits it to NAT or no networking.
-                if (m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+                // OpenVMM serves its NIC with its built-in Consomme; configuration validation limits it to Consomme or no networking.
+                if (m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
                 {
                     const auto description = m_backend->GetDescription();
                     const auto loopbackAdapter = description.NetworkAdapters.find(L"loopback0");
-                    m_networkingEngine = std::make_unique<wsl::core::OpenVmmNatNetworking>(
+                    m_networkingEngine = std::make_unique<wsl::core::OpenVmmConsommeNetworking>(
                         *m_backend,
                         description.NetworkAdapters.at(L"eth0"),
                         loopbackAdapter == description.NetworkAdapters.end() ? std::optional<VmNetworkAttachment>{}
                                                                              : loopbackAdapter->second,
                         std::move(gnsChannel),
                         m_vmConfig.EnableLocalhostRelay,
-                        m_vmConfig.EnableDnsTunneling);
+                        m_vmConfig.EnableDnsTunneling,
+                        ipv6Available);
                     m_networkingEngine->Initialize();
                 }
                 else
@@ -724,14 +730,8 @@ void WslCoreVm::Initialize(const GUID& VmId, const wil::shared_handle& UserToken
             }
             else if (m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
             {
-                const auto kernelModules = wsl::shared::string::Split(m_vmConfig.KernelModulesList, L',');
                 wsl::core::ConsommeNetworkingFlags flags = wsl::core::ConsommeNetworkingFlags::LoopbackClientIp;
-                // For CONFIG_IPV6=m, the module-list fallback assumes the user does not disable IPv6
-                // while also requesting that the ipv6 module be loaded.
-                WI_SetFlagIf(
-                    flags,
-                    wsl::core::ConsommeNetworkingFlags::Ipv6,
-                    m_ipv6Available || std::find(kernelModules.begin(), kernelModules.end(), L"ipv6") != kernelModules.end());
+                WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::Ipv6, ipv6Available);
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::LocalhostRelay, m_vmConfig.EnableLocalhostRelay);
                 WI_SetFlagIf(flags, wsl::core::ConsommeNetworkingFlags::DnsTunneling, m_vmConfig.EnableDnsTunneling);
                 // NAT may have fallen back to Consomme after the early-config message; drop the unused DNS hvsocket.
@@ -1669,10 +1669,10 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
     }
 
     // OpenVMM NICs can only be added at creation time.
-    if (Backend == BackendKind::OpenVmm && m_vmConfig.NetworkingMode == NetworkingMode::Nat)
+    if (Backend == BackendKind::OpenVmm && m_vmConfig.NetworkingMode == NetworkingMode::Consomme)
     {
         request.NetworkAdapters.emplace_back(
-            wsl::core::CreateOpenVmmNatNetworkAdapterRequest(m_vmConfig.EnableDnsTunneling, m_vmConfig.MacAddress));
+            wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(m_vmConfig.EnableDnsTunneling, m_vmConfig.MacAddress));
         if (m_vmConfig.EnableLocalhostRelay)
         {
             request.NetworkAdapters.emplace_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());

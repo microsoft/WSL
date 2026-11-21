@@ -39,7 +39,7 @@ set(SOURCES
     LxssServerPort.cpp
     MountSpecParsing.cpp
     NatNetworking.cpp
-    OpenVmmNatNetworking.cpp
+    OpenVmmConsommeNetworking.cpp
     notifications.cpp
     Redirector.cpp
     registry.cpp
@@ -146,7 +146,7 @@ set(HEADERS
     LxssServerPort.h
     MountSpecParsing.h
     NatNetworking.h
-    OpenVmmNatNetworking.h
+    OpenVmmConsommeNetworking.h
     notifications.h
     precomp.h
     Redirector.h
