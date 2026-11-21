@@ -339,17 +339,15 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
-    TEST_METHOD(BootDiskUsesVmOwnerToken)
+    TEST_METHOD(BootDiskAcceptsRequesterToken)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
         request.BootDisks.push_back(CreateDisk(L"disk"));
         auto& token = request.BootDisks.front().Disk.UserToken;
-        token.emplace();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+
+        // The service passes a copy of the caller's token, which is never the VM owner's token instance.
         token = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        token = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
         VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
         token.reset();
         VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
@@ -844,7 +842,7 @@ class OpenVmmVirtualMachineBackendTests
         backend->Terminate();
     }
 
-    TEST_METHOD(EnforcesStorageIdentityAndDiskOwnership)
+    TEST_METHOD(EnforcesDiskOwnership)
     {
         SKIP_TEST_ARM64();
         using wsl::windows::common::filesystem::TempFile;
@@ -860,15 +858,11 @@ class OpenVmmVirtualMachineBackendTests
         auto guest = StartGuest(*backend);
         VmDiskRequest disk{};
         disk.Source = VmVirtualDiskSource{file.Path};
-        disk.UserToken.emplace();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AttachDisk(disk); }));
+
+        // The service passes a copy of the caller's token, which is never the VM owner's token instance.
         disk.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AttachDisk(disk); }));
-        disk.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
         const auto managed = backend->AttachDisk(disk);
         VERIFY_ARE_EQUAL(managed.Id.Value, backend->AttachDisk(disk).Id.Value);
-        disk.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AttachDisk(disk); }));
         disk.UserToken.reset();
 
         disk.UserDisk = true;
@@ -894,11 +888,7 @@ class OpenVmmVirtualMachineBackendTests
 
         VmPersistentMemoryRequest memory{};
         memory.Path = file.Path;
-        memory.UserToken.emplace();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory(memory); }));
         memory.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddPersistentMemory(memory); }));
-        memory.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
         const auto device = backend->AddPersistentMemory(memory);
         VERIFY_ARE_EQUAL(file.Path.wstring(), device.EffectiveHostPath.wstring());
         backend->Terminate();

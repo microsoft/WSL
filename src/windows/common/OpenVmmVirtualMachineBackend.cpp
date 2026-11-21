@@ -70,26 +70,6 @@ std::filesystem::path PrepareCrashDumpPath(const VmCrashCaptureRequest& Request,
     return Request.SavedStateFolder.value() / std::format(L"{}{}-{}{}", c_savedStatePrefix, std::time(nullptr), vmId, c_savedStateExtension);
 }
 
-void ValidateOwnerToken(const std::optional<wil::shared_handle>& Token, HANDLE Owner)
-{
-    if (!Token)
-    {
-        return;
-    }
-
-    const auto token = Token->get();
-    THROW_HR_IF(E_INVALIDARG, !token);
-    if (token != Owner)
-    {
-        const auto tokenInfo = wil::get_token_information<TOKEN_STATISTICS>(token);
-        const auto ownerInfo = wil::get_token_information<TOKEN_STATISTICS>(Owner);
-        THROW_HR_IF_MSG(
-            c_notSupported,
-            tokenInfo.TokenId.HighPart != ownerInfo.TokenId.HighPart || tokenInfo.TokenId.LowPart != ownerInfo.TokenId.LowPart,
-            "OpenVMM uses the VM owner identity and does not support alternate user tokens");
-    }
-}
-
 std::filesystem::path GetVsockListenerPath(const std::filesystem::path& VsockPath, GuestServicePort Port)
 {
     return std::format(L"{}_{:08x}{}", VsockPath.native(), Port.Value, c_vsockServiceIdSuffix);
@@ -234,7 +214,6 @@ VmDescription wsl::windows::common::vm::openvmm::ValidateCreateRequest(const VmC
         THROW_HR_IF(E_INVALIDARG, disk.Key.empty() || description.BootDisks.contains(disk.Key));
         description.BootDisks.emplace(disk.Key, VmDiskAttachment{});
         validation::ValidateDiskRequest(disk.Disk);
-        ValidateOwnerToken(disk.Disk.UserToken, Request.Identity.UserToken.get());
         if (const auto* placement = GetVirtioBlkPlacement(disk.Disk.Placement))
         {
             THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), allocated.test(placement->Slot));
@@ -872,12 +851,16 @@ void OpenVmmVirtualMachineBackend::CloseHostSocket(VmHostSocketId Socket)
 VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& Request)
 {
     ExecutionContext context(Context::OpenVmm);
-    ValidateOwnerToken(Request.UserToken, m_description.Identity.UserToken.get());
     const auto& path = validation::ValidateDiskSource(Request);
     THROW_HR_IF_MSG(
         c_notSupported,
         std::holds_alternative<VmPhysicalDiskSource>(Request.Source),
         "OpenVMM physical-disk support is not available");
+
+    // OpenVMM opens the disk by path as the VM owner, so Request.UserToken isn't used. Unlike HCS, which grants the VM access
+    // as the requester, this lets a requester attach any file the VM owner can open, and fails for files only the requester
+    // can open, when the two differ in elevation. Passing a handle opened as the requester (DiskBackend.virtual_disk) will
+    // close this gap.
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
@@ -1000,7 +983,7 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
 {
     ExecutionContext context(Context::OpenVmm);
-    ValidateOwnerToken(Request.UserToken, m_description.Identity.UserToken.get());
+    // As for disks, OpenVMM opens the file by path as the VM owner, so Request.UserToken isn't used.
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
