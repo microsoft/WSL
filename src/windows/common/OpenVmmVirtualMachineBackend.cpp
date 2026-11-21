@@ -507,7 +507,16 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
         TraceLoggingValue(GetTickCount64() - startTimeMs, "durationMs"));
     const auto result = WaitForSingleObject(m_process.get(), 0);
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
-    THROW_HR_WITH_USER_ERROR_IF(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed(), result == WAIT_OBJECT_0);
+    if (result == WAIT_OBJECT_0)
+    {
+        DWORD exitCode = 0;
+        LOG_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(m_process.get(), &exitCode));
+        WSL_LOG(
+            "OpenVmmProcessExitedDuringCreate",
+            TraceLoggingValue(m_description.Identity.VmId, "vmId"),
+            TraceLoggingHexUInt32(exitCode, "exitCode"));
+        THROW_HR_WITH_USER_ERROR(WSL_E_VM_CRASHED, wsl::shared::Localization::MessageWSL2Crashed());
+    }
 
     // OpenVMM runs on the Windows Hypervisor Platform, which 'wsl --install' doesn't enable because OpenVMM is opt-in.
     THROW_HR_WITH_USER_ERROR_IF(

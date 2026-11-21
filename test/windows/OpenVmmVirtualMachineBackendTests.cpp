@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "OpenVmmNatNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
+#include "WslInstall.h"
 #include "VirtualMachineBackendTestHelpers.h"
 #include "WslCoreHostDnsInfo.h"
 #include "vsock.hpp"
@@ -1120,6 +1121,56 @@ class OpenVmmVirtualMachineBackendTests
             expectedFeatures.set(static_cast<size_t>(feature));
         }
         VERIFY_IS_TRUE(capabilities.Features == expectedFeatures);
+    }
+};
+
+// Runs in the HCS WSL2 pass of every image, including images without the Windows Hypervisor Platform, to verify that
+// OpenVMM either boots or reports that no hypervisor is available instead of failing with an unrelated error.
+class OpenVmmHypervisorAvailabilityTests
+{
+    WSL_TEST_CLASS(OpenVmmHypervisorAvailabilityTests)
+
+    TEST_METHOD(BootsOrReportsMissingHypervisor)
+    {
+        SKIP_TEST_ARM64();
+        if (!LxsstuVmMode())
+        {
+            LogSkipped("OpenVMM requires WSL2");
+            return;
+        }
+        using namespace wsl::windows::common;
+
+        std::optional<bool> whpInstalled;
+        try
+        {
+            whpInstalled = WslInstall::IsOptionalComponentInstalled(L"HypervisorPlatform");
+        }
+        CATCH_LOG()
+
+        ExecutionContext context(Context::Wsl);
+        std::unique_ptr<OpenVmmVirtualMachineBackend> backend;
+        const auto result = wil::ResultFromException([&] {
+            backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+            auto guest = StartGuest(*backend);
+        });
+
+        const auto error = context.ReportedError();
+        LogInfo(
+            "HypervisorPlatform installed: %ls, OpenVMM boot result: 0x%08x, error: %ls, message: %ls",
+            whpInstalled ? (*whpInstalled ? L"yes" : L"no") : L"unknown",
+            result,
+            error ? wslutil::ErrorToString(*error).Code.c_str() : L"none",
+            error && error->Message ? error->Message->c_str() : L"none");
+
+        if (backend)
+        {
+            backend->Terminate();
+        }
+
+        if (FAILED(result))
+        {
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_HV_NOT_PRESENT), result);
+        }
     }
 };
 
