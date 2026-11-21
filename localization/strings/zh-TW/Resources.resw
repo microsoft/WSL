@@ -2279,6 +2279,9 @@ Windows 版本： {}</value>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器網路模式不支援連接埠對應；連接埠由目標容器擁有。</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>停用容器網路時，不支援連接埠對應。啟用網路功能或移除連接埠對應。</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>容器網路模式需要目標容器名稱。</value>
   </data>
