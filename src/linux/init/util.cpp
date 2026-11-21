@@ -284,6 +284,53 @@ Return Value:
     return Result;
 }
 
+wil::unique_fd UtilAcceptVsockFromHost(int SocketFd, int Timeout)
+{
+    const auto flags = fcntl(SocketFd, F_GETFL);
+    THROW_LAST_ERROR_IF(flags < 0);
+    THROW_LAST_ERROR_IF(fcntl(SocketFd, F_SETFL, flags | O_NONBLOCK) < 0);
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{Timeout};
+    // Guest processes can connect to this listener, so discard non-host peers until the deadline.
+    for (;;)
+    {
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
+        THROW_ERRNO_IF(ETIMEDOUT, remaining <= 0);
+
+        pollfd pollDescriptor{SocketFd, POLLIN, 0};
+        const auto result = poll(&pollDescriptor, 1, gsl::narrow_cast<int>(remaining));
+        if (result < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+
+            THROW_LAST_ERROR();
+        }
+
+        THROW_ERRNO_IF(ETIMEDOUT, result == 0 || WI_IsFlagClear(pollDescriptor.revents, POLLIN));
+
+        sockaddr_vm peer{};
+        socklen_t peerSize = sizeof(peer);
+        wil::unique_fd socket{accept4(SocketFd, reinterpret_cast<sockaddr*>(&peer), &peerSize, SOCK_CLOEXEC)};
+        if (!socket)
+        {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                continue;
+            }
+
+            THROW_LAST_ERROR();
+        }
+
+        if (peer.svm_cid == VMADDR_CID_HOST)
+        {
+            return socket;
+        }
+    }
+}
+
 int UtilBindVsockAnyPort(struct sockaddr_vm* SocketAddress, int Type)
 
 /*++
