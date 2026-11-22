@@ -2273,6 +2273,9 @@ Gebruik:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Poorttoewijzingen worden niet ondersteund met de containernetwerkmodus; poorten behoren toe aan de doelcontainer.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Poorttoewijzingen worden niet ondersteund wanneer containernetwerken zijn uitgeschakeld. Schakel netwerken in of verwijder de poorttoewijzingen.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>De doelcontainernaam is vereist voor de containernetwerkmodus.</value>
   </data>
