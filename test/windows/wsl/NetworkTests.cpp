@@ -31,36 +31,6 @@ using wsl::shared::hns::GuestEndpointResourceType;
 using wsl::shared::hns::ModifyGuestEndpointSettingRequest;
 using wsl::shared::hns::ModifyRequestType;
 
-bool TryLoadWinhttpProxyMethods() noexcept
-{
-    constexpr auto winhttpModuleName = L"Winhttp.dll";
-    const wil::shared_hmodule winhttpModule{LoadLibraryEx(winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)};
-    if (!winhttpModule)
-    {
-        return false;
-    }
-
-    try
-    {
-        // attempt to find the functions for the Winhttp proxy APIs.
-        static LxssDynamicFunction<decltype(WinHttpRegisterProxyChangeNotification)> WinHttpRegisterProxyChangeNotification{
-            winhttpModule, "WinHttpRegisterProxyChangeNotification"};
-        static LxssDynamicFunction<decltype(WinHttpUnregisterProxyChangeNotification)> WinHttpUnregisterProxyChangeNotification{
-            winhttpModule, "WinHttpUnregisterProxyChangeNotification"};
-        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsEx)> WinHttpGetProxySettingsEx{
-            winhttpModule, "WinHttpGetProxySettingsEx"};
-        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsResultEx)> WinHttpGetProxySettingsResultEx{
-            winhttpModule, "WinHttpGetProxySettingsResultEx"};
-        static LxssDynamicFunction<decltype(WinHttpFreeProxySettingsEx)> WinHttpFreeProxySettingsEx{
-            winhttpModule, "WinHttpFreeProxySettingsEx"};
-    }
-    catch (...)
-    {
-        return false;
-    }
-    return true;
-}
-
 #define HYPERV_FIREWALL_TEST_ONLY() \
     { \
         WINDOWS_11_TEST_ONLY(); \
@@ -91,15 +61,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
         if (!TryLoadDnsResolverMethods()) \
         { \
             LogSkipped("DNS tunneling APIs not present on this OS. Skipping test..."); \
-            return; \
-        } \
-    }
-
-#define WINHTTP_PROXY_TEST_ONLY() \
-    { \
-        if (!TryLoadWinhttpProxyMethods()) \
-        { \
-            LogSkipped("Winhttp proxy APIs not present on this OS. Skipping test..."); \
             return; \
         } \
     }
@@ -4285,6 +4246,44 @@ class NetworkTests
                                            ? expectedErrorCode
                                            : static_cast<int>(wsl::shared::conncheck::ConnCheckStatus::FailureSocketConnect);
         RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
+    }
+
+    TEST_METHOD(HttpProxyTracksChangesWithoutNetworkingMode)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        VERIFY_SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+
+        ScopedWindowsProxySettings originalSettings;
+        SetHttpProxySettings(c_httpProxyLocalhostv4, L"", L"", true);
+
+        wil::unique_handle userToken;
+        VERIFY_WIN32_BOOL_SUCCEEDED(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        HttpProxyStateTracker tracker(10000, userToken.get());
+
+        const auto verifyProxy = [&](const std::string& expectedProxy) {
+            std::optional<HttpProxySettings> settings;
+            Stopwatch<std::chrono::seconds> watchdog(std::chrono::seconds(30));
+            do
+            {
+                settings = tracker.WaitForInitialProxySettings();
+                if (settings && settings->Proxy == expectedProxy && settings->SecureProxy == expectedProxy)
+                {
+                    break;
+                }
+            } while (Sleep(100), !watchdog.IsExpired());
+
+            VERIFY_IS_TRUE(settings.has_value());
+            VERIFY_ARE_EQUAL(expectedProxy, settings->Proxy);
+            VERIFY_ARE_EQUAL(expectedProxy, settings->SecureProxy);
+        };
+
+        verifyProxy(wsl::shared::string::WideToMultiByte(c_httpProxyLocalhostv4));
+
+        SetHttpProxySettings(c_httpProxyString2, L"", L"", true);
+        verifyProxy(wsl::shared::string::WideToMultiByte(c_httpProxyString2));
+
+        ClearHttpProxySettings(true);
+        verifyProxy("");
     }
 
     TEST_METHOD(HttpProxyRestoredAfterNatFallback)

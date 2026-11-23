@@ -18217,17 +18217,122 @@ sys.exit(1 if queries else 0)
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
     }
 
+    void VerifyWindowsProxyDefaults(WSLCNetworkingMode NetworkingMode, const std::string& Host, bool Supported = false)
+    {
+        ScopedWindowsProxySettings originalSettings;
+        const auto proxy = std::format("http://{}:3128", Host);
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"Set-WinhttpProxy -SettingScope User -Proxy \\\"{}\\\" -ProxyBypass \\\".windows.invalid\\\" -AutoconfigUrl \\\"\\\"", wsl::shared::string::MultiByteToWide(proxy)));
+
+        const auto sessionName = std::format(L"windows-proxy-{}-{}", static_cast<int>(NetworkingMode), Supported);
+        auto session = CreateSession(GetDefaultSessionSettings(sessionName.c_str(), false, NetworkingMode));
+        auto terminate = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
+        LoadTestImage(*session, "alpine:latest");
+
+        const auto readEnvironment = [&](const std::vector<std::string>& environment) {
+            WSLCContainerLauncher launcher("alpine:latest", "", {"env"}, environment, "bridge");
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+            const auto result = process.WaitAndCaptureOutput(30000);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            return "\n" + result.Output.at(1);
+        };
+        const auto environment = readEnvironment({});
+        for (const auto* name : {"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"})
+        {
+            if (Supported)
+            {
+                VERIFY_IS_TRUE(environment.find(std::format("\n{}={}\n", name, proxy)) != std::string::npos);
+            }
+            else
+            {
+                VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
+            }
+        }
+        for (const auto* name : {"no_proxy", "NO_PROXY"})
+        {
+            VERIFY_IS_TRUE(environment.find(std::format("\n{}=.windows.invalid\n", name)) != std::string::npos);
+        }
+
+        const std::vector<std::string> overrides{"http_proxy=http://localhost:8081", "HTTPS_PROXY=", "no_proxy="};
+        const auto overriddenEnvironment = readEnvironment(overrides);
+        for (const auto& value : overrides)
+        {
+            VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}\n", value)) != std::string::npos);
+        }
+        for (const auto* name : {"HTTP_PROXY", "https_proxy", "NO_PROXY"})
+        {
+            VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}=", name)) == std::string::npos);
+        }
+    }
+
+    WSLC_TEST_METHOD(WindowsProxySettingsRestored)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        ScopedWindowsProxySettings originalSettings;
+        LxsstuLaunchPowershellAndCaptureOutput(
+            L"Set-WinhttpProxy -SettingScope User -Proxy 'http=original.proxy.invalid:3128;https=secure.proxy.invalid:3129' "
+            L"-ProxyBypass '<local>;*.original.invalid' -AutoconfigUrl 'http://127.0.0.1:9/original.pac?token=synthetic' "
+            L"-AutoDetect");
+        const auto expected = LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first;
+
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "192.0.2.1", true);
+
+        VERIFY_ARE_EQUAL(expected, LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first);
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyLoopbackDefaultsNAT)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "127.0.0.1");
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyLoopbackDefaultsWithoutHostLoopback)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "127.0.0.1");
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyIpv6DefaultsNAT)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "[2001:db8::1]");
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "192.0.2.1", true);
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyIpv6DefaultsConsomme)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[2001:db8::1]", true);
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyMappedLoopbackDefaultsConsomme)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:127.0.0.1]");
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:7f00:1]");
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:192.0.2.1]", true);
+    }
+
     // Helper: COM callback that captures all warnings received.
     class CapturingWarningCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
     {
     public:
         HRESULT OnWarning(LPCWSTR Message) override
+        try
         {
             std::lock_guard lock(m_lock);
             m_warnings.emplace_back(Message);
             return S_OK;
         }
+        CATCH_RETURN();
 
         std::vector<std::wstring> GetWarnings()
         {

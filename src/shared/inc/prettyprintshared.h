@@ -132,7 +132,8 @@ inline void PrettyPrint(std::stringstream& Out, const T& Value)
         }
 
         gsl::span<const char> span(Value.MessageHead, Value.MessageSize);
-        Out << wsl::shared::string::Join(wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span), Value.Index), ',');
+        const auto strings = wsl::shared::string::ArrayFromSpan(gsl::as_bytes(span), Value.Index);
+        Out << wsl::shared::string::Join(strings, ',');
     }
     else
     {

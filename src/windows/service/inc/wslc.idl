@@ -726,6 +726,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
     ULONG IdleTimeoutSec;
+    [unique] LPCSTR HostLoopback;
 } WSLCSessionInitSettings;
 
 [

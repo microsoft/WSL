@@ -544,6 +544,7 @@ WSLCSessionInitSettings WSLCSessionManagerImpl::CreateSessionSettings(
     sessionSettings.StorageFlags = Settings->StorageFlags;
     sessionSettings.SwapSizeMb = Settings->MemoryMb;
     sessionSettings.IdleTimeoutSec = Settings->IdleTimeoutSec;
+    sessionSettings.HostLoopback = Settings->HostLoopback;
     return sessionSettings;
 }
 
