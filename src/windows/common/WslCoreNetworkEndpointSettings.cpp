@@ -89,7 +89,8 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
         L'-');
 
     EndpointIpAddress address{};
-    auto firstIpv4Address = ipv4Interface ? ipv4Interface->FirstUnicastAddress : nullptr;
+    // If the IPv4 route lookup fails, the adapter selected for IPv6 may still have a local IPv4 address.
+    auto firstIpv4Address = bestInterface->FirstUnicastAddress;
     while (firstIpv4Address && firstIpv4Address->Address.lpSockaddr->sa_family != AF_INET)
     {
         firstIpv4Address = firstIpv4Address->Next;
@@ -131,7 +132,8 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
     // Build IPv4 default route.
     EndpointRoute route{};
-    const auto v4Gateway = findGatewayAddress(ipv4Interface ? ipv4Interface->FirstGatewayAddress : nullptr, AF_INET);
+    // Prefer a reported IPv4 gateway over a generated one, even on the IPv6 fallback adapter.
+    const auto v4Gateway = findGatewayAddress(bestInterface->FirstGatewayAddress, AF_INET);
     if (v4Gateway)
     {
         SOCKADDR_INET v4NextHop{};
