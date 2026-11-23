@@ -15,7 +15,6 @@ Abstract:
 #include "precomp.h"
 #include "ComposeService.h"
 #include "ConsoleService.h"
-#include <array>
 #include <filesystem.hpp>
 #include <relay.hpp>
 #include <WSLCContainerEntry.h>
@@ -36,32 +35,40 @@ namespace {
             projectDirectory = sourcePath.parent_path();
 
             // Capture document bytes and source context as the input snapshot for interpretation.
-            std::ifstream stream{sourcePath, std::ios::binary};
+            std::ifstream stream{sourcePath, std::ios::binary | std::ios::ate};
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), wsl::shared::Localization::MessageWslcComposeFileOpenFailed(sourcePath.wstring()), !stream);
 
-            std::array<char, 4096> buffer{};
-            while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
-            {
-                const auto bytesRead = gsl::narrow<size_t>(stream.gcount());
-                THROW_HR_IF_MSG(
-                    HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
-                    bytesRead > ULONG_MAX - content.size(),
-                    "Compose document exceeds the maximum transport size: %ls",
-                    sourcePath.c_str());
-                content.append(buffer.data(), bytesRead);
-            }
-
+            const auto documentSize = stream.tellg();
             THROW_HR_WITH_USER_ERROR_IF(
                 HRESULT_FROM_WIN32(ERROR_READ_FAULT),
                 wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-                stream.bad() || !stream.eof());
-            THROW_HR_IF(E_INVALIDARG, content.empty());
+                documentSize < 0);
+            THROW_HR_IF(E_INVALIDARG, documentSize == 0);
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
+                static_cast<uint64_t>(documentSize) > ULONG_MAX,
+                "Compose document exceeds the maximum transport size: %ls",
+                sourcePath.c_str());
+            const auto contentSize = gsl::narrow<ULONG>(static_cast<uint64_t>(documentSize));
+            const auto streamSize = gsl::narrow<std::streamsize>(contentSize);
+
+            content.resize(contentSize);
+            stream.seekg(0, std::ios::beg);
+            stream.read(content.data(), streamSize);
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
+                wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
+                stream.gcount() != streamSize || !stream);
+            THROW_HR_WITH_USER_ERROR_IF(
+                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
+                wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
+                stream.peek() != std::char_traits<char>::eof() || stream.bad());
 
             document.SourcePath = sourcePath.c_str();
             document.BaseDirectory = projectDirectory.c_str();
             document.Content = reinterpret_cast<const byte*>(content.data());
-            document.ContentSize = gsl::narrow<ULONG>(content.size());
+            document.ContentSize = contentSize;
 
             documents.ProjectDirectory = projectDirectory.c_str();
             documents.Documents = &document;
@@ -151,13 +158,16 @@ namespace {
             wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
             wsl::windows::common::wslutil::COMOutputHandle stderrHandle;
 
-            THROW_IF_FAILED(container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
+            THROW_IF_FAILED(container->Attach(FALSE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
 
             io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
                 stdoutHandle.Release(), GetStdHandle(STD_OUTPUT_HANDLE)));
 
-            io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
-                stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
+            if (!stderrHandle.Empty())
+            {
+                io.AddHandle(std::make_unique<wsl::windows::common::io::RelayHandle<wsl::windows::common::io::ReadHandle>>(
+                    stderrHandle.Release(), GetStdHandle(STD_ERROR_HANDLE)));
+            }
         }
 
         io.Run({});

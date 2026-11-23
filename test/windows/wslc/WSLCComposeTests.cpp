@@ -1308,7 +1308,7 @@ services:
             wsl::windows::common::wslutil::COMOutputHandle stdinHandle;
             wsl::windows::common::wslutil::COMOutputHandle stdoutHandle;
             wsl::windows::common::wslutil::COMOutputHandle stderrHandle;
-            VERIFY_SUCCEEDED(container->Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
+            VERIFY_SUCCEEDED(container->Attach(TRUE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
             if (tty)
             {
                 VERIFY_SUCCEEDED(process->ResizeTty(30, 100));

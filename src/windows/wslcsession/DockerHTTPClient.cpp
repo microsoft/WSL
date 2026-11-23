@@ -390,13 +390,13 @@ docker_schema::InspectExec DockerHTTPClient::InspectExec(const std::string& Id)
     return Transaction<EmptyRequest, docker_schema::InspectExec>(verb::get, URL::Create("/exec/{}/json", Id));
 }
 
-wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys)
+wil::unique_socket DockerHTTPClient::AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys, bool AttachStdin)
 {
     std::map<std::string, std::string> headers{{"Upgrade", "tcp"}, {"Connection", "upgrade"}};
 
     auto url = URL::Create("/containers/{}/attach", Id);
     url.SetParameter("stream", true);
-    url.SetParameter("stdin", true);
+    url.SetParameter("stdin", AttachStdin);
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
 

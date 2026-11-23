@@ -335,7 +335,7 @@ int ContainerService::Attach(Terminal& terminal, Session& session, const std::st
     COMOutputHandle stdinLogs{};
     COMOutputHandle stdoutLogs{};
     COMOutputHandle stderrLogs{};
-    THROW_IF_FAILED(container->Attach(nullptr, &stdinLogs, &stdoutLogs, &stderrLogs));
+    THROW_IF_FAILED(container->Attach(TRUE, nullptr, &stdinLogs, &stdoutLogs, &stderrLogs));
 
     if (!stdoutLogs.Empty())
     {
