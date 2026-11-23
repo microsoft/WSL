@@ -565,6 +565,7 @@ typedef struct _WSLCSessionSettings {
     WSLCHandle DmesgOutput;
     WSLCSessionStorageFlags StorageFlags;
     ULONG IdleTimeoutSec;
+    [unique] LPCSTR DockerDaemonConfig;
 
     // Below options are used for debugging purposes only.
     [unique] LPCWSTR RootVhdOverride;
@@ -726,6 +727,7 @@ typedef struct _WSLCSessionInitSettings
     WSLCFeatureFlags FeatureFlags;
     [unique] LPCSTR RootVhdTypeOverride;
     ULONG IdleTimeoutSec;
+    [unique] LPCSTR DockerDaemonConfig;
 } WSLCSessionInitSettings;
 
 [

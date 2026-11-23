@@ -412,6 +412,7 @@ private:
     ServiceRunningProcess StartProcess(
         const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
     void InstallTrustedRootCertificates();
+    void WriteDockerdConfig();
     void StartContainerd();
     void StartDockerd();
     int StopProcess(ServiceRunningProcess& Process, DWORD TerminateTimeoutMs, DWORD KillTimeoutMs);
@@ -462,6 +463,7 @@ private:
     std::optional<std::wstring> m_settingsCreatorProcessName;
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
+    std::optional<std::string> m_settingsDockerDaemonConfig;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};
