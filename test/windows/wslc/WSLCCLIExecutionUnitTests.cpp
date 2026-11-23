@@ -25,6 +25,7 @@ Abstract:
 #include "ArgumentValidation.h"
 #include "ContainerCommand.h"
 #include "ContainerTasks.h"
+#include "ComposeService.h"
 
 using namespace wsl::windows::wslc;
 using namespace wsl::windows::wslc::cli;
@@ -1066,6 +1067,36 @@ class WSLCCLIExecutionUnitTests
 
         // Other more complex EnumVariantMap tests are in the Args unit tests.
         // This one will just verify all the data types in the Data Map work as expected.
+    }
+
+    TEST_METHOD(ComposeProjectStatus_TableUsesLocalizedLabels)
+    {
+        WSLCComposeProjectSummary project{};
+        project.CreatedContainersCount = 1;
+        project.ExitedContainersCount = 2;
+        project.OtherContainersCount = 3;
+        project.RunningContainersCount = 4;
+
+        VERIFY_ARE_EQUAL(
+            std::format(
+                L"{}(1), {}(2), {}(3), {}(4)",
+                wsl::shared::Localization::WSLCCLI_ContainerStateCreated(),
+                wsl::shared::Localization::WSLCCLI_ContainerStateExited(),
+                wsl::shared::Localization::WSLCCLI_ComposeProjectStateOther(),
+                wsl::shared::Localization::WSLCCLI_ContainerStateRunning()),
+            services::ComposeService::FormatProjectStatus(project, models::FormatType::Table));
+    }
+
+    TEST_METHOD(ComposeProjectStatus_JsonUsesInvariantLabelsAndOmitsEmptyStates)
+    {
+        WSLCComposeProjectSummary project{};
+        project.CreatedContainersCount = 2;
+        project.ExitedContainersCount = 1;
+        project.RunningContainersCount = 3;
+
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"created(2), exited(1), running(3)"},
+            services::ComposeService::FormatProjectStatus(project, models::FormatType::Json));
     }
 
     // Test: SetContainerOptionsFromArgs sets WorkingDirectory when --workdir is provided

@@ -25,30 +25,6 @@ namespace wsl::windows::wslc::services {
 
 namespace {
 
-    std::string FormatProjectStatus(const WSLCComposeProjectSummary& project)
-    {
-        std::string result;
-        const auto append = [&](std::string_view name, ULONG count) {
-            if (count == 0)
-            {
-                return;
-            }
-
-            if (!result.empty())
-            {
-                result += ", ";
-            }
-
-            result += std::format("{}({})", name, count);
-        };
-
-        append("created", project.CreatedContainersCount);
-        append("exited", project.ExitedContainersCount);
-        append("other", project.OtherContainersCount);
-        append("running", project.RunningContainersCount);
-        return result;
-    }
-
     struct CapturedComposeDocuments
     {
         explicit CapturedComposeDocuments(const std::wstring& path)
@@ -190,7 +166,45 @@ namespace {
 
 } // namespace
 
-std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& session, bool all)
+std::wstring ComposeService::FormatProjectStatus(const WSLCComposeProjectSummary& project, models::FormatType format)
+{
+    std::wstring result;
+    const auto append = [&](std::wstring_view name, ULONG count) {
+        if (count == 0)
+        {
+            return;
+        }
+
+        if (!result.empty())
+        {
+            result += L", ";
+        }
+
+        result += std::format(L"{}({})", name, count);
+    };
+
+    switch (format)
+    {
+    case models::FormatType::Table:
+        append(wsl::shared::Localization::WSLCCLI_ContainerStateCreated(), project.CreatedContainersCount);
+        append(wsl::shared::Localization::WSLCCLI_ContainerStateExited(), project.ExitedContainersCount);
+        append(wsl::shared::Localization::WSLCCLI_ComposeProjectStateOther(), project.OtherContainersCount);
+        append(wsl::shared::Localization::WSLCCLI_ContainerStateRunning(), project.RunningContainersCount);
+        break;
+    case models::FormatType::Json:
+        append(L"created", project.CreatedContainersCount);
+        append(L"exited", project.ExitedContainersCount);
+        append(L"other", project.OtherContainersCount);
+        append(L"running", project.RunningContainersCount);
+        break;
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+
+    return result;
+}
+
+std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& session, bool all, models::FormatType format)
 {
     WSLCComposeProjectListOptions options{};
     options.All = all;
@@ -202,7 +216,7 @@ std::vector<models::ComposeProjectInformation> ComposeService::List(models::Sess
     result.reserve(projects.size());
     for (const auto& project : projects)
     {
-        result.emplace_back(project.ProjectKey, FormatProjectStatus(project));
+        result.emplace_back(project.ProjectKey, wsl::shared::string::WideToMultiByte(FormatProjectStatus(project, format)));
     }
 
     return result;

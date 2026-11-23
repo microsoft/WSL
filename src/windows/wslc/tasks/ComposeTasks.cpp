@@ -96,7 +96,8 @@ void CreateCompose(CLIExecutionContext& context)
 
 void GetComposeProjects(CLIExecutionContext& context)
 {
-    context.Data.Add<Data::ComposeProjects>(ComposeService::List(context.Data.Get<Data::Session>(), context.Args.GetValue<ArgType::All>()));
+    context.Data.Add<Data::ComposeProjects>(ComposeService::List(
+        context.Data.Get<Data::Session>(), context.Args.GetValue<ArgType::All>(), context.Args.GetValue<ArgType::Format>(models::FormatType::Table)));
 }
 
 void ListComposeProjects(CLIExecutionContext& context)

@@ -92,6 +92,7 @@ services:
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"NAME"));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(L"STATUS"));
         VERIFY_IS_TRUE(result.StdoutContainsSubstring(ProjectName));
+        VERIFY_IS_TRUE(result.StdoutContainsSubstring(std::format(L"{}(1)", Localization::WSLCCLI_ContainerStateRunning())));
 
         result = RunWslc(std::format(L"compose stop {}", ProjectName));
         VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
@@ -119,10 +120,63 @@ services:
         VERIFY_IS_FALSE(ContainsComposeProject(projects, WideToMultiByte(UnsupportedProjectName)));
     }
 
+    WSLC_TEST_METHOD(WSLCE2E_Compose_List_MixedStatesPreserveCounts)
+    {
+        const auto projectDirectory = std::filesystem::current_path() / ProjectName;
+        auto directoryCleanup = SetupTestDirectory(projectDirectory);
+        auto resourceCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { Cleanup(); });
+        const auto composePath = projectDirectory / L"compose.yaml";
+
+        WriteTestFileContent(
+            composePath,
+            std::format(
+                R"(
+services:
+  primary:
+    name: {}
+    image: {}
+    command: ["sleep", "3600"]
+  secondary:
+    name: {}
+    image: {}
+    command: ["sleep", "3600"]
+)",
+                WideToMultiByte(OwnedContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag()),
+                WideToMultiByte(SecondaryContainerName),
+                WideToMultiByte(AlpineTestImage().NameAndTag())));
+
+        auto result = RunWslc(std::format(L"compose create \"{}\"", composePath.wstring()));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        result = RunWslc(std::format(L"compose start {}", ProjectName));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        result = RunWslc(std::format(L"container stop {}", SecondaryContainerName));
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+
+        for (const auto& command : {L"compose list --format json", L"compose list --all --format json"})
+        {
+            result = RunWslc(command);
+            result.Verify({.Stderr = L"", .ExitCode = 0});
+            const auto projects = ParseNdjsonOutputAs<ComposeProjectInformation>(result);
+            const auto project = FindComposeProject(projects, WideToMultiByte(ProjectName));
+            VERIFY_IS_TRUE(project.has_value());
+            VERIFY_ARE_EQUAL(std::string{"exited(1), running(1)"}, project->Status);
+        }
+
+        result = RunWslc(std::format(L"compose stop {}", ProjectName));
+        VERIFY_ARE_EQUAL(0u, result.ExitCode.value_or(1));
+        result = RunWslc(L"compose list --format json");
+        result.Verify({.Stderr = L"", .ExitCode = 0});
+        const auto projects = ParseNdjsonOutputAs<ComposeProjectInformation>(result);
+        VERIFY_IS_FALSE(ContainsComposeProject(projects, WideToMultiByte(ProjectName)));
+        VerifyComposeProjectStatus(ProjectName, L"exited(2)");
+    }
+
 private:
     static void Cleanup()
     {
         EnsureContainerDoesNotExist(OwnedContainerName);
+        EnsureContainerDoesNotExist(SecondaryContainerName);
         EnsureContainerDoesNotExist(DockerContainerName);
         EnsureContainerDoesNotExist(UnsupportedContainerName);
         EnsureNetworkDoesNotExist(ProjectName + L"_default");
@@ -130,6 +184,7 @@ private:
 
     inline static const std::wstring ProjectName = L"wslc-e2e-compose-list";
     inline static const std::wstring OwnedContainerName = L"wslc-compose-list-owned";
+    inline static const std::wstring SecondaryContainerName = L"wslc-compose-list-secondary";
     inline static const std::wstring DockerProjectName = L"docker-compose-list";
     inline static const std::wstring DockerContainerName = L"wslc-compose-list-docker";
     inline static const std::wstring UnsupportedProjectName = L"unsupported-compose-list";

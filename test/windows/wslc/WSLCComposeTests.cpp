@@ -569,7 +569,7 @@ class WSLCComposeTests
         VERIFY_ARE_EQUAL(std::vector<std::string>({"container:remove:wslc-compose-secondary:1/1"}), removeProgress->ProgressDescriptions());
 
         wil::com_ptr<IWSLCContainer> removedContainer;
-        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("wslc-compose-basic", &removedContainer));
+        VERIFY_ARE_EQUAL(WSLC_E_CONTAINER_NOT_FOUND, m_defaultSession->OpenContainer("wslc-compose-secondary", &removedContainer));
         VERIFY_SUCCEEDED(m_defaultSession->DeleteNetwork(std::format("{}_default", projectPath.filename().string()).c_str()));
     }
 
