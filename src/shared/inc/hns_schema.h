@@ -253,9 +253,8 @@ struct NetworkInterface
     bool Connected{};
     uint32_t NlMtu{};
     uint32_t Metric{};
-    bool MetricOnly{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkInterface, Connected, NlMtu, Metric, MetricOnly);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(NetworkInterface, Connected, NlMtu, Metric);
 };
 
 enum class InitialIpConfigurationNotificationFlags

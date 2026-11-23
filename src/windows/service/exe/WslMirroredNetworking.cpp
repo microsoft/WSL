@@ -953,8 +953,6 @@ try
     modifyRequest.Settings.Connected = interfaceConnected;
     modifyRequest.Settings.NlMtu = interfaceMtu;
     modifyRequest.Settings.Metric = interfaceMetric;
-    modifyRequest.Settings.MetricOnly =
-        endpoint.StateTracking->InitialSyncComplete && !endpoint.Network->IsHidden && !endpoint.Network->PendingAddressRefresh;
     modifyRequest.ResourceType = hns::GuestEndpointResourceType::Interface;
     modifyRequest.targetDeviceName = wsl::shared::string::GuidToString<wchar_t>(endpoint.InterfaceGuid);
 
