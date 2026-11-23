@@ -2458,6 +2458,113 @@ try
 }
 CATCH_RETURN();
 
+HRESULT WSLCSession::ListComposeProjects(const WSLCComposeProjectListOptions* options, WSLCComposeProjectSummary** projects, ULONG* count)
+try
+{
+    WSLCExecutionContext context(this);
+    RETURN_HR_IF_NULL(E_POINTER, options);
+    RETURN_HR_IF_NULL(E_POINTER, projects);
+    RETURN_HR_IF_NULL(E_POINTER, count);
+
+    *projects = nullptr;
+    *count = 0;
+
+    auto lease = AcquireLease();
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_runtime.HasDocker());
+
+    const std::map<std::string, std::vector<std::string>> filters{
+        {"label",
+         {
+             compose::label::c_project,
+         }},
+    };
+
+    std::vector<docker_schema::ContainerInfo> containers;
+    try
+    {
+        containers = m_runtime.Docker().ListContainers(true, -1, filters);
+    }
+    CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to list compose projects");
+
+    std::map<std::string, WSLCComposeProjectSummary> projectSummaries;
+    std::set<std::string> activeProjects;
+    for (const auto& container : containers)
+    {
+        const auto projectLabel = container.Labels.find(compose::label::c_project);
+        if (projectLabel == container.Labels.end())
+        {
+            continue;
+        }
+
+        if (!ComposeNormalizer::IsValidProjectKey(projectLabel->second))
+        {
+            continue;
+        }
+
+        const auto& projectKey = projectLabel->second;
+        const auto metadataVersionLabel = container.Labels.find(compose::label::c_metadataVersion);
+        const auto metadataVersion =
+            metadataVersionLabel == container.Labels.end() ? std::string{"<missing>"} : metadataVersionLabel->second;
+        if (metadataVersion != compose::label::c_metadataVersionValue)
+        {
+            LOG_HR_MSG(
+                HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
+                "Skipping WSLC Compose project '%hs' because container '%hs' uses unsupported metadata version '%hs'",
+                projectKey.c_str(),
+                container.Id.c_str(),
+                metadataVersion.c_str());
+            continue;
+        }
+
+        auto [entry, inserted] = projectSummaries.try_emplace(projectKey);
+        if (inserted)
+        {
+            THROW_HR_IF(E_UNEXPECTED, strcpy_s(entry->second.ProjectKey, projectKey.c_str()) != 0);
+        }
+
+        switch (container.State)
+        {
+        case docker_schema::ContainerState::Created:
+            ++entry->second.CreatedContainersCount;
+            break;
+        case docker_schema::ContainerState::Running:
+            ++entry->second.RunningContainersCount;
+            activeProjects.insert(projectKey);
+            break;
+        case docker_schema::ContainerState::Exited:
+            ++entry->second.ExitedContainersCount;
+            break;
+        case docker_schema::ContainerState::Paused:
+        case docker_schema::ContainerState::Restarting:
+            ++entry->second.OtherContainersCount;
+            activeProjects.insert(projectKey);
+            break;
+        case docker_schema::ContainerState::Unknown:
+        case docker_schema::ContainerState::Removing:
+        case docker_schema::ContainerState::Dead:
+            ++entry->second.OtherContainersCount;
+            break;
+        }
+    }
+
+    if (!options->All)
+    {
+        std::erase_if(projectSummaries, [&](const auto& entry) { return !activeProjects.contains(entry.first); });
+    }
+
+    THROW_HR_IF(E_UNEXPECTED, projectSummaries.size() > ULONG_MAX);
+    if (!projectSummaries.empty())
+    {
+        auto output = wil::make_unique_cotaskmem<WSLCComposeProjectSummary[]>(projectSummaries.size());
+        std::ranges::transform(projectSummaries, output.get(), [](const auto& entry) { return entry.second; });
+        *projects = output.release();
+        *count = static_cast<ULONG>(projectSummaries.size());
+    }
+
+    return S_OK;
+}
+CATCH_RETURN();
+
 std::vector<Microsoft::WRL::ComPtr<WSLCContainer>> WSLCSession::DiscoverComposeContainers(std::string_view projectKey)
 {
     const std::string projectKeyValue{projectKey};

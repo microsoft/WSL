@@ -166,6 +166,62 @@ namespace {
 
 } // namespace
 
+std::wstring ComposeService::FormatProjectStatus(const WSLCComposeProjectSummary& project, models::FormatType format)
+{
+    std::wstring result;
+    const auto append = [&](std::wstring_view name, ULONG count) {
+        if (count == 0)
+        {
+            return;
+        }
+
+        if (!result.empty())
+        {
+            result += L", ";
+        }
+
+        result += std::format(L"{}({})", name, count);
+    };
+
+    switch (format)
+    {
+    case models::FormatType::Table:
+        append(wsl::shared::Localization::WSLCCLI_ContainerStateCreated(), project.CreatedContainersCount);
+        append(wsl::shared::Localization::WSLCCLI_ContainerStateExited(), project.ExitedContainersCount);
+        append(wsl::shared::Localization::WSLCCLI_ComposeProjectStateOther(), project.OtherContainersCount);
+        append(wsl::shared::Localization::WSLCCLI_ContainerStateRunning(), project.RunningContainersCount);
+        break;
+    case models::FormatType::Json:
+        append(L"created", project.CreatedContainersCount);
+        append(L"exited", project.ExitedContainersCount);
+        append(L"other", project.OtherContainersCount);
+        append(L"running", project.RunningContainersCount);
+        break;
+    default:
+        THROW_HR(E_UNEXPECTED);
+    }
+
+    return result;
+}
+
+std::vector<models::ComposeProjectInformation> ComposeService::List(models::Session& session, bool all, models::FormatType format)
+{
+    WSLCComposeProjectListOptions options{};
+    options.All = all;
+
+    wil::unique_cotaskmem_array_ptr<WSLCComposeProjectSummary> projects;
+    THROW_IF_FAILED(session.Get()->ListComposeProjects(&options, &projects, projects.size_address<ULONG>()));
+
+    std::vector<models::ComposeProjectInformation> result;
+    result.reserve(projects.size());
+    for (const auto& project : projects)
+    {
+        result.emplace_back(project.ProjectKey, wsl::shared::string::WideToMultiByte(FormatProjectStatus(project, format)));
+    }
+
+    return result;
+}
+
 void ComposeService::Create(Terminal&, models::Session& session, const std::wstring& path, HANDLE cancelEvent)
 {
     Execute(session, ComposeProjectReference{std::filesystem::path{path}}, WSLCComposeActionCreate, cancelEvent);
@@ -191,6 +247,15 @@ int ComposeService::Attach(Terminal&, models::Session& session, const ComposePro
 void ComposeService::Stop(Terminal&, models::Session& session, const ComposeProjectReference& project, ULONG timeout, HANDLE cancelEvent)
 {
     Execute(session, project, WSLCComposeActionStop, cancelEvent, timeout);
+}
+
+void ComposeService::Remove(Terminal& terminal, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
+{
+    const auto result = Execute(session, project, WSLCComposeActionRemove, cancelEvent);
+    if (result.value.AffectedContainersCount == 0)
+    {
+        terminal.Info(L"{}\n", wsl::shared::Localization::WSLCCLI_ComposeNoStoppedContainers());
+    }
 }
 
 } // namespace wsl::windows::wslc::services
