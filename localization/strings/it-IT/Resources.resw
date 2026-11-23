@@ -2279,6 +2279,9 @@ Utilizzo:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>I mapping delle porte non sono supportati con la modalità di rete dei contenitori; Le porte sono di proprietà del contenitore di destinazione.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>I mapping delle porte non sono supportati quando la rete dei contenitori è disabilitata. Abilitare la rete o rimuovere i mapping delle porte.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Il nome del contenitore di destinazione è obbligatorio per la modalità di rete del contenitore.</value>
   </data>

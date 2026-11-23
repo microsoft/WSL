@@ -2273,6 +2273,9 @@ Käyttö:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Porttimäärityksiä ei tueta säilön verkkotilassa; portit kuuluvat kohdesäilölle.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Porttimäärityksiä ei tueta, kun säilöverkko on poistettu käytöstä. Ota verkot käyttöön tai poista porttien yhdistämismääritykset.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Kohdesäilön nimi vaaditaan säilön verkkotilassa.</value>
   </data>

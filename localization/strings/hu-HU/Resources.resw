@@ -2273,6 +2273,9 @@ Usage:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>A portleképezések nem támogatottak, ha a tároló hálózata le van tiltva. Engedélyezze a hálózatkezelést, vagy távolítsa el a portleképezéseket.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>A tárolóhálózati módhoz meg kell adni a céltároló nevét.</value>
   </data>

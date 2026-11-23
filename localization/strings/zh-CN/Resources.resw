@@ -2273,6 +2273,9 @@ Windows 版本: {}</value>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器网络模式不支持端口映射；端口由目标容器拥有。</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>禁用容器网络时不支持端口映射。启用网络或删除端口映射。</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>容器网络模式需要目标容器名称。</value>
   </data>

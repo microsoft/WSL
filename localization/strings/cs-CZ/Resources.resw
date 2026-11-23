@@ -2273,6 +2273,9 @@ Využití:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Mapování portů režim sítě kontejneru nepodporuje; porty patří cílovému kontejneru.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Port mappings are not supported when container networking is disabled. Enable networking or remove the port mappings.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Název cílového kontejneru je pro režim sítě kontejneru povinný.</value>
   </data>

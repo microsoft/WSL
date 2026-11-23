@@ -2279,6 +2279,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>포트 매핑은 컨테이너 네트워크 모드에서 지원되지 않습니다. 포트는 대상 컨테이너에서 소유합니다.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>컨테이너 네트워킹을 사용하지 않도록 설정한 경우 포트 매핑이 지원되지 않습니다. 네트워킹을 사용하도록 설정하거나 포트 매핑을 제거하십시오.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>컨테이너 네트워크 모드에는 대상 컨테이너 이름이 필요합니다.</value>
   </data>

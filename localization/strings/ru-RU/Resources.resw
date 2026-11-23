@@ -2280,6 +2280,9 @@
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>В режиме сети контейнера сопоставление портов не поддерживается; права на порты принадлежат целевому контейнеру.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Сопоставления портов не поддерживаются, если сеть контейнера отключена. Включите сеть или удалите сопоставления портов.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Для режима сети контейнера требуется имя целевого контейнера.</value>
   </data>
