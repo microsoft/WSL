@@ -15,6 +15,7 @@ Abstract:
 #include "precomp.h"
 #include "filesystem.hpp"
 #include <set>
+#include <winioctl.h>
 
 #define FULL_PATH_PREFIX L"\\\\?\\"
 #define LXSS_DOMAIN_NAME_DEFAULT "localdomain"
@@ -634,7 +635,32 @@ wsl::windows::common::filesystem::DeviceIoControlNoThrow(_In_ HANDLE handle, _In
     return status;
 }
 
-std::pair<ULONG, ULONG> wsl::windows::common::filesystem::EnumerateFixedDrives(HANDLE Token)
+bool wsl::windows::common::filesystem::IsUsbDrive(wchar_t Drive)
+{
+    const wchar_t volumePath[] = {L'\\', L'\\', L'.', L'\\', Drive, L':', L'\0'};
+    const wil::unique_hfile handle{
+        ::CreateFileW(volumePath, 0, (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE), nullptr, OPEN_EXISTING, 0, nullptr)};
+    if (!handle)
+    {
+        return false;
+    }
+
+    STORAGE_PROPERTY_QUERY query{};
+    query.PropertyId = StorageDeviceProperty;
+    query.QueryType = PropertyStandardQuery;
+
+    STORAGE_DEVICE_DESCRIPTOR descriptor{};
+    DWORD bytesReturned = 0;
+    if (!::DeviceIoControl(handle.get(), IOCTL_STORAGE_QUERY_PROPERTY, &query, sizeof(query), &descriptor, sizeof(descriptor), &bytesReturned, nullptr) ||
+        bytesReturned < offsetof(STORAGE_DEVICE_DESCRIPTOR, BusType) + sizeof(descriptor.BusType))
+    {
+        return false;
+    }
+
+    return descriptor.BusType == BusTypeUsb;
+}
+
+std::pair<ULONG, ULONG> wsl::windows::common::filesystem::EnumerateFixedDrives(HANDLE Token, bool IncludeUsbDrives)
 {
     std::variant<wil::unique_coreverttoself_call, wil::unique_token_reverter> runAsUser;
 
@@ -660,9 +686,9 @@ std::pair<ULONG, ULONG> wsl::windows::common::filesystem::EnumerateFixedDrives(H
         driveBitmap ^= driveMask;
         const auto driveName = static_cast<wchar_t>(L'A' + index);
         drivePath[0] = driveName;
-        if (GetDriveTypeW(drivePath) != DRIVE_FIXED)
+        if ((GetDriveTypeW(drivePath) != DRIVE_FIXED) || (!IncludeUsbDrives && IsUsbDrive(driveName)))
         {
-            // Don't try to check if the user has read access to non-fixed drives.
+            // Don't try to check if the user has read access to non-fixed or excluded drives.
             // This can cause a hang for network devices. See https://github.com/microsoft/WSL/issues/11460 .
             fixedDriveBitmap ^= driveMask;
             continue;

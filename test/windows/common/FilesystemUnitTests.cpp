@@ -16,10 +16,12 @@ Abstract:
 #include "precomp.h"
 #include "Common.h"
 
+using wsl::windows::common::filesystem::EnumerateFixedDrives;
 using wsl::windows::common::filesystem::ExtractArchiveInto;
 using wsl::windows::common::filesystem::ExtractSingleFileAs;
 using wsl::windows::common::filesystem::GetCanonicalPath;
 using wsl::windows::common::filesystem::IsRepresentableFileName;
+using wsl::windows::common::filesystem::IsUsbDrive;
 using wsl::windows::common::filesystem::MakeStagingDirectory;
 using wsl::windows::common::filesystem::PosixBaseName;
 using wsl::windows::common::filesystem::StagingDirectory;
@@ -921,6 +923,46 @@ class FilesystemUnitTests
         VERIFY_IS_TRUE(std::filesystem::is_directory(root.Path() / L"gathered"));
         VERIFY_ARE_EQUAL(std::string{"one"}, ReadFileContent(root.Path() / L"gathered" / L"first.txt"));
         VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"gathered" / L"second.txt"));
+    }
+
+    TEST_METHOD(IsUsbDrive_MissingDriveReturnsFalse)
+    {
+        // Querying a drive letter that is not assigned must not throw and must return false.
+        const ULONG presentDrives = GetLogicalDrives();
+        for (ULONG index = 0; index < 26; ++index)
+        {
+            if ((presentDrives & (1UL << index)) == 0)
+            {
+                VERIFY_IS_FALSE(IsUsbDrive(static_cast<wchar_t>(L'A' + index)));
+                break;
+            }
+        }
+    }
+
+    TEST_METHOD(EnumerateFixedDrives_ExcludeUsbDrivesIsSubsetOfDefault)
+    {
+        wil::unique_handle processToken;
+        VERIFY_IS_TRUE(!!OpenProcessToken(GetCurrentProcess(), (TOKEN_QUERY | TOKEN_DUPLICATE), &processToken));
+
+        wil::unique_handle impersonationToken;
+        VERIFY_IS_TRUE(!!DuplicateTokenEx(
+            processToken.get(), (TOKEN_IMPERSONATE | TOKEN_QUERY), nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
+
+        const auto [allDrives, allNonReadable] = EnumerateFixedDrives(impersonationToken.get(), true);
+        const auto [nonUsbDrives, nonUsbNonReadable] = EnumerateFixedDrives(impersonationToken.get(), false);
+
+        // Excluding USB drives can only remove drives from the fixed-drive set, never add new ones.
+        VERIFY_ARE_EQUAL(0UL, nonUsbDrives & ~allDrives);
+        VERIFY_ARE_EQUAL(0UL, nonUsbNonReadable & ~allNonReadable);
+
+        const ULONG excludedDrives = (allDrives | allNonReadable) & ~(nonUsbDrives | nonUsbNonReadable);
+        for (ULONG index = 0; index < 26; ++index)
+        {
+            if ((excludedDrives & (1UL << index)) != 0)
+            {
+                VERIFY_IS_TRUE(IsUsbDrive(static_cast<wchar_t>(L'A' + index)));
+            }
+        }
     }
 };
 } // namespace FilesystemUnitTests

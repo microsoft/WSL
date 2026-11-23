@@ -945,7 +945,7 @@ void WslCoreVm::AddDrvFsShare(_In_ bool Admin, _In_ HANDLE UserToken)
     {
         // Add virtiofs devices associating indices with paths from the fixed drive bitmap. These devices support
         // multiple mounts in the guest, so this only needs to be done once.
-        auto fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken).first;
+        auto fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(UserToken, m_vmConfig.EnableAutoMountUsbDrives).first;
         while (fixedDrives != 0)
         {
             ULONG index;
@@ -1280,7 +1280,8 @@ std::shared_ptr<LxssRunningInstance> WslCoreVm::CreateInstanceInternal(
         m_vmConfig.DistributionStartTimeout,
         m_vmConfig.InstanceIdleTimeout,
         ConnectPort,
-        m_processJobObject.get());
+        m_processJobObject.get(),
+        m_vmConfig.EnableAutoMountUsbDrives);
 
     WI_ASSERT(!initSocket && !systemDistroSocket);
 
