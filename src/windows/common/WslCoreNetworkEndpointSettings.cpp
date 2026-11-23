@@ -55,16 +55,28 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
 std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::GetHostEndpointSettings()
 {
-    auto addresses = AdapterAddresses::GetCurrent();
-    auto bestIndex = GetBestInterface();
-    auto bestInterfacePtr =
-        std::find_if(addresses.cbegin(), addresses.cend(), [&](const auto& address) { return address->IfIndex == bestIndex; });
-    if (bestInterfacePtr == addresses.end())
+    const auto addresses = AdapterAddresses::GetCurrent();
+    const auto ipv4Index = GetBestInterface(AF_INET);
+    const auto ipv6Index = GetBestInterface(AF_INET6);
+    const IP_ADAPTER_ADDRESSES* ipv4Interface = nullptr;
+    const IP_ADAPTER_ADDRESSES* ipv6Interface = nullptr;
+    for (const auto& adapter : addresses)
+    {
+        if (ipv4Index != 0 && adapter->IfIndex == ipv4Index)
+        {
+            ipv4Interface = std::to_address(adapter);
+        }
+        if (ipv6Index != 0 && adapter->Ipv6IfIndex == ipv6Index)
+        {
+            ipv6Interface = std::to_address(adapter);
+        }
+    }
+
+    const auto* bestInterface = ipv4Interface ? ipv4Interface : ipv6Interface;
+    if (!bestInterface)
     {
         return std::make_shared<NetworkSettings>();
     }
-
-    const auto& bestInterface = *bestInterfacePtr;
 
     std::wstring macAddress = wsl::shared::string::FormatMacAddress(
         wsl::shared::string::MacAddress{
@@ -77,7 +89,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
         L'-');
 
     EndpointIpAddress address{};
-    auto firstIpv4Address = bestInterface->FirstUnicastAddress;
+    auto firstIpv4Address = ipv4Interface ? ipv4Interface->FirstUnicastAddress : nullptr;
     while (firstIpv4Address && firstIpv4Address->Address.lpSockaddr->sa_family != AF_INET)
     {
         firstIpv4Address = firstIpv4Address->Next;
@@ -91,7 +103,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
     // Find the first global-scope (non-link-local) IPv6 unicast address.
     EndpointIpAddress ipv6Address{};
-    auto nextUnicastAddress = bestInterface->FirstUnicastAddress;
+    auto nextUnicastAddress = ipv6Interface ? ipv6Interface->FirstUnicastAddress : nullptr;
     while (nextUnicastAddress)
     {
         if (nextUnicastAddress->Address.lpSockaddr->sa_family == AF_INET6)
@@ -119,7 +131,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
     // Build IPv4 default route.
     EndpointRoute route{};
-    const auto v4Gateway = findGatewayAddress(bestInterface->FirstGatewayAddress, AF_INET);
+    const auto v4Gateway = findGatewayAddress(ipv4Interface ? ipv4Interface->FirstGatewayAddress : nullptr, AF_INET);
     if (v4Gateway)
     {
         SOCKADDR_INET v4NextHop{};
@@ -133,7 +145,7 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
 
     // Build IPv6 default route.
     EndpointRoute v6Route{};
-    const auto v6Gateway = findGatewayAddress(bestInterface->FirstGatewayAddress, AF_INET6);
+    const auto v6Gateway = findGatewayAddress(ipv6Interface ? ipv6Interface->FirstGatewayAddress : nullptr, AF_INET6);
     if (v6Gateway)
     {
         SOCKADDR_INET v6NextHop{};
@@ -148,6 +160,6 @@ std::shared_ptr<wsl::core::networking::NetworkSettings> wsl::core::networking::G
         std::move(route),
         std::move(v6Route),
         std::move(macAddress),
-        bestInterface->IfIndex,
+        ipv4Interface ? ipv4Index : ipv6Index,
         bestInterface->IfType);
 }
