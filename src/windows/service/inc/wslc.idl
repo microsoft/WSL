@@ -581,7 +581,8 @@ typedef struct _WSLCSessionSettings {
 ]
 interface IWSLCContainer : IUnknown
 {
-    HRESULT Attach([in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
+    // When AttachStdin is false, StdIn is empty and TTY output is returned in StdOut.
+    HRESULT Attach([in] BOOL AttachStdin, [in, unique] LPCSTR DetachKeys, [out] WSLCHandle* StdIn, [out] WSLCHandle* StdOut, [out] WSLCHandle* StdErr);
     HRESULT Stop([in] WSLCSignal Signal, [in] LONG TimeoutSeconds);
     HRESULT Start([in] WSLCContainerStartFlags Flags, [in, unique] const WSLCProcessStartOptions* StartOptions, [in, unique] IWarningCallback* WarningCallback);
     HRESULT Delete([in] WSLCDeleteFlags Flags);

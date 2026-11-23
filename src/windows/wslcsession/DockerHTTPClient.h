@@ -139,7 +139,7 @@ public:
     common::docker_schema::InspectContainer InspectContainer(const std::string& Id, bool Size = false);
     common::docker_schema::ContainerStats ContainerStats(const std::string& Id);
     common::docker_schema::InspectExec InspectExec(const std::string& Id);
-    wil::unique_socket AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys);
+    wil::unique_socket AttachContainer(const std::string& Id, const std::optional<std::string>& DetachKeys, bool AttachStdin);
     void ResizeContainerTty(const std::string& Id, ULONG Rows, ULONG Columns);
     wil::unique_socket ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail);
     std::pair<uint32_t, wil::unique_socket> ExportContainer(const std::string& ContainerID);

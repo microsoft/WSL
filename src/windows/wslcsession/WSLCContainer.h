@@ -111,7 +111,7 @@ public:
     void OnSessionStart();
 
     wil::com_ptr<IWSLCProcess> Start(WSLCContainerStartFlags Flags, const WSLCProcessStartOptions* StartOptions);
-    void Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
+    void Attach(bool AttachStdin, LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const;
     void Stop(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, bool Kill);
     void Restart(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds);
     void Delete(WSLCDeleteFlags Flags);
@@ -381,7 +381,7 @@ public:
         WSLCContainerState state,
         std::function<void(const WSLCContainerImpl*)>&& OnDeleted);
 
-    IFACEMETHOD(Attach)(_In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
+    IFACEMETHOD(Attach)(_In_ BOOL AttachStdin, _In_opt_ LPCSTR DetachKeys, _Out_ WSLCHandle* Stdin, _Out_ WSLCHandle* Stdout, _Out_ WSLCHandle* Stderr) override;
     IFACEMETHOD(Stop)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds) override;
     IFACEMETHOD(Restart)(_In_ WSLCSignal Signal, _In_ LONG TimeoutSeconds, _In_opt_ IWarningCallback* WarningCallback) override;
     IFACEMETHOD(Kill)(_In_ WSLCSignal Signal) override;

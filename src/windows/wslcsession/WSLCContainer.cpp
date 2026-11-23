@@ -1123,7 +1123,7 @@ Microsoft::WRL::ComPtr<WSLCContainer> WSLCContainerImpl::GetComWrapper() const
     return m_comWrapper;
 }
 
-void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const
+void WSLCContainerImpl::Attach(bool AttachStdin, LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr) const
 {
     auto lock = m_lock.lock_shared();
 
@@ -1133,40 +1133,52 @@ void WSLCContainerImpl::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle*
 
     try
     {
-        ioHandle = wil::shared_socket{
-            m_runtime.Docker().AttachContainer(m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys))};
+        ioHandle = wil::shared_socket{m_runtime.Docker().AttachContainer(
+            m_id, DetachKeys == nullptr ? std::nullopt : std::optional<std::string>(DetachKeys), AttachStdin)};
     }
     CATCH_AND_THROW_DOCKER_USER_ERROR("Failed to attach to container '%hs'", m_id.c_str());
 
     // If this is a TTY process, the PTY handle can be returned directly.
     if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
     {
-        *Stdin = common::wslutil::ToCOMOutputHandle(
-            reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypeSocket);
+        if (AttachStdin)
+        {
+            *Stdin = common::wslutil::ToCOMOutputHandle(
+                reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypeSocket);
+            return;
+        }
 
+        *Stdout = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(ioHandle.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypeSocket);
         return;
     }
 
     // Otherwise the stream is multiplexed and needs to be relayed.
-    // TODO: Consider skipping stdin if the stdin flag isn't set.
-    auto [stdinRead, stdinWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
     auto [stdoutRead, stdoutWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
     auto [stderrRead, stderrWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
 
     std::vector<std::unique_ptr<OverlappedIOHandle>> handles;
+    wil::unique_hfile stdinWrite;
+    if (AttachStdin)
+    {
+        auto [inputRead, inputWrite] = common::wslutil::OpenAnonymousPipe(LX_RELAY_BUFFER_SIZE, true, true);
+        stdinWrite = std::move(inputWrite);
 
-    // This is required for docker to know when stdin is closed.
-    auto onInputComplete = [ioHandle]() { LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR); };
+        // This is required for docker to know when stdin is closed.
+        auto onInputComplete = [ioHandle]() { LOG_LAST_ERROR_IF(shutdown(ioHandle.get(), SD_SEND) == SOCKET_ERROR); };
 
-    handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
-        HandleWrapper{std::move(stdinRead), std::move(onInputComplete)}, HandleWrapper{ioHandle}));
+        handles.emplace_back(std::make_unique<RelayHandle<ReadHandle>>(
+            HandleWrapper{std::move(inputRead), std::move(onInputComplete)}, HandleWrapper{ioHandle}));
+    }
 
     handles.emplace_back(std::make_unique<DockerIORelayHandle>(
         HandleWrapper{ioHandle}, std::move(stdoutWrite), std::move(stderrWrite), DockerIORelayHandle::Format::Raw));
 
     m_runtime.Relay()->AddHandles(std::move(handles));
 
-    *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypePipe);
+    if (AttachStdin)
+    {
+        *Stdin = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdinWrite.get()), GENERIC_WRITE | SYNCHRONIZE, WSLCHandleTypePipe);
+    }
 
     *Stdout = common::wslutil::ToCOMOutputHandle(reinterpret_cast<HANDLE>(stdoutRead.get()), GENERIC_READ | SYNCHRONIZE, WSLCHandleTypePipe);
 
@@ -1239,11 +1251,11 @@ wil::com_ptr<IWSLCProcess> WSLCContainerImpl::StartPhase(
         {
             if (WI_IsFlagSet(m_initProcessFlags, WSLCProcessFlagsTty))
             {
-                io = std::make_unique<TTYProcessIO>(TypedHandle{m_runtime.Docker().AttachContainer(m_id, detachKeys), WSLCHandleTypeSocket});
+                io = std::make_unique<TTYProcessIO>(TypedHandle{m_runtime.Docker().AttachContainer(m_id, detachKeys, true), WSLCHandleTypeSocket});
             }
             else
             {
-                io = CreateRelayedProcessIO(wil::shared_socket{m_runtime.Docker().AttachContainer(m_id, detachKeys)}, m_initProcessFlags);
+                io = CreateRelayedProcessIO(wil::shared_socket{m_runtime.Docker().AttachContainer(m_id, detachKeys, true)}, m_initProcessFlags);
             }
         }
     }
@@ -3819,7 +3831,7 @@ Microsoft::WRL::ComPtr<IWSLCSession> WSLCContainer::ResolveSession(bool Required
     return session;
 }
 
-HRESULT WSLCContainer::Attach(LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
+HRESULT WSLCContainer::Attach(BOOL AttachStdin, LPCSTR DetachKeys, WSLCHandle* Stdin, WSLCHandle* Stdout, WSLCHandle* Stderr)
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, Stdin);
@@ -3833,7 +3845,7 @@ try
     auto sessionLifetime = ResolveSession();
     WSLCExecutionContext context(&m_session);
     auto vmLease = m_session.Runtime().AcquireVmLease();
-    return CallImpl(&WSLCContainerImpl::Attach, DetachKeys, Stdin, Stdout, Stderr);
+    return CallImpl(&WSLCContainerImpl::Attach, AttachStdin != FALSE, DetachKeys, Stdin, Stdout, Stderr);
 }
 CATCH_RETURN();
 

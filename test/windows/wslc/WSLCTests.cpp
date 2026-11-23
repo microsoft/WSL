@@ -16179,14 +16179,14 @@ sys.exit(1 if queries else 0)
             COMOutputHandle stdoutHandle{};
             COMOutputHandle stderrHandle{};
             auto id = container->Id();
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
+            VERIFY_ARE_EQUAL(container->Get().Attach(TRUE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
             ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Start the container.
             VERIFY_SUCCEEDED(container->Get().Start(WSLCContainerStartFlagsAttach, nullptr, nullptr));
 
             // Verify that trying to attach with null handles fails.
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
+            VERIFY_ARE_EQUAL(container->Get().Attach(TRUE, nullptr, nullptr, nullptr, nullptr), HRESULT_FROM_WIN32(RPC_X_NULL_REF_POINTER));
 
             // Get its original std handles.
             auto process = container->GetInitProcess();
@@ -16197,7 +16197,7 @@ sys.exit(1 if queries else 0)
             stdinHandle.Reset();
             stdoutHandle.Reset();
             stderrHandle.Reset();
-            VERIFY_SUCCEEDED(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
+            VERIFY_SUCCEEDED(container->Get().Attach(TRUE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
 
             PartialHandleRead originalReader(originalStdout.Get());
             PartialHandleRead attachedReader(stdoutHandle.Get());
@@ -16234,7 +16234,7 @@ sys.exit(1 if queries else 0)
             stdinHandle.Reset();
             stdoutHandle.Reset();
             stderrHandle.Reset();
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
+            VERIFY_ARE_EQUAL(container->Get().Attach(TRUE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), WSLC_E_CONTAINER_NOT_RUNNING);
             ValidateCOMErrorMessage(std::format(L"Container '{}' is not running.", id));
 
             // Validate that attaching to a deleted container fails.
@@ -16243,7 +16243,7 @@ sys.exit(1 if queries else 0)
             stdoutHandle.Reset();
             stderrHandle.Reset();
 
-            VERIFY_ARE_EQUAL(container->Get().Attach(nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), RPC_E_DISCONNECTED);
+            VERIFY_ARE_EQUAL(container->Get().Attach(TRUE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle), RPC_E_DISCONNECTED);
 
             container->SetDeleteOnClose(false);
         }
@@ -16260,7 +16260,7 @@ sys.exit(1 if queries else 0)
             COMOutputHandle attachedStdin;
             COMOutputHandle attachedStdout;
             COMOutputHandle attachedStderr;
-            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach(TRUE, nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
 
             PartialHandleRead originalReader(originalStdout.Get());
             PartialHandleRead attachedReader(attachedStdout.Get());
@@ -16283,7 +16283,7 @@ sys.exit(1 if queries else 0)
             COMOutputHandle attachedTty{};
             COMOutputHandle dummyHandle1{};
             COMOutputHandle dummyHandle2{};
-            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedTty, &dummyHandle1, &dummyHandle2));
+            VERIFY_SUCCEEDED(container.Get().Attach(TRUE, nullptr, &attachedTty, &dummyHandle1, &dummyHandle2));
 
             PartialHandleRead originalReader(originalTty.Get());
             PartialHandleRead attachedReader(attachedTty.Get());
@@ -16321,7 +16321,7 @@ sys.exit(1 if queries else 0)
             COMOutputHandle attachedStdin{};
             COMOutputHandle attachedStdout{};
             COMOutputHandle attachedStderr{};
-            VERIFY_SUCCEEDED(container.Get().Attach(nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
+            VERIFY_SUCCEEDED(container.Get().Attach(TRUE, nullptr, &attachedStdin, &attachedStdout, &attachedStderr));
 
             PartialHandleRead attachedReader(attachedStdout.Get());
 
@@ -16332,6 +16332,50 @@ sys.exit(1 if queries else 0)
             attachedReader.Expect("OK\n");
             attachedReader.ExpectClosed();
             VERIFY_ARE_EQUAL(initProcess.Wait(), 0);
+        }
+    }
+
+    WSLC_TEST_METHOD(ContainerAttachWithoutStdin)
+    {
+        for (const bool tty : {false, true})
+        {
+            const auto flags = WSLCProcessFlagsStdin | (tty ? WSLCProcessFlagsTty : WSLCProcessFlagsNone);
+            const auto command = tty ? "stty -echo -onlcr && printf 'ready\\n' && exec /bin/cat" : "printf 'ready\\n' && exec /bin/cat";
+            WSLCContainerLauncher launcher(
+                "debian:latest", std::format("attach-without-stdin-{}", tty), {"/bin/sh", "-c", command}, {}, {}, flags);
+            auto container = launcher.Launch(*m_defaultSession);
+            auto process = container.GetInitProcess();
+            auto originalStdin = process.GetStdHandle(tty ? WSLCFDTty : WSLCFDStdin);
+            wsl::windows::common::io::HandleWrapper originalStdout;
+            if (!tty)
+            {
+                originalStdout = process.GetStdHandle(WSLCFDStdout);
+            }
+            const auto& originalOutput = tty ? originalStdin : originalStdout;
+            PartialHandleRead originalReader(originalOutput.Get());
+            originalReader.Expect("ready\n");
+
+            COMOutputHandle stdoutHandle;
+            COMOutputHandle stderrHandle;
+            {
+                COMOutputHandle stdinHandle;
+                VERIFY_SUCCEEDED(container.Get().Attach(FALSE, nullptr, &stdinHandle, &stdoutHandle, &stderrHandle));
+                VERIFY_IS_TRUE(stdinHandle.Empty());
+            }
+            VERIFY_IS_FALSE(stdoutHandle.Empty());
+            VERIFY_ARE_EQUAL(tty, stderrHandle.Empty());
+
+            PartialHandleRead attachedReader(stdoutHandle.Get());
+            constexpr std::string_view c_input = "stdin-remains-open\n";
+            VERIFY_WIN32_BOOL_SUCCEEDED(WriteFile(originalStdin.Get(), c_input.data(), static_cast<DWORD>(c_input.size()), nullptr, nullptr));
+            originalReader.Expect(std::format("ready\n{}", c_input));
+            attachedReader.Expect(std::string{c_input});
+            VERIFY_ARE_EQUAL(WslcContainerStateRunning, container.State());
+
+            VERIFY_SUCCEEDED(container.Get().Kill(WSLCSignalSIGKILL));
+            VERIFY_ARE_EQUAL(128 + WSLCSignalSIGKILL, process.Wait());
+            originalReader.ExpectClosed();
+            attachedReader.ExpectClosed();
         }
     }
 
@@ -16990,7 +17034,7 @@ sys.exit(1 if queries else 0)
                 COMOutputHandle ttyHandle{};
                 COMOutputHandle unusedHandle1{};
                 COMOutputHandle unusedHandle2{};
-                VERIFY_SUCCEEDED(container.Get().Attach(DetachKeys, &ttyHandle, &unusedHandle1, &unusedHandle2));
+                VERIFY_SUCCEEDED(container.Get().Attach(TRUE, DetachKeys, &ttyHandle, &unusedHandle1, &unusedHandle2));
 
                 validateDetaches(ttyHandle.Get(), ttyHandle.Get(), DetachSequence);
             }
@@ -17035,7 +17079,7 @@ sys.exit(1 if queries else 0)
             VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
 
             COMOutputHandle unusedHandle{};
-            VERIFY_ARE_EQUAL(container.Get().Attach("invalid", &unusedHandle, &unusedHandle, &unusedHandle), E_INVALIDARG);
+            VERIFY_ARE_EQUAL(container.Get().Attach(TRUE, "invalid", &unusedHandle, &unusedHandle, &unusedHandle), E_INVALIDARG);
 
             WSLCProcessLauncher processLauncher({}, {"cat"}, {}, WSLCProcessFlagsStdin | WSLCProcessFlagsTty);
             processLauncher.SetDetachKeys("invalid");
