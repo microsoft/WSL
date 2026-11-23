@@ -2279,6 +2279,9 @@ Uso:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Las asignaciones de puerto no son compatibles con el modo de red de contenedor; Los puertos son propiedad del contenedor de destino.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>No se admiten las asignaciones de puerto cuando las redes de contenedor están deshabilitadas. Habilite las redes o quite las asignaciones de puertos.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>El nombre del contenedor de destino es necesario para el modo de red de contenedor.</value>
   </data>

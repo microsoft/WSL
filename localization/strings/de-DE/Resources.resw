@@ -2279,6 +2279,9 @@ Verwendung:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Portzuordnungen werden im Containernetzwerkmodus nicht unterstützt. Ports befinden sich im Besitz des Zielcontainers.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Portzuordnungen werden nicht unterstützt, wenn das Containernetzwerk deaktiviert ist. Aktivieren Sie den Netzwerkbetrieb, oder entfernen Sie die Portzuordnungen.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Der Zielcontainername ist für den Containernetzwerkmodus erforderlich.</value>
   </data>
