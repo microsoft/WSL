@@ -3,8 +3,10 @@
 #pragma once
 
 #include <authz.h>
+#include <gsl/gsl>
 #include <wil/resource.h>
 #include <span>
+#include <string>
 #include <string_view>
 #include <nlohmann/json_fwd.hpp>
 
@@ -24,7 +26,7 @@ std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_vi
 class EventSource
 {
 public:
-    EventSource();
+    explicit EventSource(std::wstring wslcVmId = {});
     NON_COPYABLE(EventSource);
     NON_MOVABLE(EventSource);
 
@@ -32,8 +34,12 @@ public:
 
 private:
     static void Close(AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE provider) noexcept;
+    std::wstring m_wslcVmId;
     wil::unique_handle m_token;
     wil::unique_any<AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE, decltype(&Close), Close> m_provider;
 };
+
+struct ProcessExecutionDistribution;
+void ReportEvent(EventSource& source, gsl::span<gsl::byte> bytes, bool includeCommandLine, const ProcessExecutionDistribution* distribution = nullptr);
 
 } // namespace wsl::windows::common::securityaudit

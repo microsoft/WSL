@@ -2,6 +2,11 @@
 
 #include "precomp.h"
 #include "SecurityAudit.h"
+#include "securityaudit/ProcessCreationAudit.h"
+#include "securityaudit/ProcessExecutionAudit.h"
+#include "securityaudit/NetworkAudit.h"
+#include "securityaudit/SystemAudit.h"
+#include "lxinitshared.h"
 #include "WslSecurity.h"
 #include "wslutil.h"
 #include "wslsecurityaudit.h"
@@ -133,7 +138,8 @@ std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_vi
         L"\n\n" + std::wstring(text));
 }
 
-EventSource::EventSource() : m_token(AcquireTokenWithPrivilege(SE_AUDIT_NAME))
+EventSource::EventSource(std::wstring wslcVmId) :
+    m_wslcVmId(std::move(wslcVmId)), m_token(AcquireTokenWithPrivilege(SE_AUDIT_NAME))
 {
     auto impersonation = wil::impersonate_token(m_token.get());
     EnsureInstalled();
@@ -147,7 +153,11 @@ void EventSource::Close(AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE provider) noexcept
 
 void EventSource::Report(DWORD eventId, std::span<std::wstring> fields)
 {
-    THROW_HR_IF(E_INVALIDARG, eventId > UINT16_MAX || fields.empty() || fields.size() > USHRT_MAX);
+    THROW_HR_IF(E_INVALIDARG, eventId > UINT16_MAX || fields.size() < 2 || fields.size() >= USHRT_MAX);
+    if (!m_wslcVmId.empty())
+    {
+        fields[1] += L"\r\n" + wsl::shared::Localization::MessageWslcAuditVmId(m_wslcVmId);
+    }
     auto impersonation = wil::impersonate_token(m_token.get());
     std::vector<AUDIT_PARAM> values(fields.size());
     for (size_t index = 0; index < fields.size(); ++index)
@@ -155,8 +165,87 @@ void EventSource::Report(DWORD eventId, std::span<std::wstring> fields)
         values[index].Type = APT_String;
         values[index].String = fields[index].data();
     }
+    if (!m_wslcVmId.empty())
+    {
+        // Append a machine-readable origin without shifting existing PID, JSON or display insertions.
+        AUDIT_PARAM origin{};
+        origin.Type = APT_String;
+        origin.String = m_wslcVmId.data();
+        values.push_back(origin);
+    }
     AUDIT_PARAMS parameters{sizeof(AUDIT_PARAMS), APF_AuditSuccess, static_cast<USHORT>(values.size()), values.data()};
     THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(0, m_provider.get(), eventId, nullptr, &parameters));
+}
+
+void ReportEvent(EventSource& source, gsl::span<gsl::byte> bytes, bool includeCommandLine, const ProcessExecutionDistribution* distribution)
+{
+    const auto* header = gslhelpers::try_get_struct<MESSAGE_HEADER>(bytes);
+    THROW_HR_IF(E_INVALIDARG, !header);
+    if (header->MessageType == LxInitMessageProcessExecuted)
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED>(bytes);
+        THROW_HR_IF(E_INVALIDARG, !event || bytes.size() != sizeof(*event));
+        ReportProcessExecution(source, event->Pid);
+        return;
+    }
+
+    THROW_HR_IF(
+        E_INVALIDARG,
+        header->MessageType != LxInitMessageProcessCreated && header->MessageType != LxInitMessageProcessExecutedDetails &&
+            header->MessageType != LxInitMessageNetworkAudit && header->MessageType != LxInitMessageSystemAudit);
+    std::wstring details;
+    try
+    {
+        switch (header->MessageType)
+        {
+        case LxInitMessageProcessCreated:
+            details = FormatProcessCreation(bytes);
+            break;
+        case LxInitMessageNetworkAudit:
+            details = FormatNetworkAudit(bytes);
+            break;
+        case LxInitMessageSystemAudit:
+            details = FormatSystemAudit(bytes);
+            break;
+        case LxInitMessageProcessExecutedDetails:
+            details = FormatProcessExecution(bytes, includeCommandLine, distribution);
+            break;
+        }
+    }
+    catch (const wil::ResultException& error)
+    {
+        THROW_HR_IF(error.GetErrorCode(), error.GetErrorCode() != E_INVALIDARG);
+        LOG_CAUGHT_EXCEPTION();
+        return;
+    }
+
+    switch (header->MessageType)
+    {
+    case LxInitMessageProcessCreated:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_CREATED>(bytes);
+        ReportProcessCreation(source, event->ChildPid, details);
+        break;
+    }
+    case LxInitMessageNetworkAudit:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_NETWORK_AUDIT>(bytes);
+        ReportNetworkAudit(source, *event, details);
+        break;
+    }
+    case LxInitMessageSystemAudit:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_SYSTEM_AUDIT>(bytes);
+        ReportSystemAudit(source, *event, details);
+        break;
+    }
+    case LxInitMessageProcessExecutedDetails:
+    {
+        const auto* event = gslhelpers::try_get_struct<LX_INIT_PROCESS_EXECUTED_DETAILS>(bytes);
+        ReportProcessExecutionDetails(source, event->Pid, details);
+        break;
+    }
+    }
 }
 
 } // namespace wsl::windows::common::securityaudit

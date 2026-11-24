@@ -133,15 +133,21 @@ void PollError(void* context, int error)
 }
 } // namespace
 
-int RunSecurityAudit(int socket, bool includeCommandLine)
+int RunSecurityAudit(wil::unique_fd socket, bool includeCommandLine, bool wslc)
 {
-    AuditContext audit{wsl::shared::SocketChannel{wil::unique_fd{socket}, "SecurityAudit"}};
-    audit.includeCommandLine = includeCommandLine;
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
 
     // Keep mount changes local to this worker, independent of mini-init and distributions.
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
     THROW_LAST_ERROR_IF(mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr) < 0);
+
+    AuditContext audit{wsl::shared::SocketChannel{std::move(socket), "SecurityAudit"}};
+    audit.includeCommandLine = includeCommandLine;
+    if (wslc)
+    {
+        // WSLC may move the mounts now. Do not hold up the workload for eBPF initialization.
+        audit.channel.SendResultMessage<int32_t>(0);
+    }
 
     struct statfs filesystem{};
     THROW_LAST_ERROR_IF(statfs("/sys/kernel/tracing", &filesystem) < 0);
@@ -154,7 +160,7 @@ int RunSecurityAudit(int socket, bool includeCommandLine)
 
     auto cleanup = wil::scope_exit([&] {
         // Sends remain blocking to tolerate backpressure. Unblock callbacks before the SDK joins its polling thread.
-        if (shutdown(socket, SHUT_RDWR) < 0 && errno != ENOTCONN)
+        if (shutdown(audit.channel.Socket(), SHUT_RDWR) < 0 && errno != ENOTCONN)
         {
             LOG_ERROR("Security audit socket shutdown failed: {}", errno);
         }
@@ -215,7 +221,7 @@ int RunSecurityAudit(int socket, bool includeCommandLine)
     // Terminal failures stop this collector, not mini-init or the distributions.
     while (!audit.failed)
     {
-        pollfd descriptor{socket, POLLIN, 0};
+        pollfd descriptor{audit.channel.Socket(), POLLIN, 0};
         const auto ready = TEMP_FAILURE_RETRY(poll(&descriptor, 1, 250));
         THROW_LAST_ERROR_IF(ready < 0);
         if (ready != 0)
