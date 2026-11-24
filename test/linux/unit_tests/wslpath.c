@@ -40,6 +40,8 @@ Abstract:
 
 LXT_VARIATION_HANDLER WslPathTestDrvFsRecursiveBind;
 
+LXT_VARIATION_HANDLER WslPathTestDrvFsShadowedMounts;
+
 LXT_VARIATION_HANDLER WslPathTestDrvFsEscaped;
 
 LXT_VARIATION_HANDLER WslPathTestDrvFsToWinPath;
@@ -61,6 +63,7 @@ LXT_VARIATION_HANDLER WslPathTestRemovedCwd;
 static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Windows to DrvFs", WslPathTestDrvFsFromWinPath},
     {"WslPath - Windows to DrvFs with a recursive bind", WslPathTestDrvFsRecursiveBind},
+    {"WslPath - Windows to DrvFs with shadowed mounts", WslPathTestDrvFsShadowedMounts},
     {"WslPath - DrvFs to Windows", WslPathTestDrvFsToWinPath},
     {"WslPath - DrvFs escaped characters", WslPathTestDrvFsEscaped},
     {"WslPath - DrvFs symlinks", WslPathTestDrvFsSymlink},
@@ -233,6 +236,56 @@ ErrorExit:
     if (PointerResult != NULL)
     {
         rmdir(Target);
+    }
+
+    return Result;
+}
+
+int WslPathTestDrvFsShadowedMounts(PLXT_ARGS Args)
+{
+    char Target[] = "/data/wslpath-shadow-XXXXXX";
+    char First[sizeof(Target) + sizeof("/first")];
+    char Second[sizeof(Target) + sizeof("/second")];
+    char* PointerResult;
+    bool Mounted = false;
+    int Result;
+
+    if (LxtWslVersion() == 1)
+    {
+        LxtLogInfo("Test skipped on WSL1.");
+        return 0;
+    }
+
+    LxtCheckNullErrno(mkdtemp(Target));
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", Target, "tmpfs", 0, NULL));
+    Mounted = true;
+
+    // Both aliases match C:\Windows, a longer prefix than the drive mount.
+    snprintf(First, sizeof(First), "%s/first", Target);
+    snprintf(Second, sizeof(Second), "%s/second", Target);
+    LxtCheckErrnoZeroSuccess(mkdir(First, 0700));
+    LxtCheckErrnoZeroSuccess(mkdir(Second, 0700));
+    LxtCheckErrnoZeroSuccess(mount("/mnt/c/Windows", First, NULL, MS_BIND, NULL));
+    LxtCheckErrnoZeroSuccess(mount("/mnt/c/Windows", Second, NULL, MS_BIND, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", First, true));
+
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", First, "tmpfs", 0, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", Second, true));
+
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", Second, "tmpfs", 0, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", "/mnt/c/Windows", true));
+
+ErrorExit:
+    if (Mounted && umount2(Target, MNT_DETACH) < 0)
+    {
+        LxtLogError("umount2 failed for %s: %s", Target, strerror(errno));
+        Result = LXT_RESULT_FAILURE;
+    }
+
+    if (PointerResult != NULL && rmdir(Target) < 0)
+    {
+        LxtLogError("rmdir failed for %s: %s", Target, strerror(errno));
+        Result = LXT_RESULT_FAILURE;
     }
 
     return Result;
