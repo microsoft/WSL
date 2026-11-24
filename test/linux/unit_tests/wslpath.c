@@ -38,6 +38,8 @@ Abstract:
 #define WSLPATH_ESCAPE_LX_DIR_WIN WSLPATH_DISTRO_PREFIX "\\data\\" WSLPATH_ESCAPE_NAME_ESCAPED
 #define WSLPATH_MOUNT_POINT "/data/wslpath_mount"
 
+LXT_VARIATION_HANDLER WslPathTestDrvFsRecursiveBind;
+
 LXT_VARIATION_HANDLER WslPathTestDrvFsEscaped;
 
 LXT_VARIATION_HANDLER WslPathTestDrvFsToWinPath;
@@ -58,6 +60,7 @@ LXT_VARIATION_HANDLER WslPathTestRemovedCwd;
 
 static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Windows to DrvFs", WslPathTestDrvFsFromWinPath},
+    {"WslPath - Windows to DrvFs with a recursive bind", WslPathTestDrvFsRecursiveBind},
     {"WslPath - DrvFs to Windows", WslPathTestDrvFsToWinPath},
     {"WslPath - DrvFs escaped characters", WslPathTestDrvFsEscaped},
     {"WslPath - DrvFs symlinks", WslPathTestDrvFsSymlink},
@@ -178,6 +181,60 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows\\.\\..\\Users", "/mnt/c/Users", true));
 
 ErrorExit:
+    return Result;
+}
+
+int WslPathTestDrvFsRecursiveBind(PLXT_ARGS Args)
+
+/*++
+
+Description:
+
+    This routine verifies that a recursive bind does not change the Windows
+    drive's Linux path and that the bind alias still translates to Windows.
+
+Arguments:
+
+    Args - Supplies the command line arguments.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+    char Alias[sizeof("/data/wslpath-rbind-XXXXXX/c/Windows")];
+    char Target[] = "/data/wslpath-rbind-XXXXXX";
+    bool Mounted = false;
+    char* PointerResult;
+    int Result;
+
+    if (LxtWslVersion() == 1)
+    {
+        LxtLogInfo("Test skipped on WSL1.");
+        return 0;
+    }
+
+    LxtCheckNullErrno(mkdtemp(Target));
+    LxtCheckErrnoZeroSuccess(mount("/mnt", Target, NULL, MS_BIND | MS_REC, NULL));
+    Mounted = true;
+
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", "/mnt/c/Windows", true));
+    snprintf(Alias, sizeof(Alias), "%s/c/Windows", Target);
+    LxtCheckResult(LxtCheckWslPathTranslation(Alias, "C:\\Windows", false));
+
+ErrorExit:
+    if (Mounted)
+    {
+        umount2(Target, MNT_DETACH);
+    }
+
+    if (PointerResult != NULL)
+    {
+        rmdir(Target);
+    }
+
     return Result;
 }
 

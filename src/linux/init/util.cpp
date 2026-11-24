@@ -891,6 +891,13 @@ try
         ReplacementField = &MountEnum.Current().Source;
     }
 
+    struct MountMatch
+    {
+        std::string MountPoint;
+        size_t PrefixLength;
+    };
+
+    std::vector<MountMatch> WindowsMatches;
     std::string FoundReplacement;
     size_t FoundPrefixLength = 0;
     while (MountEnum.Next())
@@ -911,31 +918,23 @@ try
         }
 
         //
-        // If a mount point was previously found, and this mount point is a
-        // prefix of the path (or the previously found mount point, for Windows
-        // to Linux translation), it means that the path is not actually on
-        // the previously found mount, so discard that result.
+        // A later mount can hide an earlier mount at the same path or below it.
+        // Keep the other Windows matches so they remain available if the
+        // preferred mount is hidden.
         //
-        // For example:
-        // - When translating /mnt/c/foo/bar, first /mnt/c is found, but a
-        //   later entry indicates /mnt/c/foo is also a mount point (e.g. using
-        //   tmpfs). This means /mnt/c/foo/bar is not on the /mnt/c mount.
-        // - When translating C:\foo, first /mnt/c is found. A later entry
-        //   indicates /mnt itself is a mount point, making the earlier /mnt/c
-        //   mount unreachable.
-        //
-        // TODO_LX: This doesn't catch the case when translating C:\foo\bar and
-        //          /mnt/c/foo is a mount point. Handling that is more complicated.
+        // TODO_LX: This doesn't catch mounts below the candidate mount point
+        // that shadow the suffix of the translated Windows path.
         //
 
-        if (!FoundReplacement.empty())
+        if (WinPath)
         {
-            const char* LinuxPath = WinPath ? FoundReplacement.c_str() : Path;
-            size_t LinuxPrefixLength = UtilIsPathPrefix(LinuxPath, MountEnum.Current().MountPoint, false);
-            if (LinuxPrefixLength > 0)
-            {
-                FoundReplacement.resize(0);
-            }
+            std::erase_if(WindowsMatches, [&](const MountMatch& Match) {
+                return UtilIsPathPrefix(Match.MountPoint.c_str(), MountEnum.Current().MountPoint, false) > 0;
+            });
+        }
+        else if (!FoundReplacement.empty() && UtilIsPathPrefix(Path, MountEnum.Current().MountPoint, false) > 0)
+        {
+            FoundReplacement.clear();
         }
 
         //
@@ -1012,15 +1011,16 @@ try
         //
         // Check if the match field is a prefix of the path.
         //
-        // N.B. For Windows paths, only matches longer than the existing match
-        //      are considered. This is because Windows mounts aren't
-        //      guaranteed to be in order and NTFS directory mounts should be
-        //      preferred over plain drive letter mounts if they match.
-        //
 
         Length = UtilIsPathPrefix(Path, *MatchField, WinPath);
-        if ((Length == 0) || ((WinPath != false) && (Length < FoundPrefixLength)))
+        if (Length == 0)
         {
+            continue;
+        }
+
+        if (WinPath)
+        {
+            WindowsMatches.push_back({*ReplacementField, Length});
             continue;
         }
 
@@ -1041,6 +1041,15 @@ try
         // Continue searching the file even if a mount has been found, since
         // newer mounts could shadow this one or be a nested mount.
         //
+    }
+
+    // Use the longest Windows prefix. For equal prefixes, keep the first
+    // visible mount so a later bind alias cannot redirect translation.
+    if (!WindowsMatches.empty())
+    {
+        auto Match = std::ranges::max_element(WindowsMatches, {}, &MountMatch::PrefixLength);
+        FoundPrefixLength = Match->PrefixLength;
+        FoundReplacement = std::move(Match->MountPoint);
     }
 
     if (!FoundReplacement.empty() && PrefixLength != nullptr)
