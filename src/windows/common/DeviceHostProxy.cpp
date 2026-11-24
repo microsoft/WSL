@@ -27,6 +27,51 @@ namespace {
 constexpr GUID c_virtioFsDeviceId{0x872270E1, 0xA899, 0x4AF6, {0xB4, 0x54, 0x71, 0x93, 0x63, 0x44, 0x35, 0xAD}};
 constexpr GUID c_virtioNetDeviceId{0xF07010D0, 0x0EA9, 0x447F, {0x88, 0xEF, 0xBD, 0x95, 0x2A, 0x4D, 0x2F, 0x14}};
 constexpr GUID c_virtioPmemDeviceId{0xEDBB24BB, 0x5E19, 0x40F4, {0x8A, 0x0F, 0x82, 0x24, 0x31, 0x30, 0x64, 0xFD}};
+
+struct ProcessJob
+{
+    wil::unique_handle Process;
+    wil::unique_handle Job;
+};
+
+wil::srwlock g_processJobsLock;
+_Guarded_by_(g_processJobsLock) std::vector<ProcessJob> g_processJobs;
+
+// Place a device host process in a kill-on-close job that stays open until the service exits, so
+// the process cannot outlive the service. The job is not closed when a VM shuts down: COM starts one
+// device host process for each logon session and token type, so one process can serve several VMs.
+// The process exits by itself when its last VM releases it.
+void AssignDeviceHostProcessToJob(DWORD ProcessId)
+{
+    auto lock = g_processJobsLock.lock_exclusive();
+    std::erase_if(
+        g_processJobs, [](const ProcessJob& Entry) { return WaitForSingleObject(Entry.Process.get(), 0) != WAIT_TIMEOUT; });
+    if (std::any_of(g_processJobs.begin(), g_processJobs.end(), [&](const ProcessJob& Entry) {
+            return GetProcessId(Entry.Process.get()) == ProcessId;
+        }))
+    {
+        return;
+    }
+
+    // Each process needs its own job: a process the system has already placed in a job cannot be
+    // assigned to a job that already owns a different process (ERROR_ACCESS_DENIED).
+    wil::unique_handle process(
+        OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, ProcessId));
+    if (!process)
+    {
+        LOG_LAST_ERROR_MSG("Failed to open device host process %u for job assignment", ProcessId);
+        return;
+    }
+
+    wil::unique_handle job = wsl::windows::common::helpers::CreateKillOnCloseJob();
+    if (!AssignProcessToJobObject(job.get(), process.get()))
+    {
+        LOG_LAST_ERROR_MSG("Failed to assign device host process %u to job object", ProcessId);
+        return;
+    }
+
+    g_processJobs.push_back({std::move(process), std::move(job)});
+}
 } // namespace
 
 DeviceHostProxy::DeviceHostProxy(const std::wstring& VmId, const GUID& RuntimeId, bool EnableTelemetry) :
@@ -491,27 +536,11 @@ try
     const wil::com_ptr<IUnknown> unknown = remoteHost.query<IUnknown>();
     THROW_IF_FAILED(proxyDeviceHost(m_system.get(), unknown.get(), ProcessId, IpcSectionHandle));
 
-    // Assign the device host process to a fresh kill-on-close job so it is terminated when the VM
-    // shuts down. Each process needs its own job: a process the system has already placed in a job
-    // cannot be assigned to a job that already owns a different process (ERROR_ACCESS_DENIED).
     {
         auto lock = m_devicesLock.lock_exclusive();
         if (!m_devicesShutdown)
         {
-            wil::unique_handle process(OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, ProcessId));
-            LOG_LAST_ERROR_IF_MSG(!process, "Failed to open device host process %u for job assignment", ProcessId);
-            if (process)
-            {
-                wil::unique_handle job = wsl::windows::common::helpers::CreateKillOnCloseJob();
-                if (AssignProcessToJobObject(job.get(), process.get()))
-                {
-                    m_processJobs.emplace_back(std::move(job));
-                }
-                else
-                {
-                    LOG_LAST_ERROR_MSG("Failed to assign device host process %u to job object", ProcessId);
-                }
-            }
+            AssignDeviceHostProcessToJob(ProcessId);
         }
     }
 
