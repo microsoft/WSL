@@ -28,6 +28,8 @@ struct ComposeProjectFiles
     std::vector<std::filesystem::path> Files;
     std::filesystem::path ProjectDirectory;
     std::optional<std::string> ProjectName;
+    // Variable files applied in order; later files override earlier ones.
+    std::vector<std::filesystem::path> EnvironmentFiles;
 };
 
 // A compose project, identified either by its files or by the name of an existing project.

@@ -2754,6 +2754,10 @@ For privacy information about this product please visit https://aka.ms/privacy.<
     <value>No Compose configuration file was found in '{}' or any parent directory.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="WSLCCLI_ComposeEnvFileNotFoundError" xml:space="preserve">
+    <value>The environment file '{}' was not found.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="WSLCCLI_ComposeProjectNameInvalidError" xml:space="preserve">
     <value>Invalid project name '{}': must consist of at most {} lowercase alphanumeric characters, hyphens, and underscores, and start with a letter or number.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
@@ -2801,6 +2805,26 @@ For privacy information about this product please visit https://aka.ms/privacy.<
   <data name="MessageWslcComposeEnvironmentScalarsExpected" xml:space="preserve">
     <value>The Compose file '{0}' is invalid: the 'environment' property for service '{1}' must contain scalar values.</value>
     <comment>{Locked="{0}"}{Locked="{1}"}{Locked="environment"}File paths, service names, and the property name should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVariableInvalid" xml:space="preserve">
+    <value>The file '{0}' is invalid: the value '{1}' contains an invalid variable reference.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and values should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVariableRequired" xml:space="preserve">
+    <value>The file '{0}' is invalid: the required variable '{1}' is missing a value.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and variable names should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeVariableRequiredReason" xml:space="preserve">
+    <value>The file '{0}' is invalid: the required variable '{1}' is missing a value: {2}</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}{Locked="{2}"}File paths, variable names, and user-provided error text should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeEnvFileInvalid" xml:space="preserve">
+    <value>The environment file '{0}' is invalid at line {1}.</value>
+    <comment>{Locked="{0}"}{Locked="{1}"}File paths and line numbers should not be translated</comment>
+  </data>
+  <data name="MessageWslcComposeEnvFileReadFailed" xml:space="preserve">
+    <value>Failed to read the environment file '{0}'.</value>
+    <comment>{Locked="{0}"}File paths should not be translated</comment>
   </data>
   <data name="MessageWslcComposeVolumeShortSyntaxExpected" xml:space="preserve">
     <value>The Compose file '{0}' is invalid: the 'volumes' property for service '{1}' must contain only short-syntax strings.</value>

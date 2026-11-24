@@ -60,7 +60,25 @@ namespace {
         return result;
     }
 
-    std::vector<std::string> ParseComposeEnvironment(const std::filesystem::path& path, const std::string& serviceName, const YAML::Node& node)
+    // Entries without a value take the variable's value when it is set, and otherwise stay bare so the variable is unset.
+    std::string ResolveEnvironmentEntry(std::string entry, const ComposeVariables& variables)
+    {
+        if (entry.find('=') != std::string::npos)
+        {
+            return entry;
+        }
+
+        auto value = variables.Find(entry);
+        if (!value.has_value())
+        {
+            return entry;
+        }
+
+        return std::format("{}={}", entry, *value);
+    }
+
+    std::vector<std::string> ParseComposeEnvironment(
+        const std::filesystem::path& path, const std::string& serviceName, const YAML::Node& node, const ComposeVariables& variables)
     {
         if (!node)
         {
@@ -69,7 +87,13 @@ namespace {
 
         if (node.IsSequence())
         {
-            return ParseComposeStringList(path, serviceName, node, "environment");
+            auto result = ParseComposeStringList(path, serviceName, node, "environment");
+            for (auto& entry : result)
+            {
+                entry = ResolveEnvironmentEntry(std::move(entry), variables);
+            }
+
+            return result;
         }
 
         if (!node.IsMap())
@@ -86,9 +110,14 @@ namespace {
                 ThrowInvalidComposeFile(Localization::MessageWslcComposeEnvironmentScalarsExpected(path.wstring(), serviceName));
             }
 
-            const auto name = entry.first.as<std::string>();
-            const auto value = entry.second.IsNull() ? std::string{} : entry.second.as<std::string>();
-            result.emplace_back(std::format("{}={}", name, value));
+            auto name = entry.first.as<std::string>();
+            if (entry.second.IsNull())
+            {
+                result.emplace_back(ResolveEnvironmentEntry(std::move(name), variables));
+                continue;
+            }
+
+            result.emplace_back(std::format("{}={}", name, entry.second.as<std::string>()));
         }
 
         return result;
@@ -304,6 +333,7 @@ namespace {
         const std::filesystem::path& baseDirectory,
         const std::string& serviceName,
         const YAML::Node& settings,
+        const ComposeVariables& variables,
         ComposeContainerDefinition& definition)
     {
         for (const auto& setting : settings)
@@ -362,7 +392,7 @@ namespace {
         ApplyList(
             settings["environment"],
             definition.Environment,
-            [&](const YAML::Node& node) { return ParseComposeEnvironment(path, serviceName, node); },
+            [&](const YAML::Node& node) { return ParseComposeEnvironment(path, serviceName, node, variables); },
             [](const std::string& entry) { return EnvironmentKey(entry); });
 
         ApplyList(
@@ -375,10 +405,39 @@ namespace {
             settings["ports"], definition.Ports, [&](const YAML::Node& node) { return ParseComposePorts(path, serviceName, node); }, PortKey);
     }
 
-    void ParseComposeDocument(const ComposeSpecDocument& document, std::vector<ComposeServiceState>& services)
+    // Replaces variable references in every scalar value; keys and tags are left as written.
+    void InterpolateNode(YAML::Node node, const ComposeVariables& variables, const std::filesystem::path& path)
+    {
+        switch (node.Type())
+        {
+        case YAML::NodeType::Scalar:
+            if (node.Scalar().find('$') != std::string::npos)
+            {
+                node = variables.Interpolate(node.Scalar(), path);
+            }
+            break;
+        case YAML::NodeType::Sequence:
+            for (auto child : node)
+            {
+                InterpolateNode(child, variables, path);
+            }
+            break;
+        case YAML::NodeType::Map:
+            for (auto entry : node)
+            {
+                InterpolateNode(entry.second, variables, path);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    void ParseComposeDocument(const ComposeSpecDocument& document, const ComposeVariables& variables, std::vector<ComposeServiceState>& services)
     {
         const auto& path = document.SourcePath;
         const auto root = YAML::Load(document.Content);
+        InterpolateNode(root, variables, path);
         if (!root.IsMap())
         {
             ThrowInvalidComposeFile(Localization::MessageWslcComposeMapExpected(path.wstring()));
@@ -453,13 +512,13 @@ namespace {
                 existing = services.insert(services.end(), ComposeServiceState{.SourcePath = path, .Definition = {.ServiceName = serviceName}});
             }
 
-            ApplyComposeService(path, document.BaseDirectory, serviceName, service.second, existing->Definition);
+            ApplyComposeService(path, document.BaseDirectory, serviceName, service.second, variables, existing->Definition);
         }
     }
 
 } // namespace
 
-ComposeSpec ComposeSpec::Parse(const std::vector<ComposeSpecDocument>& documents)
+ComposeSpec ComposeSpec::Parse(const std::vector<ComposeSpecDocument>& documents, const ComposeVariables& variables)
 {
     THROW_HR_IF(E_INVALIDARG, documents.empty());
 
@@ -469,7 +528,7 @@ ComposeSpec ComposeSpec::Parse(const std::vector<ComposeSpecDocument>& documents
     {
         try
         {
-            ParseComposeDocument(document, services);
+            ParseComposeDocument(document, variables, services);
         }
         catch (const YAML::Exception& exception)
         {

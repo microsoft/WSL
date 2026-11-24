@@ -114,6 +114,30 @@ struct ComposeRequestStorage
         documents.ExplicitProjectName = explicitProjectName.c_str();
     }
 
+    void SetEnvironment(std::vector<std::string> entries)
+    {
+        environment = std::move(entries);
+        environmentValues.clear();
+        for (const auto& entry : environment)
+        {
+            environmentValues.push_back(entry.c_str());
+        }
+
+        documents.Environment.Values = environmentValues.data();
+        documents.Environment.Count = gsl::narrow<ULONG>(environmentValues.size());
+    }
+
+    void SetEnvironmentFile(const std::filesystem::path& path, std::string fileContent)
+    {
+        environmentFilePath = path;
+        environmentFileContent = std::move(fileContent);
+        environmentFile.SourcePath = environmentFilePath.c_str();
+        environmentFile.Content = reinterpret_cast<const byte*>(environmentFileContent.data());
+        environmentFile.ContentSize = gsl::narrow<ULONG>(environmentFileContent.size());
+        documents.EnvironmentFiles = &environmentFile;
+        documents.EnvironmentFileCount = 1;
+    }
+
     std::filesystem::path sourcePath;
     std::filesystem::path projectDirectory;
     std::vector<char> content;
@@ -122,6 +146,11 @@ struct ComposeRequestStorage
     std::vector<WSLCComposeDocument> documentList;
     std::string projectKey;
     std::string explicitProjectName;
+    std::vector<std::string> environment;
+    std::vector<LPCSTR> environmentValues;
+    std::filesystem::path environmentFilePath;
+    std::string environmentFileContent;
+    WSLCComposeEnvironmentFile environmentFile{};
     WSLCComposeDocument document{};
     WSLCComposeDocumentCollection documents{};
     WSLCComposeOperationRequest request{};
@@ -2007,6 +2036,173 @@ secrets:
         WriteFileContent(composePath, "services:\n  web:\n    environment:\n      A: b\n");
         WriteFileContent(overridePath, "services:\n  web:\n    image: alpine:latest\n");
         ComposeRequestStorage request{std::vector{composePath, overridePath}, WSLCComposeActionValidate};
+        ExecuteCompose(*m_defaultSession, request);
+    }
+
+    TEST_METHOD(ComposeVariablesInterpolate)
+    {
+        const std::string projectName{"compose-variables"};
+        const auto projectPath = std::filesystem::current_path() / projectName;
+        const auto composePath = projectPath / "compose.yaml";
+        const auto networkName = projectName + "_default";
+        const std::array containerNames{projectName + "-list-1", projectName + "-web-1"};
+
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
+        auto cleanup = wil::scope_exit([&] {
+            for (const auto& name : containerNames)
+            {
+                wil::com_ptr<IWSLCContainer> container;
+                if (SUCCEEDED(m_defaultSession->OpenContainer(name.c_str(), &container)))
+                {
+                    LOG_IF_FAILED(container->Delete(WSLCDeleteFlagsForce));
+                }
+            }
+
+            const auto deleteNetworkResult = m_defaultSession->DeleteNetwork(networkName.c_str());
+            if (deleteNetworkResult != WSLC_E_NETWORK_NOT_FOUND)
+            {
+                LOG_IF_FAILED(deleteNetworkResult);
+            }
+
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+        });
+
+        WriteFileContent(
+            composePath,
+            "services:\n"
+            "  web:\n"
+            "    image: ${IMAGE}\n"
+            "    environment:\n"
+            "      FILE: $FROM_FILE\n"
+            "      QUOTED: ${QUOTED}\n"
+            "      SINGLE: ${SINGLE}\n"
+            "      UNQUOTED: ${UNQUOTED}\n"
+            "      OVERRIDDEN: ${OVERRIDDEN}\n"
+            "      REFERENCE: ${REFERENCE}\n"
+            "      DEFAULT: ${MISSING:-fallback}\n"
+            "      EMPTY_COLON_DEFAULT: ${EMPTY:-fallback}\n"
+            "      EMPTY_DEFAULT: ${EMPTY-fallback}\n"
+            "      ALTERNATE: ${FROM_FILE:+alternate}\n"
+            "      ESCAPED: $$FROM_FILE\n"
+            "      UNSET: \"[${MISSING}]\"\n"
+            "      PROCESS_ONLY:\n"
+            "      NOT_SET:\n"
+            "  list:\n"
+            "    image: alpine:latest\n"
+            "    environment:\n"
+            "      - FROM_FILE\n"
+            "      - NOT_SET\n"
+            "      - LITERAL=${FROM_FILE}\n");
+
+        ComposeRequestStorage request{composePath, WSLCComposeActionCreate};
+        request.SetEnvironment({"OVERRIDDEN=process", "IMAGE=alpine:latest", "PROCESS_ONLY=process-value"});
+        request.SetEnvironmentFile(
+            projectPath / ".env",
+            "\xEF\xBB\xBF# comment\n"
+            "export FROM_FILE=file-value\n"
+            "QUOTED=\"first\\nsecond\"\n"
+            "SINGLE='$FROM_FILE'\n"
+            "UNQUOTED=plain # trailing comment\n"
+            "OVERRIDDEN=file\n"
+            "REFERENCE=${FROM_FILE}-ref\n"
+            "EMPTY=\n");
+
+        const auto result = ExecuteCompose(*m_defaultSession, request);
+        VERIFY_ARE_EQUAL(2u, result.value.AffectedContainersCount);
+
+        const auto inspect = [&](const std::string& name) {
+            wil::com_ptr<IWSLCContainer> container;
+            VERIFY_SUCCEEDED(m_defaultSession->OpenContainer(name.c_str(), &container));
+            auto value = InspectContainer(container.get());
+            VERIFY_IS_TRUE(value.Config.Env.has_value());
+            return value;
+        };
+
+        const auto hasEnv = [](const auto& value, std::string_view entry) {
+            return std::ranges::find(*value.Config.Env, entry) != value.Config.Env->end();
+        };
+
+        const auto hasValue = [](const auto& value, std::string_view name) {
+            return std::ranges::any_of(*value.Config.Env, [&](const std::string& entry) {
+                return entry.starts_with(name) && entry.size() > name.size() && entry[name.size()] == '=';
+            });
+        };
+
+        const auto web = inspect(containerNames[1]);
+        VERIFY_ARE_EQUAL(std::string{"alpine:latest"}, web.Config.Image);
+        for (const auto* expected :
+             {"FILE=file-value",
+              "QUOTED=first\nsecond",
+              "SINGLE=$FROM_FILE",
+              "UNQUOTED=plain",
+              "OVERRIDDEN=process",
+              "REFERENCE=file-value-ref",
+              "DEFAULT=fallback",
+              "EMPTY_COLON_DEFAULT=fallback",
+              "EMPTY_DEFAULT=",
+              "ALTERNATE=alternate",
+              "ESCAPED=$FROM_FILE",
+              "UNSET=[]",
+              "PROCESS_ONLY=process-value"})
+        {
+            VERIFY_IS_TRUE(hasEnv(web, expected), wsl::shared::string::MultiByteToWide(expected).c_str());
+        }
+
+        VERIFY_IS_FALSE(hasValue(web, "NOT_SET"));
+
+        const auto list = inspect(containerNames[0]);
+        VERIFY_IS_TRUE(hasEnv(list, "FROM_FILE=file-value"));
+        VERIFY_IS_TRUE(hasEnv(list, "LITERAL=file-value"));
+        VERIFY_IS_FALSE(hasValue(list, "NOT_SET"));
+    }
+
+    TEST_METHOD(ComposeVariableErrorsRejected)
+    {
+        const auto projectPath = std::filesystem::current_path() / "compose-variable-errors";
+        const auto composePath = projectPath / "compose.yaml";
+        const auto environmentPath = projectPath / ".env";
+        VERIFY_IS_TRUE(std::filesystem::create_directory(projectPath));
+        auto cleanup = wil::scope_exit([&] {
+            std::error_code error;
+            std::filesystem::remove_all(projectPath, error);
+        });
+
+        const auto verifyRejected = [&](std::string_view composeContent, std::string environmentContent, const std::wstring& expectedMessage) {
+            WriteFileContent(composePath, composeContent);
+            ComposeRequestStorage request{composePath, WSLCComposeActionValidate};
+            request.SetEnvironmentFile(environmentPath, std::move(environmentContent));
+            const auto result = WaitForCompose(*m_defaultSession, request);
+            VERIFY_ARE_EQUAL(E_INVALIDARG, result.value.Result);
+            VERIFY_ARE_EQUAL(WSLCComposeOperationStatusFailed, result.value.Status);
+            VERIFY_IS_NOT_NULL(result.value.ErrorMessage);
+            VERIFY_ARE_EQUAL(expectedMessage, std::wstring{result.value.ErrorMessage});
+        };
+
+        verifyRejected(
+            "services:\n  web:\n    image: ${REQUIRED:?must be set}\n",
+            "",
+            wsl::shared::Localization::MessageWslcComposeVariableRequiredReason(composePath.wstring(), "REQUIRED", "must be set"));
+
+        verifyRejected(
+            "services:\n  web:\n    image: ${REQUIRED:?}\n",
+            "REQUIRED=\n",
+            wsl::shared::Localization::MessageWslcComposeVariableRequired(composePath.wstring(), "REQUIRED"));
+
+        verifyRejected(
+            "services:\n  web:\n    image: \"${UNCLOSED\"\n",
+            "",
+            wsl::shared::Localization::MessageWslcComposeVariableInvalid(composePath.wstring(), "${UNCLOSED"));
+
+        verifyRejected(
+            "services:\n  web:\n    image: alpine:latest\n",
+            "A=1\nB=2\nC='unterminated\n",
+            wsl::shared::Localization::MessageWslcComposeEnvFileInvalid(environmentPath.wstring(), 3));
+
+        // A required variable supplied by the process environment is accepted.
+        WriteFileContent(composePath, "services:\n  web:\n    image: ${REQUIRED:?must be set}\n");
+        ComposeRequestStorage request{composePath, WSLCComposeActionValidate};
+        request.SetEnvironment({"REQUIRED=alpine:latest"});
         ExecuteCompose(*m_defaultSession, request);
     }
 

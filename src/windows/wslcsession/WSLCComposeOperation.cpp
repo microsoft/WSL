@@ -74,6 +74,31 @@ WSLCComposeOperation::Request WSLCComposeOperation::CaptureRequest(const WSLCCom
             documents.Documents.emplace_back(std::move(captured));
         }
 
+        THROW_HR_IF(E_POINTER, source.Environment.Count != 0 && source.Environment.Values == nullptr);
+        documents.Environment.reserve(source.Environment.Count);
+        for (ULONG index = 0; index < source.Environment.Count; ++index)
+        {
+            THROW_HR_IF_NULL(E_POINTER, source.Environment.Values[index]);
+            documents.Environment.emplace_back(source.Environment.Values[index]);
+        }
+
+        THROW_HR_IF(E_POINTER, source.EnvironmentFileCount != 0 && source.EnvironmentFiles == nullptr);
+        documents.EnvironmentFiles.reserve(source.EnvironmentFileCount);
+        for (ULONG index = 0; index < source.EnvironmentFileCount; ++index)
+        {
+            const auto& file = source.EnvironmentFiles[index];
+            THROW_HR_IF_NULL(E_POINTER, file.SourcePath);
+            THROW_HR_IF(E_POINTER, file.ContentSize != 0 && file.Content == nullptr);
+
+            ComposeEnvironmentFile captured{.SourcePath = file.SourcePath};
+            if (file.ContentSize != 0)
+            {
+                captured.Content.assign(reinterpret_cast<const char*>(file.Content), file.ContentSize);
+            }
+
+            documents.EnvironmentFiles.emplace_back(std::move(captured));
+        }
+
         result.Documents = std::move(documents);
         break;
     }
