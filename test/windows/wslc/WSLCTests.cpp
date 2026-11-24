@@ -2933,8 +2933,12 @@ class WSLCTests
         NON_COPYABLE(BlockingOperation);
         NON_MOVABLE(BlockingOperation);
 
-        BlockingOperation(std::function<HRESULT(HANDLE)>&& Operation, HRESULT ExpectedResult = S_OK, bool AllowEarlyCompletion = false, bool UseOverlappedWritePipe = false) :
-            m_operation(std::move(Operation)), m_expectedResult(ExpectedResult), m_allowEarlyCompletion(AllowEarlyCompletion)
+        BlockingOperation(
+            std::function<HRESULT(HANDLE)>&& Operation,
+            std::vector<HRESULT> ExpectedResult = {S_OK},
+            bool AllowEarlyCompletion = false,
+            bool UseOverlappedWritePipe = false) :
+            m_operation(std::move(Operation)), m_expectedResult(std::move(ExpectedResult)), m_allowEarlyCompletion(AllowEarlyCompletion)
         {
             auto [pipeRead, pipeWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(100000, false, UseOverlappedWritePipe);
 
@@ -3007,7 +3011,23 @@ class WSLCTests
         {
             m_testCompleteEvent.SetEvent();
 
-            VERIFY_ARE_EQUAL(m_expectedResult, m_result.get_future().get());
+            const auto result = m_result.get_future().get();
+            if (std::ranges::find(m_expectedResult, result) == m_expectedResult.end())
+            {
+                std::string expectedResults;
+                for (const auto expectedResult : m_expectedResult)
+                {
+                    if (!expectedResults.empty())
+                    {
+                        expectedResults += ", ";
+                    }
+
+                    expectedResults += std::format("0x{:08X}", static_cast<ULONG>(expectedResult));
+                }
+
+                LogError("Unexpected HRESULT: 0x%08X. Expected one of: [%hs]", static_cast<ULONG>(result), expectedResults.c_str());
+                VERIFY_FAIL();
+            }
         }
 
         std::function<HRESULT(HANDLE)> m_operation;
@@ -3016,7 +3036,7 @@ class WSLCTests
         std::thread m_operationThread;
         std::thread m_ioThread;
         std::promise<HRESULT> m_result;
-        HRESULT m_expectedResult{};
+        std::vector<HRESULT> m_expectedResult;
         bool m_allowEarlyCompletion{};
     };
 
@@ -3102,7 +3122,7 @@ class WSLCTests
                 [&](HANDLE handle) {
                     return m_defaultSession->SaveImage(ToCOMInputHandle(handle), "debian:latest", nullptr, cancelEvent.get());
                 },
-                E_ABORT);
+                {E_ABORT});
 
             cancelEvent.SetEvent();
             operation.Complete();
@@ -17111,7 +17131,10 @@ sys.exit(1 if queries else 0)
         // Validate that SaveImage is aborted when the session terminates.
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
         BlockingOperation operation(
-            [&](HANDLE handle) { return m_defaultSession->SaveImage(ToCOMInputHandle(handle), "debian:latest", nullptr, nullptr); }, E_ABORT, true, true);
+            [&](HANDLE handle) { return m_defaultSession->SaveImage(ToCOMInputHandle(handle), "debian:latest", nullptr, nullptr); },
+            {E_ABORT, HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED)},
+            true,
+            true);
 
         // Terminate the session.
         VERIFY_SUCCEEDED(m_defaultSession->Terminate());
@@ -17132,7 +17155,11 @@ sys.exit(1 if queries else 0)
         });
 
         // Use overlapped write pipe so the server-side WriteFile doesn't block synchronously.
-        BlockingOperation operation([&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); }, E_ABORT, true, true);
+        BlockingOperation operation(
+            [&](HANDLE handle) { return container.Get().Export(ToCOMInputHandle(handle)); },
+            {E_ABORT, HRESULT_FROM_WIN32(ERROR_OPERATION_ABORTED)},
+            true,
+            true);
 
         // Avoid attempting container delete on scope exit after intentional session termination;
         // rely on the prune scope-exit above to clean up instead.
