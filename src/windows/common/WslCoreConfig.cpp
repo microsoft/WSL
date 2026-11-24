@@ -526,12 +526,6 @@ void wsl::core::Config::ValidateOpenVmmSupport() const
         HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED),
         shared::Localization::MessageOpenVmmNetworkingConflict(),
         NetworkingMode != NetworkingMode::Consomme && NetworkingMode != NetworkingMode::None);
-
-    // As with Consomme on HCS, the Hyper-V firewall settings don't apply.
-    if (NetworkingMode == NetworkingMode::Consomme)
-    {
-        validateSetting(EnableDnsTunneling, L"wsl2.dnsTunneling", L"false");
-    }
 }
 
 void wsl::core::FirewallConfiguration::Enable() noexcept

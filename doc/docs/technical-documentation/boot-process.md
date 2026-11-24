@@ -68,7 +68,6 @@ networkingMode=consomme
 virtioFs=true
 nestedVirtualization=false
 hardwarePerformanceCounters=false
-dnsTunneling=false
 
 [experimental]
 openVmm=true
@@ -82,7 +81,7 @@ OpenVMM currently does not support:
 - ARM64 or UEFI boot
 - GPU assignment
 - Physical-disk devices
-- NAT, mirrored, or bridged networking, or DNS tunneling
+- NAT, mirrored, or bridged networking
 - Nested virtualization, performance counters, or advanced memory controls
 - Plan 9 file sharing, aggregate virtio-fs devices, or switching user/elevation context after VM creation
 

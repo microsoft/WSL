@@ -233,7 +233,6 @@ class OpenVmmVirtualMachineBackendTests
             "virtio9p=false\n"
             "hardwarePerformanceCounters=false\n"
             "networkingMode=consomme\n"
-            "dnsTunneling=false\n"
             "ipv6=false\n"
             "[experimental]\n"
             "openVmm=true\n"
@@ -266,8 +265,8 @@ class OpenVmmVirtualMachineBackendTests
                              VERIFY_IS_TRUE((wsl::shared::string::MacAddress{0x02, 0x11, 0x22, 0x33, 0x44, 0x56}) == Config.MacAddress);
                          }));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nnetworkingMode=none\nfirewall=true\ndnsTunneling=true\nipv6=true\n"));
-        // As with Consomme on HCS, the Hyper-V firewall settings don't apply.
-        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nfirewall=true\n"));
+        // As with Consomme on HCS, the Hyper-V firewall settings don't apply. DNS tunneling uses OpenVMM's DnsQueryRaw resolver.
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nfirewall=true\ndnsTunneling=true\n"));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[experimental]\nopenVmm=false\n[wsl2]\ngpuSupport=true\n"));
         bool openVmmEnabled = true;
         VERIFY_ARE_EQUAL(
@@ -283,7 +282,6 @@ class OpenVmmVirtualMachineBackendTests
                  "\n[wsl2]\nnetworkingMode=mirrored\n",
                  "\n[wsl2]\nnetworkingMode=bridged\n",
                  "\n[wsl2]\nnetworkingMode=nat\n",
-                 "\n[wsl2]\ndnsTunneling=true\n",
                  "\n[experimental]\nvirtioFsAggregateShares=true\n",
                  "\n[experimental]\nswiotlb=1M\n",
              })

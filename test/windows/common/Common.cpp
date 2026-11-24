@@ -1535,9 +1535,8 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     };
 
     // Run with /p:OpenVmm=1 to exercise the OpenVMM backend instead of HCS. The service rejects settings that
-    // OpenVMM doesn't support (GPU, GUI apps, nested virtualization, Plan 9 and aggregate virtio-fs shares,
-    // hardware performance counters, and the Hyper-V firewall and DNS tunneling in NAT mode), so defaults are
-    // adjusted unless a test overrides them.
+    // OpenVMM doesn't support (GPU, GUI apps, nested virtualization, Plan 9 and aggregate virtio-fs shares, and
+    // hardware performance counters), so defaults are adjusted unless a test overrides them.
     const bool openVmm = LxsstuOpenVmmMode();
     if (openVmm)
     {
@@ -1545,8 +1544,6 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
         Default.drvFsMode = Default.drvFsMode.value_or(DrvFsMode::VirtioFs);
         Default.virtioFsAggregateShares = Default.virtioFsAggregateShares.value_or(false);
         Default.nestedVirtualization = Default.nestedVirtualization.value_or(false);
-        Default.firewall = Default.firewall.value_or(false);
-        Default.dnsTunneling = Default.dnsTunneling.value_or(false);
     }
 
     std::wstring newConfig =

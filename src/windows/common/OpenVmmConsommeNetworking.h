@@ -6,13 +6,10 @@
 #include "GnsPortTrackerChannel.h"
 #include "INetworkingEngine.h"
 #include "IVirtualMachineBackend.h"
+#include "WslCoreHostDnsInfo.h"
 #include "WslCoreNetworkingSupport.h"
 
 namespace wsl::core {
-
-namespace networking {
-    struct DnsInfo;
-}
 
 // ClientMac should come from wsl::core::Config::MacAddress, which is generated when not configured.
 VmNetworkAdapterRequest CreateOpenVmmConsommeNetworkAdapterRequest(bool EnableDnsTunneling, const wsl::shared::string::MacAddress& ClientMac);
@@ -57,6 +54,7 @@ private:
     bool m_enableDnsTunneling;
     bool m_enableIpv6;
     wil::srwlock m_dnsLock;
+    std::optional<networking::DnsSuffixRegistryWatcher> m_dnsSuffixRegistryWatcher;
     networking::unique_notify_handle m_networkNotifyHandle;
     wil::srwlock m_lock;
     _Guarded_by_(m_lock) std::map<PortKey, VmPortBindingId> m_portBindings;

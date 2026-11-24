@@ -105,6 +105,7 @@ OpenVmmConsommeNetworking::OpenVmmConsommeNetworking(
 OpenVmmConsommeNetworking::~OpenVmmConsommeNetworking()
 {
     m_gnsChannel.Stop();
+    m_dnsSuffixRegistryWatcher.reset();
     m_networkNotifyHandle.reset();
 }
 
@@ -149,11 +150,12 @@ void OpenVmmConsommeNetworking::Initialize()
     m_gnsChannel.SendHnsNotification(ToJsonW(routeNotification).c_str(), m_adapterId);
 
     UpdateDns();
-    if (!m_enableDnsTunneling)
-    {
-        THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(
-            &OpenVmmConsommeNetworking::OnNetworkConnectivityChange, this, true, &m_networkNotifyHandle));
-    }
+    lock.reset();
+
+    // As with HCS Consomme, resend the guest's DNS settings when the host's DNS suffixes or connectivity change.
+    m_dnsSuffixRegistryWatcher.emplace([this]() noexcept { RefreshDns(); });
+    THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(
+        &OpenVmmConsommeNetworking::OnNetworkConnectivityChange, this, true, &m_networkNotifyHandle));
 }
 
 void NETIOAPI_API_ OpenVmmConsommeNetworking::OnNetworkConnectivityChange(PVOID Context, NL_NETWORK_CONNECTIVITY_HINT)

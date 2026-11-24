@@ -83,11 +83,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
 #define DNS_TUNNELING_TEST_ONLY() \
     { \
         WINDOWS_11_TEST_ONLY(); \
-        if (LxsstuOpenVmmMode()) \
-        { \
-            LogSkipped("OpenVMM doesn't support DNS tunneling. Skipping test..."); \
-            return; \
-        } \
         if (!AreExperimentalNetworkingFeaturesSupported()) \
         { \
             LogSkipped("DNS tunneling not supported on this OS. Skipping test..."); \
