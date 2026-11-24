@@ -60,19 +60,8 @@ namespace {
         }
     }
 
-    std::filesystem::path ResolveDirectory(const std::filesystem::path& currentDirectory, const std::wstring& directory)
-    {
-        auto path = (currentDirectory / directory).lexically_normal();
-        if (!path.has_filename() && path.has_relative_path())
-        {
-            path = path.parent_path();
-        }
-
-        return path;
-    }
-
-    // Resolve symlinks so project identity and relative paths follow the target document.
-    std::filesystem::path ResolveComposeFilePath(const std::filesystem::path& path)
+    // Make the path absolute and resolve symlinks so project identity and relative paths follow the target.
+    std::filesystem::path ResolvePath(const std::filesystem::path& path)
     {
         std::error_code error;
         auto resolved = wsl::windows::common::filesystem::GetCanonicalPath(path, error);
@@ -80,6 +69,29 @@ namespace {
             HRESULT_FROM_WIN32(error.value()), Localization::MessageWslcComposePathResolveFailed(path.wstring()), static_cast<bool>(error));
 
         return resolved;
+    }
+
+    std::filesystem::path ResolveDirectory(const std::filesystem::path& currentDirectory, const std::wstring& directory)
+    {
+        // A drive-relative path (e.g. "c:project") on the current drive is relative to the current directory.
+        // Root names are compared case-insensitively since the path join treats "c:" and "C:" as different drives.
+        std::filesystem::path path{directory};
+        if (path.has_root_name() && !path.has_root_directory() &&
+            wsl::shared::string::IsEqual(path.root_name().native(), currentDirectory.root_name().native(), true))
+        {
+            path = ResolvePath(currentDirectory / path.relative_path());
+        }
+        else
+        {
+            path = ResolvePath(currentDirectory / path);
+        }
+
+        if (!path.has_filename() && path.has_relative_path())
+        {
+            path = path.parent_path();
+        }
+
+        return path;
     }
 
     bool IsLowerAlphanumeric(wchar_t character)
@@ -118,13 +130,13 @@ namespace {
         for (const auto& file : args.GetAllValues<ArgType::ComposeFile>())
         {
             THROW_HR_WITH_USER_ERROR_IF(E_NOTIMPL, Localization::WSLCCLI_ComposeStdinFileNotImplementedError(), file == L"-");
-            files.push_back(ResolveComposeFilePath(currentDirectory / file));
+            files.push_back(ResolvePath(currentDirectory / file));
         }
 
         if (files.empty())
         {
             files = DiscoverComposeFiles(projectDirectory.value_or(currentDirectory));
-            std::ranges::transform(files, files.begin(), ResolveComposeFilePath);
+            std::ranges::transform(files, files.begin(), ResolvePath);
         }
 
         models::ComposeProjectFiles project;

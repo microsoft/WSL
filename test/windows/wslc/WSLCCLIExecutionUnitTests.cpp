@@ -1052,6 +1052,29 @@ class WSLCCLIExecutionUnitTests
         VERIFY_ARE_EQUAL(projectDirectory.wstring(), ProjectFiles(project).ProjectDirectory.wstring());
     }
 
+    TEST_METHOD(ComposeProject_DriveRelativeProjectDirectory)
+    {
+        ScopedTempDirectory directory;
+        const auto composeFile = directory.AddFile(L"project\\compose.yml");
+        const auto projectDirectory = directory.Path() / L"project";
+
+        auto rootName = directory.Path().root_name().wstring();
+        VERIFY_ARE_EQUAL(2u, rootName.size());
+
+        // Both letter cases of the current drive must resolve against the current directory.
+        for (const wchar_t drive : {static_cast<wchar_t>(towlower(rootName[0])), static_cast<wchar_t>(towupper(rootName[0]))})
+        {
+            const auto driveRelative = std::wstring{drive} + L":project";
+            auto project = ResolveProject(
+                {L"compose", L"--project-directory", driveRelative, L"up"}, task::ComposeProjectSelection::Files, directory.Path());
+
+            const auto& files = ProjectFiles(project);
+            VERIFY_IS_TRUE(files.ProjectDirectory.is_absolute());
+            VERIFY_ARE_EQUAL(projectDirectory.wstring(), files.ProjectDirectory.wstring());
+            VERIFY_ARE_EQUAL(composeFile.wstring(), files.Files[0].wstring());
+        }
+    }
+
     TEST_METHOD(ComposeProject_StdinFileNotImplemented)
     {
         ScopedTempDirectory directory;
