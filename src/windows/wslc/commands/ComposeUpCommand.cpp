@@ -23,13 +23,6 @@ using namespace wsl::shared;
 
 namespace wsl::windows::wslc {
 
-std::vector<Argument> ComposeUpCommand::GetArguments() const
-{
-    return {
-        Argument::Create(ArgType::Path, {.Required = true, .Desc = Localization::WSLCCLI_ComposePathArgDescription()}),
-    };
-}
-
 std::wstring ComposeUpCommand::ShortDescription() const
 {
     return Localization::WSLCCLI_ComposeUpDesc();
@@ -42,7 +35,7 @@ std::wstring ComposeUpCommand::LongDescription() const
 
 void ComposeUpCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession << UpCompose;
+    context << ResolveSession << ResolveComposeProject(ComposeProjectSelection::Files) << UpCompose;
 }
 
 } // namespace wsl::windows::wslc

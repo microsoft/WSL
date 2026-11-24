@@ -16,7 +16,6 @@ Abstract:
 #include "ComposeService.h"
 #include "ConsoleService.h"
 #include <array>
-#include <filesystem.hpp>
 #include <relay.hpp>
 #include <WSLCContainerEntry.h>
 #include <WSLCProcessLauncher.h>
@@ -25,53 +24,73 @@ namespace wsl::windows::wslc::services {
 
 namespace {
 
-    struct CapturedComposeDocuments
+    std::string ReadComposeDocument(const std::filesystem::path& sourcePath)
     {
-        explicit CapturedComposeDocuments(const std::wstring& path)
+        std::ifstream stream{sourcePath, std::ios::binary};
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), wsl::shared::Localization::MessageWslcComposeFileOpenFailed(sourcePath.wstring()), !stream);
+
+        std::string content;
+        std::array<char, 4096> buffer{};
+        while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
         {
-            std::error_code error;
-            sourcePath = wsl::windows::common::filesystem::GetCanonicalPath(path, error);
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(error.value()), wsl::shared::Localization::MessageWslcComposePathResolveFailed(path), static_cast<bool>(error));
-            projectDirectory = sourcePath.parent_path();
-
-            // Capture document bytes and source context as the input snapshot for interpretation.
-            std::ifstream stream{sourcePath, std::ios::binary};
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_OPEN_FAILED), wsl::shared::Localization::MessageWslcComposeFileOpenFailed(sourcePath.wstring()), !stream);
-
-            std::array<char, 4096> buffer{};
-            while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
-            {
-                const auto bytesRead = gsl::narrow<size_t>(stream.gcount());
-                THROW_HR_IF_MSG(
-                    HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
-                    bytesRead > ULONG_MAX - content.size(),
-                    "Compose document exceeds the maximum transport size: %ls",
-                    sourcePath.c_str());
-                content.append(buffer.data(), bytesRead);
-            }
-
-            THROW_HR_WITH_USER_ERROR_IF(
-                HRESULT_FROM_WIN32(ERROR_READ_FAULT),
-                wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
-                stream.bad() || !stream.eof());
-            THROW_HR_IF(E_INVALIDARG, content.empty());
-
-            document.SourcePath = sourcePath.c_str();
-            document.BaseDirectory = projectDirectory.c_str();
-            document.Content = reinterpret_cast<const byte*>(content.data());
-            document.ContentSize = gsl::narrow<ULONG>(content.size());
-
-            documents.ProjectDirectory = projectDirectory.c_str();
-            documents.Documents = &document;
-            documents.DocumentCount = 1;
+            const auto bytesRead = gsl::narrow<size_t>(stream.gcount());
+            THROW_HR_IF_MSG(
+                HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE),
+                bytesRead > ULONG_MAX - content.size(),
+                "Compose document exceeds the maximum transport size: %ls",
+                sourcePath.c_str());
+            content.append(buffer.data(), bytesRead);
         }
 
-        std::filesystem::path sourcePath;
+        THROW_HR_WITH_USER_ERROR_IF(
+            HRESULT_FROM_WIN32(ERROR_READ_FAULT),
+            wsl::shared::Localization::MessageWslcComposeFileReadFailed(sourcePath.wstring()),
+            stream.bad() || !stream.eof());
+        THROW_HR_IF(E_INVALIDARG, content.empty());
+
+        return content;
+    }
+
+    struct CapturedComposeDocuments
+    {
+        NON_COPYABLE(CapturedComposeDocuments);
+        NON_MOVABLE(CapturedComposeDocuments);
+
+        explicit CapturedComposeDocuments(const models::ComposeProjectFiles& project) :
+            sourcePaths(project.Files), projectDirectory(project.ProjectDirectory), projectName(project.ProjectName)
+        {
+            THROW_HR_IF(E_INVALIDARG, sourcePaths.empty());
+
+            // Capture document bytes and source context as the input snapshot for interpretation.
+            contents.reserve(sourcePaths.size());
+            for (const auto& sourcePath : sourcePaths)
+            {
+                contents.push_back(ReadComposeDocument(sourcePath));
+            }
+
+            // The document entries point into sourcePaths and contents, which are not modified after this point.
+            documentEntries.resize(sourcePaths.size());
+            for (size_t index = 0; index < sourcePaths.size(); ++index)
+            {
+                auto& document = documentEntries[index];
+                document.SourcePath = sourcePaths[index].c_str();
+                document.BaseDirectory = projectDirectory.c_str();
+                document.Content = reinterpret_cast<const byte*>(contents[index].data());
+                document.ContentSize = gsl::narrow<ULONG>(contents[index].size());
+            }
+
+            documents.ProjectDirectory = projectDirectory.c_str();
+            documents.ExplicitProjectName = projectName.has_value() ? projectName->c_str() : nullptr;
+            documents.Documents = documentEntries.data();
+            documents.DocumentCount = gsl::narrow<ULONG>(documentEntries.size());
+        }
+
+        std::vector<std::filesystem::path> sourcePaths;
         std::filesystem::path projectDirectory;
-        std::string content;
-        WSLCComposeDocument document{};
+        std::optional<std::string> projectName;
+        std::vector<std::string> contents;
+        std::vector<WSLCComposeDocument> documentEntries;
         WSLCComposeDocumentCollection documents{};
     };
 
@@ -96,25 +115,21 @@ namespace {
     };
 
     ComposeOperationResult Execute(
-        models::Session& session,
-        const ComposeProjectReference& project,
-        WSLCComposeAction action,
-        HANDLE cancelEvent,
-        std::optional<ULONG> timeout = std::nullopt)
+        models::Session& session, const models::ComposeProject& project, WSLCComposeAction action, HANDLE cancelEvent, std::optional<ULONG> timeout = std::nullopt)
     {
         std::optional<CapturedComposeDocuments> captured;
         WSLCComposeOperationRequest request{};
         request.Action = action;
-        if (const auto* path = std::get_if<std::filesystem::path>(&project))
+        if (const auto* files = std::get_if<models::ComposeProjectFiles>(&project.Value))
         {
-            captured.emplace(path->wstring());
+            captured.emplace(*files);
             request.Project.Type = WSLCComposeProjectTypeDocuments;
             request.Project.Value.Documents = &captured->documents;
         }
         else
         {
             request.Project.Type = WSLCComposeProjectTypeProjectKey;
-            request.Project.Value.ProjectKey = std::get<std::string>(project).c_str();
+            request.Project.Value.ProjectKey = std::get<std::string>(project.Value).c_str();
         }
 
         if (timeout.has_value())
@@ -166,29 +181,29 @@ namespace {
 
 } // namespace
 
-void ComposeService::Create(Terminal&, models::Session& session, const std::wstring& path, HANDLE cancelEvent)
+void ComposeService::Create(Terminal&, models::Session& session, const models::ComposeProject& project, HANDLE cancelEvent)
 {
-    Execute(session, ComposeProjectReference{std::filesystem::path{path}}, WSLCComposeActionCreate, cancelEvent);
+    Execute(session, project, WSLCComposeActionCreate, cancelEvent);
 }
 
-int ComposeService::Up(Terminal&, models::Session& session, const std::wstring& path, HANDLE cancelEvent)
+int ComposeService::Up(Terminal&, models::Session& session, const models::ComposeProject& project, HANDLE cancelEvent)
 {
-    const auto result = Execute(session, ComposeProjectReference{std::filesystem::path{path}}, WSLCComposeActionUp, cancelEvent);
+    const auto result = Execute(session, project, WSLCComposeActionUp, cancelEvent);
     return AttachContainers(session, result);
 }
 
-void ComposeService::Start(Terminal&, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
+void ComposeService::Start(Terminal&, models::Session& session, const models::ComposeProject& project, HANDLE cancelEvent)
 {
     Execute(session, project, WSLCComposeActionStart, cancelEvent);
 }
 
-int ComposeService::Attach(Terminal&, models::Session& session, const ComposeProjectReference& project, HANDLE cancelEvent)
+int ComposeService::Attach(Terminal&, models::Session& session, const models::ComposeProject& project, HANDLE cancelEvent)
 {
     auto result = Execute(session, project, WSLCComposeActionAttach, cancelEvent);
     return AttachContainers(session, result);
 }
 
-void ComposeService::Stop(Terminal&, models::Session& session, const ComposeProjectReference& project, ULONG timeout, HANDLE cancelEvent)
+void ComposeService::Stop(Terminal&, models::Session& session, const models::ComposeProject& project, ULONG timeout, HANDLE cancelEvent)
 {
     Execute(session, project, WSLCComposeActionStop, cancelEvent, timeout);
 }
