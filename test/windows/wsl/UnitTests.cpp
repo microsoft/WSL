@@ -536,7 +536,7 @@ class UnitTests
 
     WSL2_TEST_METHOD(SystemdKillInitTerminatesDistro)
     {
-        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        WslConfigChange config(LxssGenerateTestConfig({.instanceIdleTimeout = -1}));
         auto revert = EnableSystemd("initTimeout=0");
         // Wait for systemd to start
         VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
@@ -7647,7 +7647,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
     TEST_METHOD(DistroTimeout)
     {
-        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=-1");
+        WslConfigChange config(LxssGenerateTestConfig({.instanceIdleTimeout = -1}));
         auto distroId = GetDistributionId(LXSS_DISTRO_NAME_TEST_L);
 
         // Validate that distributions don't time out when timeout is -1
@@ -7660,7 +7660,7 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
 
         // Validate that distributions time out when timeout value is > 0
         {
-            config.Update(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=2000");
+            config.Update(LxssGenerateTestConfig({.instanceIdleTimeout = 2000}));
 
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo OK"), 0L);
 

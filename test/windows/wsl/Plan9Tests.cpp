@@ -406,7 +406,7 @@ class Plan9Tests
         // This test has proven to be unstable, most likely because another program opens a file inside the distro, which prevents it from terminating.
         SKIP_TEST_UNSTABLE();
 
-        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=10000");
+        WslConfigChange config(LxssGenerateTestConfig({.instanceIdleTimeout = 10000}));
         auto revertLogging = EnablePlan9Logging();
 
         auto dumpLogs = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {

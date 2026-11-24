@@ -584,6 +584,7 @@ enum class DrvFsMode
 struct TestConfigDefaults
 {
     std::optional<size_t> vmIdleTimeout;
+    std::optional<int> instanceIdleTimeout;
     std::optional<bool> safeMode;
     std::optional<bool> guiApplications;
     std::optional<bool> earlyBootLogging;
