@@ -522,6 +522,9 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         m_vmExited.store(true);
     }
 
+    // Wait for dockerd to deliver pending events before it is stopped. Teardown only runs on the relay thread when the VM
+    // exits unexpectedly (OnVmExited), where dockerd is already gone and the relay thread could not deliver events while
+    // waiting for them, so skipping the wait there never drops events on a normal VM stop.
     if (m_dockerClient && m_dockerdProcess.has_value() && !m_vmExited.load() && !m_terminating->load() && m_ioRelay &&
         !m_ioRelay->IsRelayThread())
     {
