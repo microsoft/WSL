@@ -49,13 +49,20 @@ struct ComposeContainerDefinition
     std::vector<Port> Ports;
 };
 
+struct ComposeSpecDocument
+{
+    std::filesystem::path SourcePath;
+    // Relative bind mount sources resolve against this directory.
+    std::filesystem::path BaseDirectory;
+    std::string Content;
+};
+
 struct ComposeSpec
 {
     std::vector<ComposeContainerDefinition> Containers;
     std::string ProjectName;
 
-    // Relative bind mount sources resolve against baseDirectory; path is used for diagnostics.
-    static ComposeSpec Parse(const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& content);
+    static ComposeSpec Parse(const std::vector<ComposeSpecDocument>& documents);
 };
 
 } // namespace wsl::windows::service::wslc

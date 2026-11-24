@@ -34,18 +34,27 @@ namespace {
 ComposeSpec ComposeNormalizer::Normalize(const ComposeDocuments& documents, const ComposeProjectSelection& selection)
 {
     THROW_HR_IF(E_INVALIDARG, documents.ProjectDirectory.empty());
-    THROW_HR_IF(E_INVALIDARG, documents.Documents.size() != 1);
+    THROW_HR_IF(E_INVALIDARG, documents.Documents.empty());
     ValidateSelection(selection);
 
-    const auto& document = documents.Documents.front();
-    THROW_HR_IF(E_INVALIDARG, document.SourcePath.empty());
-    THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
-    THROW_HR_IF(E_INVALIDARG, document.Content.empty());
+    std::vector<ComposeSpecDocument> specDocuments;
+    specDocuments.reserve(documents.Documents.size());
+    for (const auto& document : documents.Documents)
+    {
+        THROW_HR_IF(E_INVALIDARG, document.SourcePath.empty());
+        THROW_HR_IF(E_INVALIDARG, document.BaseDirectory.empty());
+        THROW_HR_IF(E_INVALIDARG, document.Content.empty());
 
-    // Interpretation consumes the captured snapshot; source paths provide document context.
-    // yaml-cpp detects the document encoding from the original bytes and any byte-order mark.
-    const std::string content(reinterpret_cast<const char*>(document.Content.data()), document.Content.size());
-    auto spec = ComposeSpec::Parse(document.SourcePath, document.BaseDirectory, content);
+        // Interpretation consumes the captured snapshot; source paths provide document context.
+        // yaml-cpp detects the document encoding from the original bytes and any byte-order mark.
+        specDocuments.push_back({
+            .SourcePath = document.SourcePath,
+            .BaseDirectory = document.BaseDirectory,
+            .Content = std::string(reinterpret_cast<const char*>(document.Content.data()), document.Content.size()),
+        });
+    }
+
+    auto spec = ComposeSpec::Parse(specDocuments);
 
     std::string projectName;
     if (documents.ExplicitProjectName.has_value())

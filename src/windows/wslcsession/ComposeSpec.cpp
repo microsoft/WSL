@@ -175,9 +175,210 @@ namespace {
         };
     }
 
-    ComposeSpec ParseComposeFile(const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& content)
+    enum class ComposeMergeMode
     {
-        const auto root = YAML::Load(content);
+        Merge,
+        Override,
+        Reset,
+    };
+
+    ComposeMergeMode GetMergeMode(const YAML::Node& node)
+    {
+        const auto& tag = node.Tag();
+        if (tag == "!reset")
+        {
+            return ComposeMergeMode::Reset;
+        }
+
+        if (tag == "!override")
+        {
+            return ComposeMergeMode::Override;
+        }
+
+        return ComposeMergeMode::Merge;
+    }
+
+    // A service accumulated across documents, with the document that first defined it for error reporting.
+    struct ComposeServiceState
+    {
+        std::filesystem::path SourcePath;
+        ComposeContainerDefinition Definition;
+    };
+
+    constexpr std::array<std::string_view, 8> c_supportedServiceProperties{
+        "name", "container_name", "image", "environment", "working_dir", "command", "volumes", "ports"};
+
+    std::string_view EnvironmentKey(std::string_view entry)
+    {
+        return entry.substr(0, entry.find('='));
+    }
+
+    std::pair<uint16_t, uint16_t> PortKey(const ComposeContainerDefinition::Port& port)
+    {
+        return {port.HostPort, port.ContainerPort};
+    }
+
+    std::vector<ComposeContainerDefinition::Volume> ParseComposeVolumes(
+        const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& serviceName, const YAML::Node& node)
+    {
+        if (!node.IsSequence())
+        {
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeVolumesListExpected(path.wstring(), serviceName));
+        }
+
+        std::vector<ComposeContainerDefinition::Volume> result;
+        result.reserve(node.size());
+        for (const auto& volume : node)
+        {
+            result.emplace_back(ParseComposeVolume(path, baseDirectory, serviceName, volume));
+        }
+
+        return result;
+    }
+
+    std::vector<ComposeContainerDefinition::Port> ParseComposePorts(const std::filesystem::path& path, const std::string& serviceName, const YAML::Node& node)
+    {
+        if (!node.IsSequence())
+        {
+            ThrowInvalidComposeFile(Localization::MessageWslcComposePortsListExpected(path.wstring(), serviceName));
+        }
+
+        std::vector<ComposeContainerDefinition::Port> result;
+        result.reserve(node.size());
+        for (const auto& port : node)
+        {
+            result.emplace_back(ParseComposePort(path, serviceName, port));
+        }
+
+        return result;
+    }
+
+    // Replaces the target value, or clears it when the node is tagged !reset.
+    template <typename T, typename TParse>
+    void ApplyValue(const YAML::Node& node, T& target, TParse&& parse)
+    {
+        if (!node)
+        {
+            return;
+        }
+
+        target = GetMergeMode(node) == ComposeMergeMode::Reset ? T{} : parse(node);
+    }
+
+    // Adds parsed entries to the target list, replacing any existing entry with the same key.
+    // A !override tag clears the list first; a !reset tag only clears it.
+    template <typename T, typename TParse, typename TKey>
+    void ApplyList(const YAML::Node& node, std::vector<T>& target, TParse&& parse, TKey&& key)
+    {
+        if (!node)
+        {
+            return;
+        }
+
+        const auto mode = GetMergeMode(node);
+        if (mode != ComposeMergeMode::Merge)
+        {
+            target.clear();
+        }
+
+        if (mode == ComposeMergeMode::Reset)
+        {
+            return;
+        }
+
+        for (auto& entry : parse(node))
+        {
+            const auto existing = std::ranges::find(target, std::invoke(key, entry), key);
+            if (existing != target.end())
+            {
+                *existing = std::move(entry);
+                continue;
+            }
+
+            target.emplace_back(std::move(entry));
+        }
+    }
+
+    void ApplyComposeService(
+        const std::filesystem::path& path,
+        const std::filesystem::path& baseDirectory,
+        const std::string& serviceName,
+        const YAML::Node& settings,
+        ComposeContainerDefinition& definition)
+    {
+        for (const auto& setting : settings)
+        {
+            const auto key = setting.first.as<std::string>();
+            if (std::ranges::find(c_supportedServiceProperties, key) == c_supportedServiceProperties.end())
+            {
+                ThrowInvalidComposeFile(Localization::MessageWslcComposePropertyUnsupported(path.wstring(), key));
+            }
+        }
+
+        ApplyValue(settings["name"] ? settings["name"] : settings["container_name"], definition.Name, [&](const YAML::Node& node) {
+            auto name = node.as<std::string>();
+            if (name.empty())
+            {
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceNameEmpty(path.wstring(), serviceName));
+            }
+
+            return name;
+        });
+
+        ApplyValue(settings["image"], definition.Image, [&](const YAML::Node& node) {
+            if (!node.IsScalar())
+            {
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceImageRequired(path.wstring(), serviceName));
+            }
+
+            auto image = node.as<std::string>();
+            if (image.empty())
+            {
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceImageEmpty(path.wstring(), serviceName));
+            }
+
+            return image;
+        });
+
+        ApplyValue(settings["working_dir"], definition.WorkingDirectory, [&](const YAML::Node& node) {
+            if (!node.IsScalar() || !node.Scalar().starts_with('/'))
+            {
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeWorkingDirectoryInvalid(path.wstring(), serviceName));
+            }
+
+            return node.as<std::string>();
+        });
+
+        ApplyValue(settings["command"], definition.Command, [&](const YAML::Node& node) {
+            if (node.IsScalar())
+            {
+                // TODO: Implement proper parsing
+                return shared::string::Split(node.as<std::string>(), ' ');
+            }
+
+            return ParseComposeStringList(path, serviceName, node, "command");
+        });
+
+        ApplyList(
+            settings["environment"],
+            definition.Environment,
+            [&](const YAML::Node& node) { return ParseComposeEnvironment(path, serviceName, node); },
+            [](const std::string& entry) { return EnvironmentKey(entry); });
+
+        ApplyList(
+            settings["volumes"],
+            definition.Volumes,
+            [&](const YAML::Node& node) { return ParseComposeVolumes(path, baseDirectory, serviceName, node); },
+            &ComposeContainerDefinition::Volume::ContainerPath);
+
+        ApplyList(
+            settings["ports"], definition.Ports, [&](const YAML::Node& node) { return ParseComposePorts(path, serviceName, node); }, PortKey);
+    }
+
+    void ParseComposeDocument(const ComposeSpecDocument& document, std::vector<ComposeServiceState>& services)
+    {
+        const auto& path = document.SourcePath;
+        const auto root = YAML::Load(document.Content);
         if (!root.IsMap())
         {
             ThrowInvalidComposeFile(Localization::MessageWslcComposeMapExpected(path.wstring()));
@@ -208,135 +409,94 @@ namespace {
             }
         }
 
-        const auto services = root["services"];
-        if (!services || !services.IsMap() || services.size() == 0)
+        const auto servicesNode = root["services"];
+        if (!servicesNode)
+        {
+            return;
+        }
+
+        if (!servicesNode.IsMap())
         {
             ThrowInvalidComposeFile(Localization::MessageWslcComposeServicesMapExpected(path.wstring()));
         }
 
-        ComposeSpec spec;
-
-        spec.Containers.reserve(services.size());
-        for (const auto& service : services)
+        for (const auto& service : servicesNode)
         {
-            if (!service.first.IsScalar() || !service.second.IsMap())
+            if (!service.first.IsScalar())
             {
                 ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceMapExpected(path.wstring()));
             }
 
             const auto serviceName = service.first.as<std::string>();
-            const auto& settings = service.second;
-            for (const auto& setting : settings)
+            const auto mode = GetMergeMode(service.second);
+            auto existing = std::ranges::find_if(
+                services, [&](const ComposeServiceState& state) { return state.Definition.ServiceName == serviceName; });
+
+            if (mode != ComposeMergeMode::Merge && existing != services.end())
             {
-                const auto key = setting.first.as<std::string>();
-                if (key != "name" && key != "container_name" && key != "image" && key != "environment" && key != "working_dir" &&
-                    key != "command" && key != "volumes" && key != "ports")
-                {
-                    ThrowInvalidComposeFile(Localization::MessageWslcComposePropertyUnsupported(path.wstring(), key));
-                }
+                services.erase(existing);
+                existing = services.end();
             }
 
-            const auto image = settings["image"];
-            if (!image || !image.IsScalar())
+            if (mode == ComposeMergeMode::Reset)
             {
-                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceImageRequired(path.wstring(), serviceName));
+                continue;
             }
 
-            const auto nameNode = settings["name"] ? settings["name"] : settings["container_name"];
-            const auto name = nameNode ? nameNode.as<std::string>() : std::string{};
-            if (nameNode && name.empty())
+            if (!service.second.IsMap())
             {
-                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceNameEmpty(path.wstring(), serviceName));
+                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceMapExpected(path.wstring()));
             }
 
-            const auto imageName = image.as<std::string>();
-            if (imageName.empty())
+            if (existing == services.end())
             {
-                ThrowInvalidComposeFile(Localization::MessageWslcComposeServiceImageEmpty(path.wstring(), serviceName));
+                existing = services.insert(services.end(), ComposeServiceState{.SourcePath = path, .Definition = {.ServiceName = serviceName}});
             }
 
-            ComposeContainerDefinition definition{
-                .ServiceName = serviceName,
-                .Name = name,
-                .Image = imageName,
-                .Environment = ParseComposeEnvironment(path, serviceName, settings["environment"]),
-            };
-
-            const auto command = settings["command"];
-            if (command && command.IsScalar())
-            {
-                // TODO: Implement proper parsing
-                definition.Command = shared::string::Split(command.as<std::string>(), ' ');
-            }
-            else
-            {
-                definition.Command = ParseComposeStringList(path, serviceName, command, "command");
-            }
-
-            const auto workingDirectory = settings["working_dir"];
-            if (workingDirectory)
-            {
-                if (!workingDirectory.IsScalar())
-                {
-                    ThrowInvalidComposeFile(Localization::MessageWslcComposeWorkingDirectoryInvalid(path.wstring(), serviceName));
-                }
-
-                definition.WorkingDirectory = workingDirectory.as<std::string>();
-                if (!definition.WorkingDirectory.starts_with('/'))
-                {
-                    ThrowInvalidComposeFile(Localization::MessageWslcComposeWorkingDirectoryInvalid(path.wstring(), serviceName));
-                }
-            }
-
-            const auto volumes = settings["volumes"];
-            if (volumes)
-            {
-                if (!volumes.IsSequence())
-                {
-                    ThrowInvalidComposeFile(Localization::MessageWslcComposeVolumesListExpected(path.wstring(), serviceName));
-                }
-
-                definition.Volumes.reserve(volumes.size());
-                for (const auto& volume : volumes)
-                {
-                    definition.Volumes.emplace_back(ParseComposeVolume(path, baseDirectory, serviceName, volume));
-                }
-            }
-
-            const auto ports = settings["ports"];
-            if (ports)
-            {
-                if (!ports.IsSequence())
-                {
-                    ThrowInvalidComposeFile(Localization::MessageWslcComposePortsListExpected(path.wstring(), serviceName));
-                }
-
-                definition.Ports.reserve(ports.size());
-                for (const auto& port : ports)
-                {
-                    definition.Ports.emplace_back(ParseComposePort(path, serviceName, port));
-                }
-            }
-
-            spec.Containers.emplace_back(std::move(definition));
+            ApplyComposeService(path, document.BaseDirectory, serviceName, service.second, existing->Definition);
         }
-
-        return spec;
     }
 
 } // namespace
 
-ComposeSpec ComposeSpec::Parse(const std::filesystem::path& path, const std::filesystem::path& baseDirectory, const std::string& content)
+ComposeSpec ComposeSpec::Parse(const std::vector<ComposeSpecDocument>& documents)
 {
-    try
+    THROW_HR_IF(E_INVALIDARG, documents.empty());
+
+    // Documents merge in order: later documents override scalars, merge environment and volumes by key, and append ports.
+    std::vector<ComposeServiceState> services;
+    for (const auto& document : documents)
     {
-        return ParseComposeFile(path, baseDirectory, content);
+        try
+        {
+            ParseComposeDocument(document, services);
+        }
+        catch (const YAML::Exception& exception)
+        {
+            ThrowInvalidComposeFile(Localization::MessageWslcComposeFileInvalid(
+                document.SourcePath.wstring(), wsl::shared::string::MultiByteToWide(exception.what())));
+        }
     }
-    catch (const YAML::Exception& exception)
+
+    if (services.empty())
     {
-        ThrowInvalidComposeFile(
-            Localization::MessageWslcComposeFileInvalid(path.wstring(), wsl::shared::string::MultiByteToWide(exception.what())));
+        ThrowInvalidComposeFile(Localization::MessageWslcComposeServicesMapExpected(documents.front().SourcePath.wstring()));
     }
+
+    ComposeSpec spec;
+    spec.Containers.reserve(services.size());
+    for (auto& service : services)
+    {
+        if (service.Definition.Image.empty())
+        {
+            ThrowInvalidComposeFile(
+                Localization::MessageWslcComposeServiceImageRequired(service.SourcePath.wstring(), service.Definition.ServiceName));
+        }
+
+        spec.Containers.emplace_back(std::move(service.Definition));
+    }
+
+    return spec;
 }
 
 } // namespace wsl::windows::service::wslc
