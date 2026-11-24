@@ -1621,7 +1621,7 @@ void WslCoreVm::InitializeGuest()
     message->EnableInboxGpuLibs = m_enableInboxGpuLibs;
     try
     {
-        const auto enabled = securityaudit::ProcessExecutionEnabled();
+        const auto enabled = m_vmConfig.EnableSecurityAudit && securityaudit::ProcessExecutionEnabled();
         message->IncludeAuditCommandLine = enabled && securityaudit::IncludeProcessCommandLine();
         message->EnableSecurityAudit = enabled;
     }

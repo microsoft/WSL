@@ -273,6 +273,7 @@ namespace ConfigSetting {
     static constexpr auto MaxCrashDumpCount = "wsl2.maxCrashDumpCount";
     static constexpr auto DistributionInstallPath = "general.distributionInstallPath";
     static constexpr auto InstanceIdleTimeout = "general.instanceIdleTimeout";
+    static constexpr auto SecurityAudit = "general.securityAudit";
     static constexpr auto DnsTunneling = "wsl2.dnsTunneling";
     static constexpr auto Firewall = "wsl2.firewall";
     static constexpr auto AutoProxy = "wsl2.autoProxy";
@@ -309,6 +310,8 @@ struct Config
     void ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt_ HANDLE UserToken);
     void SaveNetworkingSettings(_In_opt_ HANDLE UserToken) const;
     static unsigned long WriteConfigFile(_In_ LPCWSTR ConfigFilePath, _In_ ConfigKey KeyToWrite, _In_ bool RemoveKey = false);
+    static bool ReadSecurityAuditSetting(_In_ HANDLE UserToken);
+    static constexpr bool c_defaultSecurityAudit = true;
 
     std::filesystem::path KernelPath;
     std::wstring KernelCommandLine;
@@ -336,6 +339,7 @@ struct Config
     bool EnableGuiApps = true;
     std::filesystem::path SystemDistroPath;
     bool EnableTelemetry = shared::OfficialBuild;
+    bool EnableSecurityAudit = c_defaultSecurityAudit;
     int VmIdleTimeout = (60 * 1000);
     int InstanceIdleTimeout = (15 * 1000);
     std::filesystem::path DebugConsoleLogFile;

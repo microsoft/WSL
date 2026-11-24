@@ -154,6 +154,7 @@ internal static class SettingsApplyHelper
             { WslConfigEntry.GUIApplicationsEnabled, "Settings_GUIApplications/Header" },
             { WslConfigEntry.NestedVirtualizationEnabled, "Settings_NestedVirtualization/Header" },
             { WslConfigEntry.SafeModeEnabled, "Settings_SafeMode/Header" },
+            { WslConfigEntry.SecurityAuditEnabled, "Settings_SecurityAudit/Header" },
             { WslConfigEntry.SparseVHDEnabled, "Settings_SparseVHD/Header" },
             { WslConfigEntry.VMIdleTimeout, "Settings_VMIdleTimeout/Header" },
             { WslConfigEntry.InstanceIdleTimeout, "Settings_InstanceIdleTimeout/Header" },

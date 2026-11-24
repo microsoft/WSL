@@ -449,7 +449,7 @@ try
     std::optional<bool> includeCommandLine;
     try
     {
-        if (securityaudit::ProcessExecutionEnabled())
+        if (securityaudit::ProcessExecutionEnabled() && wsl::core::Config::ReadSecurityAuditSetting(m_userToken.get()))
         {
             includeCommandLine = securityaudit::IncludeProcessCommandLine();
         }

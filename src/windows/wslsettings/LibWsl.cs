@@ -44,7 +44,8 @@ namespace LibWsl
         KernelPath = 24,
         SystemDistroPath = 25,
         KernelModulesPath = 26,
-        InstanceIdleTimeout = 27
+        InstanceIdleTimeout = 27,
+        SecurityAuditEnabled = 28
     }
 
     public enum NetworkingConfiguration
