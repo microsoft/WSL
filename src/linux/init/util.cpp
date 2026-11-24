@@ -894,6 +894,9 @@ try
     struct MountMatch
     {
         std::string MountPoint;
+        std::string TranslatedPath;
+        std::string Root;
+        dev_t Device;
         size_t PrefixLength;
     };
 
@@ -922,14 +925,11 @@ try
         // Keep the other Windows matches so they remain available if the
         // preferred mount is hidden.
         //
-        // TODO_LX: This doesn't catch mounts below the candidate mount point
-        // that shadow the suffix of the translated Windows path.
-        //
 
         if (WinPath)
         {
             std::erase_if(WindowsMatches, [&](const MountMatch& Match) {
-                return UtilIsPathPrefix(Match.MountPoint.c_str(), MountEnum.Current().MountPoint, false) > 0;
+                return UtilIsPathPrefix(Match.TranslatedPath.c_str(), MountEnum.Current().MountPoint, false) > 0;
             });
         }
         else if (!FoundReplacement.empty() && UtilIsPathPrefix(Path, MountEnum.Current().MountPoint, false) > 0)
@@ -1020,7 +1020,11 @@ try
 
         if (WinPath)
         {
-            WindowsMatches.push_back({*ReplacementField, Length});
+            std::string TranslatedPath = Path + Length;
+            UtilCanonicalisePathSeparator(TranslatedPath, PATH_SEP);
+            TranslatedPath.insert(0, *ReplacementField);
+            WindowsMatches.push_back(
+                {*ReplacementField, std::move(TranslatedPath), MountEnum.Current().Root, MountEnum.Current().Device, Length});
             continue;
         }
 
@@ -1043,13 +1047,30 @@ try
         //
     }
 
-    // Use the longest Windows prefix. For equal prefixes, keep the first
-    // visible mount so a later bind alias cannot redirect translation.
-    if (!WindowsMatches.empty())
+    // Prefer the longest prefix and preserve the last-match rule for
+    // independent mounts. Within each device and root, use the first visible
+    // mount so a later bind of the same directory cannot redirect translation.
+    auto Best = WindowsMatches.end();
+    for (auto Match = WindowsMatches.begin(); Match != WindowsMatches.end(); ++Match)
     {
-        auto Match = std::ranges::max_element(WindowsMatches, {}, &MountMatch::PrefixLength);
-        FoundPrefixLength = Match->PrefixLength;
-        FoundReplacement = std::move(Match->MountPoint);
+        if (Best != WindowsMatches.end() && Match->PrefixLength < Best->PrefixLength)
+        {
+            continue;
+        }
+
+        const auto Alias = std::find_if(WindowsMatches.begin(), Match, [&](const MountMatch& Earlier) {
+            return Earlier.PrefixLength == Match->PrefixLength && Earlier.Device == Match->Device && Earlier.Root == Match->Root;
+        });
+        if (Alias == Match)
+        {
+            Best = Match;
+        }
+    }
+
+    if (Best != WindowsMatches.end())
+    {
+        FoundPrefixLength = Best->PrefixLength;
+        FoundReplacement = std::move(Best->MountPoint);
     }
 
     if (!FoundReplacement.empty() && PrefixLength != nullptr)

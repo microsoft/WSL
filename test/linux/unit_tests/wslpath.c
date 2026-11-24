@@ -211,6 +211,7 @@ Return Value:
     char Alias[sizeof("/data/wslpath-rbind-XXXXXX/c/Windows")];
     char Target[] = "/data/wslpath-rbind-XXXXXX";
     bool Mounted = false;
+    bool OverlayMounted = false;
     char* PointerResult = NULL;
     int Result;
 
@@ -232,7 +233,17 @@ Return Value:
     snprintf(Alias, sizeof(Alias), "%s/c/Windows", Target);
     LxtCheckResult(LxtCheckWslPathTranslation(Alias, "C:\\Windows", false));
 
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", "/mnt/c/Windows", "tmpfs", 0, NULL));
+    OverlayMounted = true;
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", Alias, true));
+
 ErrorExit:
+    if (OverlayMounted && umount2("/mnt/c/Windows", MNT_DETACH) < 0)
+    {
+        LxtLogError("Failed to detach the Windows directory overlay: %s", strerror(errno));
+        Result = LXT_RESULT_FAILURE;
+    }
+
     if (Mounted)
     {
         umount2(Target, MNT_DETACH);
