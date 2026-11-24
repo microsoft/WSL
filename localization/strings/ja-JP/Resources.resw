@@ -716,6 +716,12 @@ Windows バージョン: {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>更新プログラムを確認しています。</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API のレート制限に達しました。後でもう一度お試しください。</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API のレート制限に達しました。Windows Update を使用して更新プログラムを確認しています。</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>この配布は、Microsoft Store からのみ使用できます。</value>
   </data>
@@ -964,7 +970,7 @@ NAT ネットワークにフォールバックしています。</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>ローカルホスト プロキシ構成が検出されましたが、WSL にミラーリングされませんでした。NAT モードの WSL は、ローカルホスト プロキシをサポートしません。</value>
+    <value>ローカルホスト プロキシ構成が検出されましたが、WSL にミラーリングされませんでした。このプロキシ アドレスは、現在のネットワーク構成ではサポートされていません。</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1204,7 +1210,7 @@ WSL を修復するには任意のキーを押すか、取り消すには CTRL-C
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 エラー コード: {}
-このエラーが予期しないものである場合は、既存の問題を検索するか、https://github.com/microsoft/WSL/issues で新しい問題を提出することを検討してください。</value>
+このエラーが予期しないものである場合は、既存の問題を検索するか、https://github.com/microsoft/WSL/issues で新しい問題を提出することを検討してください</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -2079,6 +2085,25 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>ディストリビューションの実行を継続し、それらをホストしている WSL 仮想マシンがアイドル状態になった後に自動的にシャットダウンされないようにします。</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>WSL ディストリビューション VM を常にオンのままにする</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>WSL ディストリビューション VM はアイドル状態ではシャットダウンされないため、新しいシェルがすぐに起動します。WSL の実行中はより多くのメモリを使用します。これは、次の WSL セッションで有効になります。</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>WSL ディストリビューション VM を常にオンのままにする</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>継続実行設定を変更できませんでした</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>.wslconfig が読み取り専用でないことを確認してから、もう一度やり直してください。</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>これは、[オプション機能] の [WSL 設定] でいつでも変更できます。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>タイムアウトのリセット</value>
   </data>
@@ -2253,6 +2278,9 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>ポート マッピングは、コンテナー ネットワーク モードではサポートされていません。ポートはターゲット コンテナーによって所有されます。</value>
+  </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>コンテナー ネットワークが無効になっている場合、ポート マッピングはサポートされません。ネットワークを有効にするか、ポート マッピングを削除してください。</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>コンテナー ネットワーク モードにはターゲット コンテナー名が必要です。</value>
@@ -2431,20 +2459,12 @@ VS Code 自体のコマンド パレットから、より多くの VS Code リ�
      <value>必要なものが見つからないときに位置指定引数が見つかりました: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>'{}' にオプション名がありません</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>次の引数で始まる転送された引数を解決できませんでした: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>無効な余分な引数が見つかりました: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>値を持つエイリアス オプションはエイリアス チェーンの最後に配置する必要があります: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4169,6 +4189,14 @@ Windows バージョン: {}</value>
     <value>コンテナー '{}' のタイムスタンプを復元できませんでした</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>コンテナー '{}' の永続化された状態を読み込めませんでした。その状態に対する変更は保存されません。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>コンテナー '{}' の永続化された状態を保存できませんでした</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>イメージのインポート進行状況の解析に失敗しました</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4202,6 +4230,18 @@ Windows バージョン: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>ホストの信頼されたルート証明書を VM にインストールできませんでした: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC はゲストに '{}' を書き込めませんでした (ゲスト エラー {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC はゲスト VM を起動しましたが、Docker エンジンが {} ミリ秒以内に準備完了しませんでした。WSL 診断ログを収集して、スタートアップ エラーを調査します。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker エンジンは、WSLC ゲスト VM で準備が整う前にコード {} で終了しました。WSL 診断ログを収集して、スタートアップ エラーを調査します。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

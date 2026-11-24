@@ -1290,6 +1290,33 @@ with mmap.mmap(fd, 32 * 1024, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.
         VERIFY_ARE_EQUAL(L'W', ReadFileContent(EnvTestFile1.wstring())[0]);
     }
 
+    // Validates that fsync and fdatasync succeed on a directory in a virtiofs bind mount (#42129).
+    WSLC_TEST_METHOD(WSLCE2E_Container_Run_Volume_Bind_VirtioFs_DirectorySync_Success)
+    {
+        const auto hostDirectory = EnvTestFile1.parent_path();
+
+        constexpr auto directorySyncScript =
+            LR"PY(
+import os
+
+with open('/proc/mounts', encoding='utf-8') as mounts_file:
+    mounts = (line.split() for line in mounts_file)
+    if not any(fields[1:3] == ['/data', 'virtiofs'] for fields in mounts):
+        raise RuntimeError('/data is not mounted as virtiofs')
+
+fd = os.open('/data', os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(fd)
+    os.fdatasync(fd)
+finally:
+    os.close(fd)
+)PY";
+
+        auto result = RunWslc(std::format(
+            L"container run --rm --volume \"{}:/data\" {} python3 -c \"{}\"", hostDirectory.wstring(), PythonImage.NameAndTag(), directorySyncScript));
+        result.Verify({.Stdout = L"", .Stderr = L"", .ExitCode = 0});
+    }
+
     WSLC_TEST_METHOD(WSLCE2E_Container_Run_Mount_Volume_Success)
     {
         auto result = RunWslc(std::format(

@@ -50,6 +50,9 @@ std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
 
+// Set by the WslcContainerStoppingDuringTerminate test once the terminating session announces the VM stop.
+wil::unique_event g_terminateVmStopping{wil::EventOptions::ManualReset};
+
 std::vector<char> ReadFromSocket(SOCKET socket)
 {
     // Simplified error handling for the sake of the demo.
@@ -683,10 +686,35 @@ try
 CATCH_RETURN();
 
 HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId)
+try
 {
     g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << ContainerId << std::endl;
+
+    if (g_testType == PluginTestType::WslcContainerStoppingDuringTerminate)
+    {
+        wil::unique_event entered;
+        entered.open(c_containerStoppingEnteredEvent, EVENT_MODIFY_STATE);
+
+        // Reenter only once the test has started terminating the session and its teardown has begun.
+        entered.SetEvent();
+        THROW_WIN32_IF(ERROR_TIMEOUT, !g_terminateVmStopping.wait(30000));
+
+        std::vector<const char*> args = {"/bin/true", nullptr};
+        WSLCProcessHandle process = nullptr;
+        const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+        g_logfile << std::format("WSLC Container stopping reentrant WSLCCreateProcess: {:#x}", static_cast<uint32_t>(processHr)) << std::endl;
+        if (SUCCEEDED(processHr))
+        {
+            g_api->WSLCReleaseProcess(process);
+        }
+
+        const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "/test-plugin/container-stopping-mount", TRUE);
+        g_logfile << std::format("WSLC Container stopping reentrant WSLCMountFolder: {:#x}", static_cast<uint32_t>(mountHr)) << std::endl;
+    }
+
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
@@ -781,6 +809,12 @@ try
 
         entered.SetEvent();
         THROW_WIN32_IF(ERROR_TIMEOUT, !release.wait(30000));
+        return S_OK;
+    }
+
+    if (g_testType == PluginTestType::WslcContainerStoppingDuringTerminate)
+    {
+        g_terminateVmStopping.SetEvent();
         return S_OK;
     }
 
@@ -905,7 +939,7 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(
             E_INVALIDARG,
             static_cast<DWORD>(g_testType) <= 0 ||
-                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcVmExitDuringSessionRelease));
+                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerStoppingDuringTerminate));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

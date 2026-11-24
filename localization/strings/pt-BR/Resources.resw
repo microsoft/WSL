@@ -717,6 +717,12 @@ Argumentos:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Verificando se há atualizações.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>O limite de taxa da API do GitHub foi atingido. Tente novamente mais tarde.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>O limite de taxa da API do GitHub foi atingido. Verificando se há atualizações usando o Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Esta distribuição só está disponível no Microsoft Store.</value>
   </data>
@@ -856,7 +862,7 @@ Para obter mais informações sobre Admin Protection, visite https://aka.ms/apde
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidDistribution" xml:space="preserve">
-    <value>Found invalid distribution registration '{}', {}.</value>
+    <value>Registro de distribuição inválido encontrado '{}', {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
@@ -965,7 +971,7 @@ Voltando à rede NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Uma configuração de proxy de host local foi detectada, mas não espelhada em WSL. O WSL no modo NAT não dá suporte a proxies de localhost.</value>
+    <value>Uma configuração de proxy local foi detectada, mas não foi replicada no WSL. Esse endereço de proxy não é compatível com a configuração de rede atual.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1205,7 +1211,7 @@ Este prompt expirará em 60 segundos.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Código de erro: {}
-Se esse erro foi inesperado, considere pesquisar problemas existentes ou registrar um novo problema em https://github.com/microsoft/WSL/issues.</value>
+Se esse erro foi inesperado, considere pesquisar problemas existentes ou registrar um novo problema em https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -2080,6 +2086,25 @@ Você também pode acessar mais opções do VS Code Remote através da paleta de
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Evite que as distribuições em execução e a máquina virtual WSL que as hospeda sejam desligadas automaticamente depois de ficarem ociosas.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Manter a VM da distribuição do WSL sempre ativada</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>Sua VM de distribuição WSL não será desligada quando estiver ociosa, portanto, novos shells serão iniciados instantaneamente. Usa mais memória enquanto o WSL está em execução. Isso entrará em vigor na sua próxima sessão do WSL.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Manter a VM da distribuição do WSL sempre ativada</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Não foi possível alterar a configuração para manter em execução</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Verifique se .wslconfig não é somente leitura e tente novamente.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Você pode alterar isso a qualquer momento nas Configurações do WSL em Recursos Opcionais.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Redefinir tempo limite</value>
   </data>
@@ -2254,6 +2279,9 @@ Uso:
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Não há suporte para mapeamentos de porta com o modo de rede de contêineres; As portas são de propriedade do contêiner de destino.</value>
+  </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Não há suporte para mapeamentos de porta quando a rede de contêineres está desabilitada. Habilite a rede ou remova os mapeamentos de porta.</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>O nome do contêiner de destino é necessário para o modo de rede do contêiner.</value>
@@ -2432,20 +2460,12 @@ Uso:
      <value>Encontrado um argumento posicional quando nenhum era esperado: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Nome da opção ausente em: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Falha ao resolve argumentos encaminhados iniciando no argumento: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Argumento extra inválido encontrado: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>As opções de alias com um valor devem ser as últimas na cadeia de alias: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4170,6 +4190,14 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
     <value>Falha ao restaurar o carimbo de data e hora do contêiner '{}'</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Falha ao carregar o estado persistente do contêiner '{}'. As alterações em seu estado não serão salvas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Falha ao salvar o estado persistente do contêiner '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Falha ao analisar o progresso da importação da imagem</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4203,6 +4231,18 @@ Na primeira execução, cria o arquivo com todas as configurações comentadas n
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Falha ao instalar certificados raiz confiáveis do host na VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>O WSLC não pôde gravar '{}' no convidado (erro de convidado {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>O WSLC iniciou a VM convidada, mas o Docker Engine não ficou pronto dentro de {} milissegundos. Colete os logs de diagnóstico do WSL para investigar a falha na inicialização.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>O Docker Engine foi encerrado com o código {} antes de ficar pronto na VM convidada do WSLC. Colete logs de diagnóstico do WSL para investigar a falha de inicialização.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

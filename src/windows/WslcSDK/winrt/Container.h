@@ -28,6 +28,8 @@ struct Container : ContainerT<Container>
     void Start();
     void Stop(winrt::Microsoft::WSL::Containers::Signal const& signal, winrt::Windows::Foundation::TimeSpan timeout);
     void Delete(winrt::Microsoft::WSL::Containers::DeleteContainerOption const& flags);
+    void ConnectNetwork(winrt::Microsoft::WSL::Containers::ContainerNetwork const& network);
+    void DisconnectNetwork(hstring const& nameOrId);
     winrt::Microsoft::WSL::Containers::Process CreateProcess(winrt::Microsoft::WSL::Containers::ProcessSettings const& newProcessSettings);
     hstring Inspect();
     hstring Id();
@@ -41,6 +43,7 @@ struct Container : ContainerT<Container>
 
 private:
     void EnsureNotClosed() const;
+    void RegisterInitProcessCallbacks();
 
     winrt::com_ptr<implementation::Process> m_initProcess;
     bool m_opened = false;

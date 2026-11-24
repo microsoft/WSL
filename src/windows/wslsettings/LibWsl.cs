@@ -238,10 +238,10 @@ namespace LibWsl
                 return;
             NativeToManagedMap.TryRemove(__Instance, out _);
             DisposePartial(disposing);
-            if (__ownsNativeInstance)
-                Marshal.FreeHGlobal(__Instance);
             if (__ownsNativeStringValueInstance && ((__Internal*)__Instance)->StringValue != __IntPtr.Zero)
                 Marshal.FreeHGlobal(((__Internal*)__Instance)->StringValue);
+            if (__ownsNativeInstance)
+                Marshal.FreeHGlobal(__Instance);
             __Instance = IntPtr.Zero;
         }
 

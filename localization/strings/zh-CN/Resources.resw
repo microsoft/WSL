@@ -710,6 +710,12 @@ Windows 版本: {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>正在检查更新。</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>已达到 GitHub API 速率限制。请稍后重试。</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>已达到 GitHub API 速率限制。正在使用 Windows 更新检查更新。</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>此分发仅可从 Microsoft Store 获得。</value>
   </data>
@@ -958,7 +964,7 @@ Windows 版本: {}</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>检测到 localhost 代理配置，但未镜像到 WSL。NAT 模式下的 WSL 不支持 localhost 代理。</value>
+    <value>检测到 localhost 代理配置，但未镜像到 WSL。当前网络配置不支持此代理地址。</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1204,7 @@ Windows 版本: {}</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 错误代码： {}
-如果此错误是意外错误，请考虑搜索现有问题或在 https://github.com/microsoft/WSL/issues 提交新问题。</value>
+如果此错误是意外错误，请考虑搜索现有问题或在 https://github.com/microsoft/WSL/issues 提交新问题</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -2073,6 +2079,25 @@ Windows 版本: {}</value>
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>防止正在运行的分发及托管它们的 WSL 虚拟机在空闲后被自动关闭。</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>始终保持 WSL 发行版 VM 运行</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>WSL 发行版 VM 在空闲时不会关闭，因此新 shell 可以立即启动。WSL 运行时会占用更多内存。这将在你下次启动 WSL 会话时生效。</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>始终保持 WSL 发行版 VM 运行</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>无法更改保持运行设置</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>请确保 .wslconfig 不是只读的，然后重试。</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>你可以随时在 WSL 设置的“可选功能”下更改此设置。</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>重置超时</value>
   </data>
@@ -2247,6 +2272,9 @@ Windows 版本: {}</value>
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>容器网络模式不支持端口映射；端口由目标容器拥有。</value>
+  </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>禁用容器网络时不支持端口映射。启用网络或删除端口映射。</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>容器网络模式需要目标容器名称。</value>
@@ -2425,20 +2453,12 @@ Windows 版本: {}</value>
      <value>在未预期的情况下找到位置参数:“{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>以下位置缺少选项名称:“{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>无法解析从参数“{}”开始的转发参数</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>遇到无效的额外参数:“{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>带有值的别名选项必须位于别名链末尾:“{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4162,6 +4182,14 @@ Windows 版本: {}</value>
     <value>未能还原容器 '{}' 的时间戳</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>无法加载容器 '{}' 的持久状态。不会保存对其状态的更改。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>无法保存容器 “{}” 的持久状态</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>未能分析映像导入进度</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4195,6 +4223,18 @@ Windows 版本: {}</value>
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>未能将主机受信任的根证书安装到 VM 中： {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC 无法在来宾中写入 "{}" (来宾错误 {})。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC 已启动来宾 VM，但 Docker 引擎未在 {} 毫秒内准备就绪。收集 WSL 诊断日志以调查启动失败。</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker 引擎在 WSLC 来宾 VM 中准备就绪之前已退出，代码为 {}。收集 WSL 诊断日志以调查启动失败。</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

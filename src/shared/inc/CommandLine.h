@@ -434,6 +434,7 @@ public:
                         if (e.Positional) // Positional arguments can't consume extra arguments.
                         {
                             offset = 0;
+                            argumentPosition++;
                         }
 
                         m_parseIndex += offset;
@@ -452,11 +453,6 @@ public:
                 }
 
                 THROW_USER_ERROR(wsl::shared::Localization::MessageInvalidCommandLine(m_argv[m_parseIndex], m_name ? m_name : m_argv[0]));
-            }
-
-            if (m_parseIndex < m_argc && m_argv[m_parseIndex - offset][0] != '-')
-            {
-                argumentPosition++;
             }
         }
     }

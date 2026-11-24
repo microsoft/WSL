@@ -37,6 +37,13 @@ namespace {
         return S_OK;
     }
 
+    GUID GetCurrentLogicalThreadId()
+    {
+        GUID logicalThreadId{};
+        winrt::check_hresult(CoGetCurrentLogicalThreadId(&logicalThreadId));
+        return logicalThreadId;
+    }
+
 } // namespace
 
 Session::Session(winrt::Microsoft::WSL::Containers::SessionSettings const& settings) : m_settings(settings)
@@ -462,6 +469,12 @@ WslcSession Session::ToHandle()
 
 void Session::Close()
 {
+    // Close waits for in-flight Terminated handlers, so calling it from one would wait on itself.
+    if (IsInTerminatedHandler())
+    {
+        throw winrt::hresult_illegal_method_call(L"Session cannot be closed from its Terminated handler");
+    }
+
     m_terminationWait.reset();
     m_terminationEvent.reset();
     m_crashDumpSubscription.reset();
@@ -477,6 +490,17 @@ void Session::final_release(std::unique_ptr<Session> self)
     self->Close();
 }
 
+bool Session::IsInTerminatedHandler() const
+{
+    auto lock = m_terminatedHandlerLock.lock_shared();
+    if (m_terminatedHandlerThreadId == 0)
+    {
+        return false;
+    }
+
+    return m_terminatedHandlerThreadId == GetCurrentThreadId() || m_terminatedHandlerLogicalThreadId == GetCurrentLogicalThreadId();
+}
+
 void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID context, PTP_WAIT /* wait */, TP_WAIT_RESULT /* waitResult */) noexcept
 {
     try
@@ -485,6 +509,19 @@ void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID 
 
         WslcSessionTerminationReason reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
         LOG_IF_FAILED(WslcGetSessionTerminationReason(session->m_session.get(), &reason));
+
+        const auto logicalThreadId = GetCurrentLogicalThreadId();
+        {
+            auto lock = session->m_terminatedHandlerLock.lock_exclusive();
+            session->m_terminatedHandlerThreadId = GetCurrentThreadId();
+            session->m_terminatedHandlerLogicalThreadId = logicalThreadId;
+        }
+
+        auto clearHandlerThread = wil::scope_exit([session]() {
+            auto lock = session->m_terminatedHandlerLock.lock_exclusive();
+            session->m_terminatedHandlerThreadId = 0;
+            session->m_terminatedHandlerLogicalThreadId = GUID_NULL;
+        });
 
         session->m_terminatedEvent(static_cast<SessionTerminationReason>(reason));
     }

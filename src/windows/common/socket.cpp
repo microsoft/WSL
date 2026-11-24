@@ -66,15 +66,14 @@ std::optional<wil::unique_socket> wsl::windows::common::socket::CancellableAccep
 std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(
     _In_ SOCKET Socket, _In_ OVERLAPPED& Overlapped, _In_ DWORD Timeout, _In_ HANDLE ExitHandle, _In_ const std::source_location& Location)
 {
+    return GetResult(Socket, Overlapped, Timeout, {&ExitHandle, ExitHandle != nullptr ? 1u : 0u}, Location);
+}
+
+std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(
+    _In_ SOCKET Socket, _In_ OVERLAPPED& Overlapped, _In_ DWORD Timeout, _In_ gsl::span<const HANDLE> ExitHandles, _In_ const std::source_location& Location)
+{
     const int error = WSAGetLastError();
     THROW_HR_IF(HRESULT_FROM_WIN32(error), error != WSA_IO_PENDING);
-
-    std::vector<HANDLE> waitObjects{};
-    waitObjects.push_back(Overlapped.hEvent);
-    if (ARGUMENT_PRESENT(ExitHandle))
-    {
-        waitObjects.push_back(ExitHandle);
-    }
 
     DWORD bytesProcessed;
     DWORD flagsReturned;
@@ -83,8 +82,13 @@ std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(
         WSAGetOverlappedResult(Socket, &Overlapped, &bytesProcessed, TRUE, &flagsReturned);
     });
 
+    THROW_HR_IF(E_INVALIDARG, ExitHandles.size() >= MAXIMUM_WAIT_OBJECTS);
+
+    std::vector<HANDLE> waitObjects{Overlapped.hEvent};
+    waitObjects.insert(waitObjects.end(), ExitHandles.begin(), ExitHandles.end());
+
     const DWORD waitStatus = WaitForMultipleObjects(gsl::narrow_cast<DWORD>(waitObjects.size()), waitObjects.data(), FALSE, Timeout);
-    if (waitObjects.size() > 1 && waitStatus == WAIT_OBJECT_0 + 1)
+    if (waitStatus > WAIT_OBJECT_0 && waitStatus < WAIT_OBJECT_0 + waitObjects.size())
     {
         return {0, 0};
     }
@@ -96,7 +100,8 @@ std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(
     if (!result)
     {
         const auto lastError = WSAGetLastError();
-        if (lastError != WSAECONNABORTED || (ExitHandle != nullptr && WaitForSingleObject(ExitHandle, 0) == WAIT_TIMEOUT))
+        if (lastError != WSAECONNABORTED ||
+            (!ExitHandles.empty() && WaitForMultipleObjects(gsl::narrow_cast<DWORD>(ExitHandles.size()), ExitHandles.data(), FALSE, 0) == WAIT_TIMEOUT))
         {
             THROW_WIN32(lastError);
         }
@@ -111,7 +116,18 @@ std::pair<DWORD, DWORD> wsl::windows::common::socket::GetResult(
 int wsl::windows::common::socket::Receive(
     _In_ SOCKET Socket, _In_ gsl::span<gsl::byte> Buffer, _In_opt_ HANDLE ExitHandle, _In_ DWORD Flags, _In_ DWORD Timeout, _In_ const std::source_location& Location)
 {
-    const int BytesRead = ReceiveNoThrow(Socket, Buffer, ExitHandle, Flags, Timeout, Location);
+    return Receive(Socket, Buffer, {&ExitHandle, ExitHandle != nullptr ? 1u : 0u}, Flags, Timeout, Location);
+}
+
+int wsl::windows::common::socket::Receive(
+    _In_ SOCKET Socket,
+    _In_ gsl::span<gsl::byte> Buffer,
+    _In_ gsl::span<const HANDLE> ExitHandles,
+    _In_ DWORD Flags,
+    _In_ DWORD Timeout,
+    _In_ const std::source_location& Location)
+{
+    const int BytesRead = ReceiveNoThrow(Socket, Buffer, ExitHandles, Flags, Timeout, Location);
     THROW_LAST_ERROR_IF(BytesRead == SOCKET_ERROR);
 
     return BytesRead;
@@ -119,6 +135,17 @@ int wsl::windows::common::socket::Receive(
 
 int wsl::windows::common::socket::ReceiveNoThrow(
     _In_ SOCKET Socket, _In_ gsl::span<gsl::byte> Buffer, _In_opt_ HANDLE ExitHandle, _In_ DWORD Flags, _In_ DWORD Timeout, _In_ const std::source_location& Location)
+{
+    return ReceiveNoThrow(Socket, Buffer, {&ExitHandle, ExitHandle != nullptr ? 1u : 0u}, Flags, Timeout, Location);
+}
+
+int wsl::windows::common::socket::ReceiveNoThrow(
+    _In_ SOCKET Socket,
+    _In_ gsl::span<gsl::byte> Buffer,
+    _In_ gsl::span<const HANDLE> ExitHandles,
+    _In_ DWORD Flags,
+    _In_ DWORD Timeout,
+    _In_ const std::source_location& Location)
 {
     OVERLAPPED Overlapped{};
     const wil::unique_event OverlappedEvent(wil::EventOptions::ManualReset);
@@ -130,7 +157,7 @@ int wsl::windows::common::socket::ReceiveNoThrow(
         try
         {
             BytesReturned = SOCKET_ERROR;
-            auto [innerBytes, Flags] = GetResult(Socket, Overlapped, Timeout, ExitHandle, Location);
+            auto [innerBytes, Flags] = GetResult(Socket, Overlapped, Timeout, ExitHandles, Location);
             BytesReturned = innerBytes;
         }
         catch (...)

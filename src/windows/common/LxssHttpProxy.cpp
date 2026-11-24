@@ -103,15 +103,6 @@ auto CallbackStatusToString(DWORD internetStatus) noexcept
     }
 }
 
-// struct to contain proxy specific settings
-
-void LogHttpProxySettings(const HttpProxySettings& settings) noexcept
-try
-{
-    WSL_LOG("OnProxyRequestComplete", TraceLoggingValue(settings.ToString().c_str(), "newProxySettings"));
-}
-CATCH_LOG()
-
 HttpProxySettings::HttpProxySettings(const WINHTTP_PROXY_SETTINGS_EX& proxySettings)
 {
     if (WI_IsFlagSet(proxySettings.ullFlags, WINHTTP_PROXY_TYPE_PROXY))
@@ -140,17 +131,37 @@ HttpProxySettings::HttpProxySettings(const WINHTTP_PROXY_SETTINGS_EX& proxySetti
     }
 }
 
-std::string HttpProxySettings::ToString() const
-{
-    std::ostringstream httpProxySettingsString{};
-    httpProxySettingsString << "Proxy: " << Proxy << ", SecureProxy: " << SecureProxy << ", PacUrl: " << PacUrl
-                            << ", ProxyBypasses: " << ProxyBypassesComma;
-    return httpProxySettingsString.str();
-}
-
 bool HttpProxySettings::HasSettingsConfigured() const
 {
     return !(Proxy.empty() && SecureProxy.empty() && PacUrl.empty());
+}
+
+void HttpProxySettings::AddToEnvironment(std::vector<std::string>& Environment) const
+{
+    const auto addProxy = [&](std::string_view Value, std::string_view Lower, std::string_view Upper) {
+        if (!Value.empty())
+        {
+            // Note that we add both lower and uppercase as some Linux apps use upper, others lower.
+            Environment.emplace_back(std::format("{}={}", Lower, Value));
+            Environment.emplace_back(std::format("{}={}", Upper, Value));
+        }
+    };
+
+    addProxy(Proxy, c_httpProxyLower, c_httpProxyUpper);
+    addProxy(SecureProxy, c_httpsProxyLower, c_httpsProxyUpper);
+    addProxy(ProxyBypassesComma, c_proxyBypassLower, c_proxyBypassUpper);
+    if (!PacUrl.empty())
+    {
+        // We only add uppercase as there is no standard environment variable for PAC proxies.
+        // This at least makes the PAC url available to the user in case they wish to use it.
+        Environment.emplace_back(std::format("{}={}", c_pacProxy, PacUrl));
+
+        // PAC queries can supply only HTTP; preserve WSL's best-effort HTTPS fallback.
+        if (SecureProxy.empty())
+        {
+            addProxy(Proxy, c_httpsProxyLower, c_httpsProxyUpper);
+        }
+    }
 }
 
 void CALLBACK HttpProxyStateTracker::s_GetProxySettingsExCallback(
@@ -200,16 +211,7 @@ try
     }
     }
 
-    if (SUCCEEDED_WIN32(error))
-    {
-        WSL_LOG(
-            "s_GetProxySettingsExCallback-Results",
-            TraceLoggingValue(proxySettings.pcwszProxy, "pcwszProxy"),
-            TraceLoggingValue(proxySettings.pcwszSecureProxy, "pcwszSecureProxy"),
-            TraceLoggingValue(proxySettings.pcwszAutoconfigUrl, "pcwszAutoconfigUrl"),
-            TraceLoggingValue(proxySettings.cProxyBypasses, "cProxyBypasses"));
-    }
-    else
+    if (FAILED_WIN32(error))
     {
         WSL_LOG(
             "WinHttpGetProxySettingsExCallbackFailed",
@@ -263,15 +265,18 @@ try
     {
         auto dataLock = m_proxySettingsLock.lock();
 
-        FilterProxySettingsByNetworkConfiguration(newProxySettings, m_networkMode);
+        m_unfilteredProxySettings = newProxySettings;
+        if (m_networkMode)
+        {
+            FilterProxySettingsByNetworkConfiguration(newProxySettings, *m_networkMode, m_localhostRelayEnabled);
+        }
 
         if (!AreProxyStringsIdentical(newProxySettings))
         {
-            LogHttpProxySettings(newProxySettings);
             m_proxySettings = std::move(newProxySettings);
 
             // If there was a setting changes, and this is not the initial proxy query, notify the user to restart WSL to get new proxy changes.
-            if (m_initialProxyQueryCompleted.is_signaled())
+            if (m_networkMode && m_initialProxyQueryCompleted.is_signaled())
             {
                 notifications::DisplayProxyChangeNotification(m_localizedProxyChangeString);
             }
@@ -315,7 +320,7 @@ try
 }
 CATCH_LOG()
 
-UnsupportedProxyReason HttpProxyStateTracker::IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode configuration) noexcept
+UnsupportedProxyReason HttpProxyStateTracker::IsUnsupportedProxy(LPCWSTR proxyString, wsl::core::NetworkingMode configuration, bool localhostRelayEnabled) noexcept
 try
 {
     if (!proxyString)
@@ -366,22 +371,23 @@ try
         return UnsupportedProxyReason::Supported;
     }
 
-    // v4 loopback is only supported in mirrored mode
     if (configuration != wsl::core::NetworkingMode::Mirrored)
     {
         in_addr addrV4{};
         if (SUCCEEDED_WIN32(RtlIpv4StringToAddressW(portRemoved.c_str(), true, &pStringEnd, &addrV4)))
         {
-            if (IN4_IS_ADDR_LOOPBACK(&addrV4))
+            const bool consommeLoopbackSupported = configuration == wsl::core::NetworkingMode::Consomme &&
+                                                   localhostRelayEnabled && addrV4.s_addr == htonl(INADDR_LOOPBACK);
+            if (IN4_IS_ADDR_LOOPBACK(&addrV4) && !consommeLoopbackSupported)
             {
-                return UnsupportedProxyReason::LoopbackNotMirrored;
+                return UnsupportedProxyReason::LoopbackNotSupported;
             }
             return UnsupportedProxyReason::Supported;
         }
 
         if (wsl::shared::string::IsEqual(portRemoved, c_loopback, true) || wsl::shared::string::IsEqual(portRemoved, c_localhost, true))
         {
-            return UnsupportedProxyReason::LoopbackNotMirrored;
+            return UnsupportedProxyReason::LoopbackNotSupported;
         }
 
         DWORD size = 0;
@@ -405,7 +411,7 @@ try
 
         if (wsl::shared::string::IsEqual(computerName, portRemoved, true))
         {
-            return UnsupportedProxyReason::LoopbackNotMirrored;
+            return UnsupportedProxyReason::LoopbackNotSupported;
         }
     }
     return UnsupportedProxyReason::Supported;
@@ -416,11 +422,13 @@ catch (...)
     return UnsupportedProxyReason::UnsupportedError;
 }
 
-void HttpProxyStateTracker::FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode) noexcept
+void HttpProxyStateTracker::FilterProxySettingsByNetworkConfiguration(HttpProxySettings& settings, wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept
 try
 {
-    const auto proxySupportState = IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.Proxy).c_str(), mode);
-    const auto secureProxySupportState = IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.SecureProxy).c_str(), mode);
+    const auto proxySupportState =
+        IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.Proxy).c_str(), mode, localhostRelayEnabled);
+    const auto secureProxySupportState =
+        IsUnsupportedProxy(wsl::shared::string::MultiByteToWide(settings.SecureProxy).c_str(), mode, localhostRelayEnabled);
     if (proxySupportState != UnsupportedProxyReason::Supported)
     {
         settings.Proxy.clear();
@@ -535,8 +543,9 @@ void HttpProxyStateTracker::QueryProxySettingsAsync()
     }
 }
 
-HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, wsl::core::NetworkingMode mode) :
+HttpProxyStateTracker::HttpProxyStateTracker(int ProxyTimeout, HANDLE UserToken, std::optional<wsl::core::NetworkingMode> mode, bool localhostRelayEnabled) :
     m_networkMode{mode},
+    m_localhostRelayEnabled{localhostRelayEnabled},
     m_initialQueryTimeout{ProxyTimeout},
     m_localizedProxyChangeString{wsl::shared::Localization::MessageHttpProxyChangeDetected()}
 {
@@ -582,13 +591,17 @@ std::optional<HttpProxySettings> HttpProxyStateTracker::WaitForInitialProxySetti
     return m_proxySettings;
 }
 
-void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode) noexcept
+void HttpProxyStateTracker::ConfigureNetworkingMode(wsl::core::NetworkingMode mode, bool localhostRelayEnabled) noexcept
+try
 {
     auto lock = m_proxySettingsLock.lock();
-    // if we fall back to NAT mode need to strip bad settings
-    if (m_proxySettings.has_value() && mode != m_networkMode)
+    if (m_unfilteredProxySettings.has_value() && (mode != m_networkMode || localhostRelayEnabled != m_localhostRelayEnabled))
     {
-        FilterProxySettingsByNetworkConfiguration(m_proxySettings.value(), mode);
+        auto proxySettings = m_unfilteredProxySettings.value();
+        FilterProxySettingsByNetworkConfiguration(proxySettings, mode, localhostRelayEnabled);
+        m_proxySettings = std::move(proxySettings);
     }
     m_networkMode = mode;
+    m_localhostRelayEnabled = localhostRelayEnabled;
 }
+CATCH_LOG()

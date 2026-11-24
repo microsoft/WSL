@@ -1375,7 +1375,7 @@ Return Value:
     LxtCheckErrnoFailure(Fd = open(TestFile2, O_RDONLY), ENOENT);
     LxtCheckErrno(Fd = creat(TestFile2, 0777));
     LxtCheckErrnoZeroSuccess(close(Fd));
-    LxtCheckErrnoFailure(Fd = open(TestFile3, O_CREAT | O_EXCL), EEXIST);
+    LxtCheckErrnoFailure(Fd = open(TestFile3, O_CREAT | O_EXCL, 0666), EEXIST);
     LxtCheckErrno(Fd = open(TestFile3, O_RDONLY));
     LxtCheckErrnoZeroSuccess(close(Fd));
 

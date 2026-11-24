@@ -58,11 +58,19 @@ struct Session : SessionT<Session>
 
 private:
     void EnsureStarted() const;
+    bool IsInTerminatedHandler() const;
+
     winrt::Microsoft::WSL::Containers::SessionSettings m_settings; // Only kept until Start() is called
 
     // Threadpool callback that raises the Terminated event once the session's termination handle is signaled.
     static void CALLBACK OnTerminated(PTP_CALLBACK_INSTANCE instance, PVOID context, PTP_WAIT wait, TP_WAIT_RESULT waitResult) noexcept;
     static void CALLBACK OnCrashDump(const WslcSessionCrashDumpInfo* info, PVOID context) noexcept;
+
+    // Identifies the thread running Terminated handlers so Close() can reject being called from one. A non-agile handler
+    // runs on its apartment's thread, which adopts the raising thread's COM logical thread ID for the duration of the call.
+    mutable wil::srwlock m_terminatedHandlerLock;
+    _Guarded_by_(m_terminatedHandlerLock) DWORD m_terminatedHandlerThreadId = 0;
+    _Guarded_by_(m_terminatedHandlerLock) GUID m_terminatedHandlerLogicalThreadId = GUID_NULL;
 
     winrt::event<winrt::Microsoft::WSL::Containers::SessionTerminationHandler> m_terminatedEvent;
     winrt::event<winrt::Microsoft::WSL::Containers::ProcessCrashHandler> m_crashDumpEvent;

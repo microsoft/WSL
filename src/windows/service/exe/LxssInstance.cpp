@@ -453,6 +453,9 @@ void LxssInstance::Stop()
 
 void LxssInstance::RegisterPlan9ConnectionTarget(_In_ HANDLE userToken)
 {
+    std::lock_guard lock(m_stateLock);
+    THROW_HR_IF(E_ABORT, m_destroyingEvent.is_signaled());
+
     const auto path = m_configuration.BasePath / LXSS_PLAN9_UNIX_SOCKET;
     using unique_unicode_string = wil::unique_struct<UNICODE_STRING, decltype(RtlFreeUnicodeString), RtlFreeUnicodeString>;
     unique_unicode_string socketPath;
@@ -571,9 +574,10 @@ wil::unique_handle LxssInstance::_CreateLxProcess(
 
             auto oobeCompleteEvent = wil::shared_event(wil::EventOptions::ManualReset);
 
-            auto impersonate = wil::CoImpersonateClient();
+            const wil::shared_handle userToken = wsl::windows::common::security::GetUserToken(TokenImpersonation);
+            auto impersonate = wil::impersonate_token(userToken.get());
             auto registration = wsl::windows::service::DistributionRegistration::Open(
-                wsl::windows::common::registry::OpenLxssUserKey().get(), m_configuration.DistroId);
+                userToken, wsl::windows::common::registry::OpenLxssUserKey().get(), m_configuration.DistroId);
 
             // Wait for a potential previous oobe thread to complete before creating a new one.
             if (m_oobeThread.joinable())

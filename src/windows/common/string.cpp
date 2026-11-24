@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <WslDeviceHost.h>
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -97,6 +98,56 @@ std::wstring_view wsl::windows::common::string::StripQuotes(_In_ std::wstring_vi
 std::string wsl::windows::common::string::IpPrefixAddressToString(const IP_ADDRESS_PREFIX& ipAddressPrefix)
 {
     return std::format("{}/{}", SockAddrInetToString(ipAddressPrefix.Prefix), static_cast<uint32_t>(ipAddressPrefix.PrefixLength));
+}
+
+std::string wsl::windows::common::string::IpAddressToString(const IpAddress& ipAddress)
+{
+    switch (ipAddress.family)
+    {
+    case IpAddressFamily_V4:
+    {
+        std::string formatted(INET_ADDRSTRLEN, '\0');
+        RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::strlen(formatted.data()));
+        return formatted;
+    }
+    case IpAddressFamily_V6:
+    {
+        std::string formatted(INET6_ADDRSTRLEN, '\0');
+        RtlIpv6AddressToStringA(reinterpret_cast<const IN6_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::strlen(formatted.data()));
+        return formatted;
+    }
+    default:
+        THROW_HR(E_INVALIDARG);
+    }
+}
+
+std::wstring wsl::windows::common::string::IpAddressToWstring(const IpAddress& ipAddress, uint32_t scopeId)
+{
+    switch (ipAddress.family)
+    {
+    case IpAddressFamily_V4:
+    {
+        std::wstring formatted(INET_ADDRSTRLEN, L'\0');
+        RtlIpv4AddressToStringW(reinterpret_cast<const IN_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::wcslen(formatted.data()));
+        return formatted;
+    }
+    case IpAddressFamily_V6:
+    {
+        std::wstring formatted(INET6_ADDRSTRLEN, L'\0');
+        RtlIpv6AddressToStringW(reinterpret_cast<const IN6_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::wcslen(formatted.data()));
+        if (scopeId != 0)
+        {
+            formatted += std::format(L"%{}", scopeId);
+        }
+        return formatted;
+    }
+    default:
+        THROW_HR(E_INVALIDARG);
+    }
 }
 
 std::string wsl::windows::common::string::SockAddrInetToString(const SOCKADDR_INET& sockAddrInet)

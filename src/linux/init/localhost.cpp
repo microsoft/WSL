@@ -10,6 +10,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <sys/syscall.h>
 #include <linux/unistd.h>
 #include <linux/sock_diag.h>
@@ -320,6 +321,9 @@ void RunLocalHostRelay(sockaddr_vm hvSocketAddress, int listenSocket)
                 wil::unique_fd tcpSocket{socket(socketAddress->sa_family, SOCK_STREAM, IPPROTO_TCP)};
                 THROW_LAST_ERROR_IF(!tcpSocket);
 
+                const int noDelay = 1;
+                THROW_LAST_ERROR_IF(setsockopt(tcpSocket.get(), IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay)) < 0);
+
                 if (TEMP_FAILURE_RETRY(connect(tcpSocket.get(), socketAddress, socketAddressSize)) < 0)
                 {
                     LOG_ERROR("Failed to connect to port: {}, family: {}, errno: {}", message->Port, message->Family, errno);
@@ -516,6 +520,12 @@ int RunPortTracker(int Argc, char** Argv)
     seccompDispatcher->RegisterHandler(I386_NR_socketcall, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
     });
+    seccompDispatcher->RegisterHandler(I386_NR_bind, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
+    seccompDispatcher->RegisterHandler(I386_NR_listen, [&portTracker](seccomp_notif* notification) {
+        return portTracker.ProcessSecCompNotification(notification);
+    });
 #else
     seccompDispatcher->RegisterHandler(ARMV7_NR_bind, [&portTracker](seccomp_notif* notification) {
         return portTracker.ProcessSecCompNotification(notification);
@@ -525,27 +535,12 @@ int RunPortTracker(int Argc, char** Argv)
     });
 #endif
 
-    seccompDispatcher->RegisterHandler(__NR_ioctl, [hvSocketChannel, seccompDispatcher](auto notification) -> int {
-        LX_GNS_TUN_BRIDGE_REQUEST request{};
-        request.Header.MessageType = LxGnsMessageIfStateChangeRequest;
-        request.Header.MessageSize = sizeof(request);
-        auto ifreqMemory =
-            seccompDispatcher->ReadProcessMemory(notification->id, notification->pid, notification->data.args[2], sizeof(ifreq));
-        if (!ifreqMemory.has_value())
-        {
-            return -1;
-        }
-
-        auto& ifRequest = *reinterpret_cast<ifreq*>(ifreqMemory->data());
-        memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
-        request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
-        const auto& reply = hvSocketChannel->Transaction(request);
-
-        return reply.Result;
-    });
+    seccompDispatcher->RegisterHandler(
+        __NR_ioctl, [&portTracker](seccomp_notif* notification) { return portTracker.ProcessSecCompNotification(notification); });
 
     try
     {
+        seccompDispatcher->Start();
         portTracker.Run();
     }
     catch (const std::exception& e)

@@ -14,6 +14,11 @@ parameters:
   type: string
   default: ''
 
+- name: publishToNugetOrg
+  displayName: 'Publish release NuGet packages to nuget.org'
+  type: boolean
+  default: false
+
 - name: includePublishInManual
   displayName: 'Include publishing stages in this manual run. Pipeline will fail at the end of the package stage.'
   type: boolean
@@ -119,9 +124,10 @@ extends:
           parameters:
             bypassTests: ${{ parameters.bypassTests }}
 
-        - template: nuget-publish-stage.yml@self
-          parameters:
-            bypassTests: ${{ parameters.bypassTests }}
+        - ${{ if eq(parameters.publishToNugetOrg, true) }}:
+            - template: nuget-publish-stage.yml@self
+              parameters:
+                bypassTests: ${{ parameters.bypassTests }}
 
     - ${{ if or(eq(parameters.testVersion, ''), not(eq(parameters.nugetSuffix, ''))) }}:
         - template: nuget-stage.yml@self

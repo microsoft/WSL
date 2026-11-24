@@ -65,6 +65,8 @@ WslcInspectContainer
 WslcGetContainerState
 WslcStopContainer
 WslcDeleteContainer
+WslcConnectContainerNetwork
+WslcDisconnectContainerNetwork
 WslcGetContainerID
 WslcGetContainerInitProcess
 

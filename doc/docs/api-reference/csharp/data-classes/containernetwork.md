@@ -16,7 +16,7 @@ public sealed class ContainerNetwork
 
 Notes:
 
-- `Name` must be non-empty.
+- `Name` is the network name and must be non-empty. A full network ID or unique ID prefix is also accepted.
 - `Aliases`, `IPv4Address` and `IPv6Address` are only supported on user-defined networks (not `bridge`, `host`, `none`, or `container:<name>`).
 - `IPv4Address` must be an IPv4 address and `IPv6Address` must be an IPv6 address. `null` lets the network assign one. `IPv6Address` requires a network with IPv6 enabled.
 

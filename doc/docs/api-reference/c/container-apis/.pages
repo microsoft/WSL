@@ -25,4 +25,6 @@ nav:
   - wslcgetcontainerstate.md
   - wslcstopcontainer.md
   - wslcdeletecontainer.md
+  - wslcconnectcontainernetwork.md
+  - wslcdisconnectcontainernetwork.md
   - wslcreleasecontainer.md

@@ -163,6 +163,7 @@ struct InspectContainer
     std::string Created;
     std::string Image;
     ContainerInspectState State;
+    std::uint32_t RestartCount{};
     InspectHostConfig HostConfig;
     ContainerConfig Config;
     std::map<std::string, std::vector<InspectPortBinding>> Ports;
@@ -173,7 +174,7 @@ struct InspectContainer
     std::optional<std::int64_t> SizeRootFs;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-        InspectContainer, Id, Name, Created, Image, State, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
+        InspectContainer, Id, Name, Created, Image, State, RestartCount, HostConfig, Config, Ports, Mounts, Labels, NetworkSettings, SizeRw, SizeRootFs);
 };
 
 // Serializes a container inspect document. SizeRw and SizeRootFs are only populated when the

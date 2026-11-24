@@ -14,6 +14,7 @@ Abstract:
 
 #include "lxtcommon.h"
 #include "unittests.h"
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mount.h>
@@ -53,6 +54,8 @@ LXT_VARIATION_HANDLER WslPathTestLxFromWinPath;
 
 LXT_VARIATION_HANDLER WslPathTestLxToWinPath;
 
+LXT_VARIATION_HANDLER WslPathTestRemovedCwd;
+
 static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Windows to DrvFs", WslPathTestDrvFsFromWinPath},
     {"WslPath - DrvFs to Windows", WslPathTestDrvFsToWinPath},
@@ -62,6 +65,7 @@ static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Linux to \\\\wsl.localhost", WslPathTestLxToWinPath},
     {"WslPath - \\\\wsl.localhost escaped characters", WslPathTestLxEscaped},
     {"WslPath - Invalid mountinfo line", WslPathTestInvalidMountInfo},
+    {"WslPath - Removed working directory", WslPathTestRemovedCwd},
 };
 
 int WslPathTestEntry(int Argc, char* Argv[])
@@ -170,6 +174,8 @@ Return Value:
         "C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin",
         "/mnt/c/Users/Test User/AppData/Local/Programs/Microsoft VS Code/bin",
         true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows\\..\\Users", "/mnt/c/Users", true));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows\\.\\..\\Users", "/mnt/c/Users", true));
 
 ErrorExit:
     return Result;
@@ -422,5 +428,60 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("/proc/1/", WSLPATH_DISTRO_PREFIX "\\proc\\1\\", false));
 
 ErrorExit:
+    return Result;
+}
+
+int WslPathTestRemovedCwd(PLXT_ARGS Args)
+
+/*++
+
+Description:
+
+    This routine verifies that wslpath translates an absolute Windows path but
+    rejects a relative Windows path when the current working directory has been removed.
+
+Arguments:
+
+    Args - Supplies the command line arguments.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+    char Template[] = "/tmp/wslpath-cwd-XXXXXX";
+    char* Directory = NULL;
+    int OriginalCwd;
+    int Result;
+
+    LxtCheckErrno(OriginalCwd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC));
+    Directory = mkdtemp(Template);
+    LxtCheckNotEqual(Directory, NULL, "%p");
+    LxtCheckErrno(chdir(Directory));
+    LxtCheckErrno(rmdir(Directory));
+    Directory = NULL;
+
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", "/mnt/c/Windows", true));
+    LxtCheckResult(LxtCheckWslPathTranslation(".\\Windows", NULL, true));
+
+ErrorExit:
+    if (OriginalCwd >= 0)
+    {
+        if (fchdir(OriginalCwd) < 0)
+        {
+            LxtLogError("fchdir failed: %d (%s)", errno, strerror(errno));
+            Result = LXT_RESULT_FAILURE;
+        }
+
+        close(OriginalCwd);
+    }
+
+    if (Directory != NULL)
+    {
+        rmdir(Directory);
+    }
+
     return Result;
 }

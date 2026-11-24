@@ -349,6 +349,12 @@ public partial class WslConfigSettingManaged : IWslConfigSetting
     public WslConfigSettingManaged(WslConfigSetting wslConfigSetting)
     {
         ConfigSetting = wslConfigSetting;
+
+        if (ConfigEntry.GetValueKind() == WslConfigValueKind.String)
+        {
+            var snapshot = ConfigSetting.StringValue;
+            ConfigSetting.StringValue = snapshot;
+        }
     }
 
     ~WslConfigSettingManaged()

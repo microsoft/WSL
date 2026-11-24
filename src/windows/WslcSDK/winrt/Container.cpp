@@ -16,6 +16,7 @@ Abstract:
 #include "Container.h"
 #include "Microsoft.WSL.Containers.Container.g.cpp"
 #include "ContainerSettings.h"
+#include "ContainerNetwork.h"
 #include "Process.h"
 #include "ProcessSettings.h"
 
@@ -32,6 +33,8 @@ Container::Container(WslcSession session, winrt::Microsoft::WSL::Containers::Con
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcCreateContainer(session, GetStructPointer(settings), m_container.put(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    RegisterInitProcessCallbacks();
 }
 
 Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::ProcessOutputMode initProcessOutputMode) :
@@ -41,11 +44,7 @@ Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::Pr
 
     m_initProcess = winrt::make_self<implementation::Process>(initProcessOutputMode);
 
-    if (initProcessOutputMode == ProcessOutputMode::Event)
-    {
-        auto callbacks = m_initProcess->GetEventCallbacks();
-        winrt::check_hresult(WslcSetContainerInitProcessIOCallbacks(m_container.get(), &callbacks, m_initProcess.get()));
-    }
+    RegisterInitProcessCallbacks();
 
     // Best-effort: attach the init process handle if one is available. The container may not
     // have been started yet, or may not have an init process at all.
@@ -54,6 +53,18 @@ Container::Container(WslcContainer handle, winrt::Microsoft::WSL::Containers::Pr
     {
         m_initProcess->AttachHandle(initHandle);
     }
+}
+
+void Container::RegisterInitProcessCallbacks()
+{
+    // Callbacks are registered on the container handle so that a ProcessSettings shared with other processes is never modified.
+    if (!m_initProcess || m_initProcess->OutputMode() != ProcessOutputMode::Event)
+    {
+        return;
+    }
+
+    auto callbacks = m_initProcess->GetEventCallbacks();
+    winrt::check_hresult(WslcSetContainerInitProcessIOCallbacks(m_container.get(), &callbacks, m_initProcess.get()));
 }
 
 void Container::Start()
@@ -105,6 +116,31 @@ void Container::Delete(winrt::Microsoft::WSL::Containers::DeleteContainerOption 
 {
     wil::unique_cotaskmem_string errorMessage;
     auto hr = WslcDeleteContainer(ToHandle(), static_cast<WslcDeleteContainerFlags>(flags), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Container::ConnectNetwork(winrt::Microsoft::WSL::Containers::ContainerNetwork const& network)
+{
+    if (!network)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Network cannot be null");
+    }
+
+    const auto networkStruct = GetStruct(network);
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcConnectContainerNetwork(ToHandle(), &networkStruct, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
+void Container::DisconnectNetwork(hstring const& nameOrId)
+{
+    if (nameOrId.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Network name or ID cannot be empty");
+    }
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcDisconnectContainerNetwork(ToHandle(), winrt::to_string(nameOrId).c_str(), errorMessage.put());
     THROW_MSG_IF_FAILED(hr, errorMessage);
 }
 
@@ -160,10 +196,11 @@ WslcContainer Container::ToHandle()
 
 void Container::Close()
 {
-    m_initProcess = nullptr;
-
+    // Release the container first: the shared IO callback holds a raw pointer to m_initProcess and must stop first.
     // Methods called after Close() will fail due to EnsureNotClosed().
     m_container.reset();
+
+    m_initProcess = nullptr;
 }
 
 void Container::final_release(std::unique_ptr<Container> self)

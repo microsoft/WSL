@@ -291,6 +291,18 @@ interface IWSLCCompatContainer : IUnknown
     HRESULT GetId([out, string] WSLCCompatContainerId Id);
 }
 
+[
+    uuid(77165AA5-A4EA-4428-BF99-9C0775B6E0AA),
+    pointer_default(unique),
+    object
+]
+interface IWSLCCompatContainer2 : IWSLCCompatContainer
+{
+    // Network.NetworkName and NetworkNameOrId accept a network name, ID, or unique ID prefix.
+    HRESULT ConnectNetwork([in] const WSLCCompatNetworkConnection* Network);
+    HRESULT DisconnectNetwork([in] LPCSTR NetworkNameOrId);
+}
+
 typedef struct _WSLCCompatDeletedImageInformation
 {
     char Image[WSLCCompat_MAX_IMAGE_NAME_LENGTH + 1];

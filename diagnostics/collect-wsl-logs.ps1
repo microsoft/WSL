@@ -440,13 +440,15 @@ Copy-Item "C:\Windows\temp\wsl-install-log.txt" $folder -ErrorAction ignore
 Copy-Item "$env:TEMP\wsl-install-logs.txt" $folder -ErrorAction ignore
 
 $logArchive = "$(Resolve-Path $folder).tar.gz"
-tar.exe -czf $logArchive $folder
-if ($LASTEXITCODE -eq 0)
+$archiveCreated = $false
+try
 {
-    Remove-Item $folder -Recurse
-    Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+    tar.exe -czf $logArchive $folder
+    $archiveCreated = $LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $logArchive -PathType Leaf)
 }
-else
+catch {}
+
+if (-not $archiveCreated)
 {
     Remove-Item $logArchive -ErrorAction Ignore
 
@@ -454,13 +456,19 @@ else
     $logArchive = "$(Resolve-Path $folder).zip"
     try
     {
-        Compress-Archive -Path $folder -DestinationPath $logArchive -Force
-        Remove-Item $folder -Recurse
-        Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+        Compress-Archive -Path $folder -DestinationPath $logArchive -Force -ErrorAction Stop
+        $archiveCreated = Test-Path -LiteralPath $logArchive -PathType Leaf
     }
-    catch
-    {
-        Remove-Item $logArchive -ErrorAction Ignore
-        Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
-    }
+    catch {}
+}
+
+if ($archiveCreated)
+{
+    Remove-Item $folder -Recurse
+    Write-Host -ForegroundColor Green "Logs saved in: $logArchive. Please attach that file to the GitHub issue."
+}
+else
+{
+    Remove-Item $logArchive -ErrorAction Ignore
+    Write-Host -ForegroundColor Red "Failed to compress logs. They are available in: $(Resolve-Path $folder)"
 }

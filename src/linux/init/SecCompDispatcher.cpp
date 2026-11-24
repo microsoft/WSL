@@ -23,29 +23,37 @@ static int seccomp(unsigned int operation, unsigned int flags, void* args, const
 SecCompDispatcher::SecCompDispatcher(int m_NotifyFd) : m_notifyFd(m_NotifyFd)
 {
     seccomp(SECCOMP_GET_NOTIF_SIZES, 0, &m_notificationSizes);
-
-    m_worker = std::thread([this]() { Run(); });
 }
 
 SecCompDispatcher::~SecCompDispatcher()
 {
     m_shutdown.reset();
-    m_worker.join();
+    if (m_worker.joinable())
+    {
+        m_worker.join();
+    }
 }
 
-/**
- * @brief Poll for notifications from seccomp and dispatch them a handler.
- *
- */
-void SecCompDispatcher::Run()
+void SecCompDispatcher::Start()
 {
-    UtilSetThreadName("SecCompDispatcher");
+    assert(!m_worker.joinable());
 
     // Create a pipe to signal the thread to stop.
     int pipes[2];
     Syscall(pipe2, pipes, 0);
     m_shutdown = pipes[1];
     wil::unique_fd terminate = pipes[0];
+    m_worker = std::thread([this, terminate = std::move(terminate)]() mutable { Run(std::move(terminate)); });
+}
+
+/**
+ * @brief Poll for notifications from seccomp and dispatch them a handler.
+ *
+ */
+void SecCompDispatcher::Run(wil::unique_fd terminate)
+{
+    UtilSetThreadName("SecCompDispatcher");
+
     auto wait_for_fd = [&terminate](int fd, int event) -> bool {
         struct pollfd poll_fds[2];
         poll_fds[0] = {.fd = fd, .events = event, .revents = 0};
@@ -168,12 +176,8 @@ bool SecCompDispatcher::ValidateCookie(uint64_t id) noexcept
 
 void SecCompDispatcher::RegisterHandler(int SysCallNr, const std::function<int(seccomp_notif*)>& Handler)
 {
+    assert(!m_worker.joinable());
     m_handlers[SysCallNr] = Handler;
-}
-
-void SecCompDispatcher::UnregisterHandler(int SysCallNr)
-{
-    m_handlers.erase(SysCallNr);
 }
 
 std::optional<std::vector<gsl::byte>> SecCompDispatcher::ReadProcessMemory(uint64_t Cookie, pid_t Pid, size_t Address, size_t Length) noexcept

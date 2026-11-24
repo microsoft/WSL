@@ -47,6 +47,55 @@ bool wsl::windows::common::disk::IsDiskOnline(_In_ HANDLE Disk)
     return !WI_IsFlagSet(attributes.Attributes, DISK_ATTRIBUTE_OFFLINE);
 }
 
+wil::unique_hfile wsl::windows::common::disk::OpenVhdBackingFile(_In_ LPCWSTR Path, _In_opt_ HANDLE UserToken)
+try
+{
+    // User-owned VHDs may not grant the service identity access.
+    wil::unique_token_reverter runAsUser;
+    if (UserToken != nullptr)
+    {
+        runAsUser = wil::impersonate_token(UserToken);
+    }
+
+    // Open the file with read-only access to validate that the user can actually read it.
+    wil::unique_hfile file{CreateFileW(
+        Path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_NO_BUFFERING, nullptr)};
+    THROW_LAST_ERROR_IF(!file);
+
+    return file;
+}
+catch (...)
+{
+    const auto result = wil::ResultFromCaughtException();
+    THROW_HR_WITH_USER_ERROR(
+        result, wsl::shared::Localization::MessageFailedToAttachDisk(Path, wsl::windows::common::wslutil::GetSystemErrorString(result)));
+}
+
+bool wsl::windows::common::disk::IsBackingVolumeMounted(_In_ HANDLE File)
+{
+    DWORD bytesReturned{};
+    return DeviceIoControl(File, FSCTL_IS_VOLUME_MOUNTED, nullptr, 0, nullptr, 0, &bytesReturned, nullptr);
+}
+
+bool wsl::windows::common::disk::TakeOffline(_In_ LPCWSTR Disk, _In_ size_t TimeoutMs)
+{
+    const auto diskHandle = OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, TimeoutMs);
+    if (!IsDiskOnline(diskHandle.get()))
+    {
+        return false;
+    }
+
+    SetOnline(diskHandle.get(), false, TimeoutMs);
+
+    return true;
+}
+
+void wsl::windows::common::disk::BringOnline(_In_ LPCWSTR Disk, _In_ size_t TimeoutMs)
+{
+    const auto diskHandle = OpenDevice(Disk, GENERIC_READ | GENERIC_WRITE, TimeoutMs);
+    SetOnline(diskHandle.get(), true, TimeoutMs);
+}
+
 void wsl::windows::common::disk::Ioctl(
     _In_ HANDLE Disk, _In_ DWORD Code, _In_opt_ LPVOID InData, _In_ DWORD InDataSize, _Out_opt_ LPVOID OutData, _In_ DWORD OutDataSize)
 {

@@ -710,6 +710,12 @@ Argumentumok:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Frissítések keresése.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Elérte a GitHub API sebességkorlátját. Próbálkozzon újra később.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Elérte a GitHub API sebességkorlátját. Frissítések keresése a Windows Update használatával.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Ez a terjesztés csak a Microsoft Store áruházban érhető el.</value>
   </data>
@@ -958,7 +964,7 @@ Visszaállás NAT-hálózatkezelésre.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>A rendszer localhost-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. A NAT módban futó WSL nem támogatja a localhost proxykat.</value>
+    <value>A rendszer localhost-proxykonfigurációt észlelt, de nem tükrözte a WSL-be. Ezt a proxycímet a jelenlegi hálózati konfiguráció nem támogatja.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1204,7 @@ Ez a kérés 60 másodpercen belül túllépi az időkorlátot.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Hibakód: {}
-Ha ez a hiba váratlanul jelentkezett, kérjük, keressen rá a meglévő problémák között, vagy nyisson egy új problémát a https://github.com/microsoft/WSL/issues oldalon.</value>
+Ha ez a hiba váratlanul jelentkezett, kérjük, keressen rá a meglévő problémák között, vagy nyisson egy új problémát a https://github.com/microsoft/WSL/issues oldalon</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -2073,6 +2079,25 @@ A VS Code-ban található parancskatalógusban további VS Code Remote beállít
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Hagyja futni a disztribúciókat és az őket üzemeltető WSL virtuális gépet, hogy ne álljanak le automatikusan, miután egy ideig inaktívak voltak.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>A WSL-disztribúciós virtuális gép mindig legyen bekapcsolva</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>A WSL-disztribúció virtuális gépe nem áll le tétlen állapotban, így az új rendszerhéjak azonnal elindulnak. Amíg a WSL fut, több memóriát használ. Ez a következő WSL-munkamenetben lép érvénybe.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>A WSL-disztribúciós virtuális gép mindig legyen bekapcsolva</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Nem sikerült módosítani a futva tartási beállítást</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Győződjön meg arról, hogy .wslconfig nem írásvédett, majd próbálkozzon újra.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Ezt bármikor módosíthatja a WSL beállításaiban, az Opcionális funkciók területen.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Időtúllépés alaphelyzetbe állítása</value>
   </data>
@@ -2247,6 +2272,9 @@ Usage:
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>A portleképezések nem támogatottak tárolóhálózati módban; a portok a céltárolóhoz tartoznak.</value>
+  </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>A portleképezések nem támogatottak, ha a tároló hálózata le van tiltva. Engedélyezze a hálózatkezelést, vagy távolítsa el a portleképezéseket.</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>A tárolóhálózati módhoz meg kell adni a céltároló nevét.</value>
@@ -2425,20 +2453,12 @@ Usage:
      <value>Nem várt helyen pozícióhoz kötött argumentum található: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Hiányzó opciónév a következőnél: „{}”</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Nem sikerült feloldani a továbbított argumentumokat a következő argumentumtól kezdődően: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Érvénytelen extra argumentum észlelve: {}</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Az értékekkel rendelkező aliasopcióknak az aliaslánc végén kell szerepelniük: „{}”</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4163,6 +4183,14 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
     <value>Nem sikerült visszaállítani a(z) {} tároló időbélyegét</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Nem sikerült betölteni a(z) '{}' tároló megőrzött állapotát. Az állapot módosításai nem lesznek mentve.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Nem sikerült menteni a(z) '{}' tároló megőrzött állapotát</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Nem sikerült feldolgozni a képimportálás folyamatát</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4196,6 +4224,18 @@ Első futtatáskor a program létrehozza a fájlt, amelyben az összes beállít
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Nem sikerült telepíteni a gazdagép megbízható főtanúsítványait a virtuális gépre: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>A WSLC nem tudta írni a(z) {} elemet a vendégben (vendéghiba: {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>A WSLC elindította a vendég virtuális gépet, de a Docker Engine {} ezredmásodpercen belül nem állt készen. Gyűjtse össze a WSL diagnosztikai naplóit az indítási hiba kivizsgálásához.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>A Docker Engine a(z) {} kilépési kóddal lépett ki, mielőtt készen állt volna a WSLC vendég virtuális gépén. Gyűjtse össze a WSL diagnosztikai naplóit az indítási hiba kivizsgálásához.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

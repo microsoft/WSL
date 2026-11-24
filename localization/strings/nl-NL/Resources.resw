@@ -710,6 +710,12 @@ Argumenten:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Controleren op updates.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>De frequentielimiet van de GitHub API is bereikt. Probeer het later opnieuw.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>De frequentielimiet van de GitHub API is bereikt. Controleren op updates met behulp van Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Deze distributie is alleen beschikbaar vanuit de Microsoft Store.</value>
   </data>
@@ -849,7 +855,7 @@ Ga voor meer informatie over Admin Protection naar https://aka.ms/apdevguide</va
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageInvalidDistribution" xml:space="preserve">
-    <value>Found invalid distribution registration '{}', {}.</value>
+    <value>Ongeldige distributieregistratie '{}' gevonden, {}.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated. The placeholders are the distribution's registry GUID and the error code.</comment>
   </data>
   <data name="MessageUsingLegacyDistribution" xml:space="preserve">
@@ -958,7 +964,7 @@ Terugvallen op NAT-netwerken.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Er is een localhost-proxyconfiguratie gedetecteerd, maar niet gespiegeld in WSL. WSL in nat-modus biedt geen ondersteuning voor localhostproxy's.</value>
+    <value>Er is een localhost-proxyconfiguratie gedetecteerd, maar niet gespiegeld in WSL. Dit proxyadres wordt niet ondersteund door de huidige netwerkconfiguratie.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1204,7 @@ Er treedt over 60 seconden een time-out op voor deze prompt.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Foutcode: {}
-Als deze fout onverwacht is, kunt u zoeken naar bestaande problemen of een nieuw probleem indienen bij https://github.com/microsoft/WSL/issues.</value>
+Als deze fout onverwacht is, kunt u zoeken naar bestaande problemen of een nieuw probleem indienen op https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -2073,6 +2079,25 @@ U hebt ook toegang tot meer externe VS Code-opties via het opdrachtpalet in VS C
   <data name="Settings_KeepWslRunningToggleSwitch.AutomationProperties.HelpText" xml:space="preserve">
     <value>Zorg ervoor dat distributies worden uitgevoerd, zodat de virtuele WSL-machine die als host fungeert, niet automatisch wordt afgesloten nadat ze inactief zijn geweest.</value>
   </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Header" xml:space="preserve">
+    <value>Virtuele machine van WSL-distributie altijd ingeschakeld houden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOn.Description" xml:space="preserve">
+    <value>De virtuele machine van je WSL-distributie wordt niet afgesloten wanneer deze niet wordt gebruikt, zodat nieuwe shells direct worden gestart. Gebruikt meer geheugen zolang WSL actief is. Dit wordt van kracht tijdens je volgende WSL-sessie.</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnToggleSwitch.AutomationProperties.Name" xml:space="preserve">
+    <value>Virtuele machine van WSL-distributie altijd ingeschakeld houden</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Title" xml:space="preserve">
+    <value>Kan de instelling voor actief houden niet wijzigen</value>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnError.Message" xml:space="preserve">
+    <value>Zorg ervoor dat .wslconfig niet alleen-lezen is en probeer het opnieuw.</value>
+    <comment>{Locked=".wslconfig"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="Settings_KeepWslVmAlwaysOnOOBEFooter.Text" xml:space="preserve">
+    <value>Je kunt dit op elk moment wijzigen in de WSL-instellingen onder Optionele functies.</value>
+  </data>
   <data name="Settings_VMIdleTimeoutResetButton.Content" xml:space="preserve">
     <value>Time-out voor opnieuw instellen</value>
   </data>
@@ -2247,6 +2272,9 @@ Gebruik:
   </data>
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Poorttoewijzingen worden niet ondersteund met de containernetwerkmodus; poorten behoren toe aan de doelcontainer.</value>
+  </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Poorttoewijzingen worden niet ondersteund wanneer containernetwerken zijn uitgeschakeld. Schakel netwerken in of verwijder de poorttoewijzingen.</value>
   </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>De doelcontainernaam is vereist voor de containernetwerkmodus.</value>
@@ -2425,20 +2453,12 @@ Gebruik:
      <value>Er is een positioneel argument gevonden, terwijl er geen werd verwacht: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="WSLCCLI_MissingArgumentNameError" xml:space="preserve">
-     <value>Ontbrekende optienaam bij: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
   <data name="WSLCCLI_FailedResolvingForwardError" xml:space="preserve">
      <value>Kan doorgestuurde argumenten niet omzetten, te beginnen bij argument: {}</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Ongeldig extra argument aangetroffen: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Aliasopties met een waarde moeten als laatste in de aliasreeks staan: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4163,6 +4183,14 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
     <value>Kan tijdstempel voor container '{}' niet herstellen</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Kan de permanente status van de container {} niet laden. Wijzigingen in de status worden niet opgeslagen.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Kan de permanente status van container '{}' niet opslaan</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Kan de voortgang van het importeren van afbeeldingen niet parseren</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4196,6 +4224,18 @@ Bij de eerste uitvoering wordt het bestand aangemaakt met alle instellingen geco
   </data>
   <data name="MessageWslcInstallCertsFailed" xml:space="preserve">
     <value>Kan de door de host vertrouwde basiscertificaten niet installeren in de VM: {}</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC kan '{}' niet schrijven in de gast (gastfout {}).</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
+    <value>WSLC heeft de gast-VM gestart, maar de Docker-engine is niet binnen {} milliseconden gereed. Diagnostische WSL-logboeken verzamelen om de opstartfout te onderzoeken.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcDockerExitedBeforeReady" xml:space="preserve">
+    <value>Docker Engine is afgesloten met code {} voordat deze gereed is gemaakt in de WSLC-gast-VM. Diagnostische WSL-logboeken verzamelen om de opstartfout te onderzoeken.</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
 </root>

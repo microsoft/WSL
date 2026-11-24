@@ -425,6 +425,23 @@ class PolicyTest
         }
     }
 
+    WSL2_TEST_METHOD(DefaultMirroredNetworkingModeOverridesDisabledFirewall)
+    {
+        if (!IsMirroredNetworkingSupported())
+        {
+            LogSkipped("Mirrored networking not supported on this OS. Skipping test...");
+            return;
+        }
+
+        WslConfigChange config(LxssGenerateTestConfig() + L"\n[wsl2]\nfirewall=false\n");
+        auto revert = SetPolicy(c_defaultNetworkingMode, static_cast<DWORD>(wsl::core::NetworkingMode::Mirrored));
+        WslShutdown();
+
+        auto [output, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode");
+        VERIFY_ARE_EQUAL(L"mirrored\n", output);
+        VERIFY_ARE_EQUAL(L"", warnings);
+    }
+
     // Build the absolute path to the installed wslc.exe.
     static std::wstring GetWslcExePath()
     {
