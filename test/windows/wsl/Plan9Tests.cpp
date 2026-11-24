@@ -406,6 +406,7 @@ class Plan9Tests
         // This test has proven to be unstable, most likely because another program opens a file inside the distro, which prevents it from terminating.
         SKIP_TEST_UNSTABLE();
 
+        WslConfigChange config(LxssGenerateTestConfig() + L"[general]\ninstanceIdleTimeout=10000");
         auto revertLogging = EnablePlan9Logging();
 
         auto dumpLogs = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() {
@@ -436,7 +437,7 @@ class Plan9Tests
         VERIFY_ARE_EQUAL(getDistroState(), LxssDistributionStateRunning);
 
         // Validate that the distro does not terminate until the file is closed
-        // Note: Distributions time out after 10 seconds.
+        // The configured idle timeout is 10 seconds.
         std::this_thread::sleep_for(std::chrono::seconds(20));
 
         // Close the file and make sure that the distro terminates

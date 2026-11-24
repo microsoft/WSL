@@ -337,7 +337,7 @@ struct Config
     std::filesystem::path SystemDistroPath;
     bool EnableTelemetry = shared::OfficialBuild;
     int VmIdleTimeout = (60 * 1000);
-    int InstanceIdleTimeout = (15 * 1000);
+    int InstanceIdleTimeout = (2 * 60 * 1000);
     std::filesystem::path DebugConsoleLogFile;
     std::wstring VmSwitch;
     int KernelBootTimeout = (30 * 1000);
