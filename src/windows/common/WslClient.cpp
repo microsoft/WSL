@@ -734,6 +734,10 @@ std::wstring FormatUsbDevices(const std::vector<usb::ListedDevice>& devices, boo
             state = L"Attached";
             break;
         case usb::DeviceState::Unsupported:
+            if (!verbose)
+            {
+                continue;
+            }
             state = L"Unsupported";
             break;
         default:
