@@ -77,10 +77,17 @@ catch (...)
 
 DWORD wsl::core::networking::GetBestInterface(ADDRESS_FAMILY family)
 {
+    if (family != AF_INET && family != AF_INET6)
+    {
+        return 0;
+    }
+
     DWORD bestInterface = 0;
     SOCKADDR_STORAGE address{};
     address.ss_family = family;
-    if (GetBestInterfaceEx(reinterpret_cast<SOCKADDR*>(&address), &bestInterface) != NO_ERROR)
+    auto* socketAddress = reinterpret_cast<SOCKADDR*>(&address);
+    INETADDR_SETANY(socketAddress);
+    if (GetBestInterfaceEx(socketAddress, &bestInterface) != NO_ERROR)
     {
         bestInterface = 0;
     }
