@@ -1023,6 +1023,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
     }
 
     const auto makingIpInterfaceUpdate = endpoint.Network->PendingIPInterfaceUpdate;
+    const auto makingAddressRefreshUpdate = endpoint.Network->PendingAddressRefresh;
     // Linux may delete routes behind us when making interface, address, and route changes
     // will track when to refresh v4 and v6 routes to ensure routes are still present after changes
     // a few customers have seen this when we update temporary v6 addresses, for example
@@ -1049,13 +1050,13 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
                 TraceLoggingValue(endpoint.InterfaceGuid, "InterfaceGuid"));
 
             syncSuccessful = false;
-            endpoint.Network->PendingAddressRefresh = true;
             // interfaces are in an unknown state - push route updates in case Linux deleted routes behind us
             refreshAllRoutes = true;
         }
         else
         {
             endpoint.Network->PendingIPInterfaceUpdate = false;
+            endpoint.Network->PendingAddressRefresh = false;
         }
 
         endpoint.Network->IsConnected = originalConnectValue;
@@ -1086,7 +1087,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
                     address->SyncStatus = PendingUpdate;
                     address->SyncRetryCount = TrackedIpAddress::MaxSyncRetryCount;
                 }
-                else if (endpoint.Network->PendingAddressRefresh)
+                else if (makingAddressRefreshUpdate)
                 {
                     address->SyncStatus = PendingUpdate;
                     address->SyncRetryCount = TrackedIpAddress::MaxSyncRetryCount;
@@ -1150,11 +1151,6 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         }
         // push route updates in case Linux deleted routes behind us after removing addresses
         refreshAllRoutes = true;
-    }
-
-    if (!endpoint.Network->PendingIPInterfaceUpdate)
-    {
-        endpoint.Network->PendingAddressRefresh = false;
     }
 
     // Third: update Linux with any routes to remove
