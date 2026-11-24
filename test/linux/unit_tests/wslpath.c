@@ -15,6 +15,7 @@ Abstract:
 #include "lxtcommon.h"
 #include "unittests.h"
 #include <fcntl.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mount.h>
@@ -100,7 +101,7 @@ Return Value:
     int Result;
 
     LxtCheckResult(LxtInitialize(Argc, Argv, &Args, LXT_NAME));
-    LxtCheckResult(LxtRunVariations(&Args, g_LxtVariations, LXT_COUNT_OF(g_LxtVariations)));
+    LxtCheckResult(LxtRunVariationsForked(&Args, g_LxtVariations, LXT_COUNT_OF(g_LxtVariations)));
 
 ErrorExit:
     LxtUninitialize();
@@ -210,7 +211,7 @@ Return Value:
     char Alias[sizeof("/data/wslpath-rbind-XXXXXX/c/Windows")];
     char Target[] = "/data/wslpath-rbind-XXXXXX";
     bool Mounted = false;
-    char* PointerResult;
+    char* PointerResult = NULL;
     int Result;
 
     if (LxtWslVersion() == 1)
@@ -218,6 +219,10 @@ Return Value:
         LxtLogInfo("Test skipped on WSL1.");
         return 0;
     }
+
+    // Isolate shared drive mounts before creating or detaching bind aliases.
+    LxtCheckErrno(unshare(CLONE_NEWNS));
+    LxtCheckErrnoZeroSuccess(mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL));
 
     LxtCheckNullErrno(mkdtemp(Target));
     LxtCheckErrnoZeroSuccess(mount("/mnt", Target, NULL, MS_BIND | MS_REC, NULL));
@@ -246,7 +251,7 @@ int WslPathTestDrvFsShadowedMounts(PLXT_ARGS Args)
     char Target[] = "/data/wslpath-shadow-XXXXXX";
     char First[sizeof(Target) + sizeof("/first")];
     char Second[sizeof(Target) + sizeof("/second")];
-    char* PointerResult;
+    char* PointerResult = NULL;
     bool Mounted = false;
     int Result;
 
@@ -255,6 +260,10 @@ int WslPathTestDrvFsShadowedMounts(PLXT_ARGS Args)
         LxtLogInfo("Test skipped on WSL1.");
         return 0;
     }
+
+    // Isolate shared drive mounts before creating or detaching bind aliases.
+    LxtCheckErrno(unshare(CLONE_NEWNS));
+    LxtCheckErrnoZeroSuccess(mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL));
 
     LxtCheckNullErrno(mkdtemp(Target));
     LxtCheckErrnoZeroSuccess(mount("tmpfs", Target, "tmpfs", 0, NULL));
