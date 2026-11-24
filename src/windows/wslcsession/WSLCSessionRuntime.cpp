@@ -522,11 +522,12 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         m_vmExited.store(true);
     }
 
-    if (m_dockerClient && !m_vmExited.load() && !m_terminating->load() && m_ioRelay && !m_ioRelay->IsRelayThread())
+    if (m_dockerClient && m_dockerdProcess.has_value() && !m_vmExited.load() && !m_terminating->load() && m_ioRelay &&
+        !m_ioRelay->IsRelayThread())
     {
         try
         {
-            m_eventTracker->WaitForPendingEvents(m_dockerClient.value(), c_pendingEventsTimeout);
+            m_eventTracker->WaitForPendingEvents([&]() { THROW_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGHUP)); }, c_pendingEventsTimeout);
         }
         CATCH_LOG();
     }

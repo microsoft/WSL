@@ -57,9 +57,6 @@ std::string EpochToRfc3339Nano(std::int64_t epochNanoseconds, std::chrono::secon
 // Renders the same layout in the local time zone. Falls back to UTC when the time zone database is unavailable.
 std::string EpochToLocalRfc3339Nano(std::int64_t epochNanoseconds);
 
-// Renders nanoseconds since the unix epoch as Unix seconds with nine fractional digits.
-std::string EpochToUnixTimestamp(std::int64_t epochNanoseconds);
-
 // Renders an elapsed number of seconds as a coarse, localized description such as "About a minute"
 // or "3 weeks". Negative values are treated as zero.
 std::wstring FormatElapsedSeconds(LONGLONG elapsedSeconds);
