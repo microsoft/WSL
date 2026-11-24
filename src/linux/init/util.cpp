@@ -1022,7 +1022,10 @@ try
         {
             std::string TranslatedPath = Path + Length;
             UtilCanonicalisePathSeparator(TranslatedPath, PATH_SEP);
-            TranslatedPath.insert(0, *ReplacementField);
+            if (strcmp(*ReplacementField, "/") != 0 || TranslatedPath.empty())
+            {
+                TranslatedPath.insert(0, *ReplacementField);
+            }
             WindowsMatches.push_back(
                 {*ReplacementField, std::move(TranslatedPath), MountEnum.Current().Root, MountEnum.Current().Device, Length});
             continue;

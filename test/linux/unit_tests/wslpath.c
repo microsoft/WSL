@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "lxtcommon.h"
+#include "lxtfs.h"
 #include "unittests.h"
 #include <fcntl.h>
 #include <sched.h>
@@ -262,6 +263,7 @@ int WslPathTestDrvFsShadowedMounts(PLXT_ARGS Args)
     char Target[] = "/data/wslpath-shadow-XXXXXX";
     char First[sizeof(Target) + sizeof("/first")];
     char Second[sizeof(Target) + sizeof("/second")];
+    char IndependentPath[sizeof(First) + sizeof("/Windows")];
     char* PointerResult = NULL;
     bool Mounted = false;
     int Result;
@@ -294,6 +296,13 @@ int WslPathTestDrvFsShadowedMounts(PLXT_ARGS Args)
 
     LxtCheckErrnoZeroSuccess(mount("tmpfs", Second, "tmpfs", 0, NULL));
     LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", "/mnt/c/Windows", true));
+
+    // A new DrvFs mount keeps priority over a later alias of the original drive.
+    LxtCheckResult(LxtFsMountDrvFs("C:", First, "uid=2000,gid=2001"));
+    snprintf(IndependentPath, sizeof(IndependentPath), "%s/Windows", First);
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", IndependentPath, true));
+    LxtCheckErrnoZeroSuccess(mount("/mnt/c", Second, NULL, MS_BIND, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", IndependentPath, true));
 
 ErrorExit:
     if (Mounted && umount2(Target, MNT_DETACH) < 0)
