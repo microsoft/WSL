@@ -1091,7 +1091,10 @@ class UnitTests
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode -n | wc -l | grep 0"), 0u);
 
             // Ensure various wslinfo functionally works as expected.
-            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'nat'"), 0u);
+            // OpenVMM defaults to Consomme.
+            VERIFY_ARE_EQUAL(
+                LxsstuLaunchWsl(LxsstuOpenVmmMode() ? L"wslinfo --networking-mode | grep -iF 'consomme'" : L"wslinfo --networking-mode | grep -iF 'nat'"),
+                0u);
 
             WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::None}));
             VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"wslinfo --networking-mode | grep -iF 'none'"), 0u);

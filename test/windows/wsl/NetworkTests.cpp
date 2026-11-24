@@ -5976,7 +5976,7 @@ class ConsommeTests
 
         auto [networkingMode, warnings] = LxsstuLaunchWslAndCaptureOutput(L"wslinfo --networking-mode", 0);
         VERIFY_IS_TRUE(warnings.empty());
-        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), LxsstuOpenVmmMode() ? L"nat" : L"consomme");
+        VERIFY_ARE_EQUAL(wsl::shared::string::Trim(networkingMode), L"consomme");
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"test -d /proc/sys/net/ipv6"), 1L);
 
         const auto state = NetworkTests::GetInterfaceState(L"eth0");

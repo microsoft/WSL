@@ -200,8 +200,8 @@ void OpenVmmConsommeNetworking::TraceLoggingRundown() noexcept
 
 void OpenVmmConsommeNetworking::FillInitialConfiguration(LX_MINI_INIT_NETWORKING_CONFIGURATION& Message)
 {
-    Message.NetworkingMode = LxMiniInitNetworkingModeNat;
-    Message.DisableIpv6 = false;
+    Message.NetworkingMode = LxMiniInitNetworkingModeConsomme;
+    Message.DisableIpv6 = !m_enableIpv6;
     Message.EnableDhcpClient = false;
     Message.PortTrackerType = LxMiniInitPortTrackerTypeMirrored;
 }

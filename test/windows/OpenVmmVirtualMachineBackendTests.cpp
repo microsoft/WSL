@@ -506,7 +506,7 @@ class OpenVmmVirtualMachineBackendTests
         LX_MINI_INIT_NETWORKING_CONFIGURATION configuration{};
         networking.FillInitialConfiguration(configuration);
 
-        VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeNat, configuration.NetworkingMode);
+        VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeConsomme, configuration.NetworkingMode);
         VERIFY_IS_FALSE(configuration.DisableIpv6);
         VERIFY_IS_FALSE(configuration.EnableDhcpClient);
         VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeMirrored, configuration.PortTrackerType);
