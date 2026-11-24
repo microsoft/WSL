@@ -229,5 +229,6 @@ void SetErrorMessage(std::wstring&& message, const std::source_location& source 
 void SetErrorMessage(std::string&& message, const std::source_location& source = std::source_location::current());
 
 void SetEventLog(HANDLE eventLog);
+void WriteServiceWarning(const std::wstring& warning) noexcept;
 
 } // namespace wsl::windows::common

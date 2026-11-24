@@ -1305,7 +1305,9 @@ void ProcessMessages(wsl::shared::SocketChannel& Channel, bool AllowAuditBootstr
                 THROW_ERRNO_IF(EINVAL, !config);
                 if (config->EnableSecurityAudit)
                 {
-                    StartSecurityAudit(config->IncludeAuditCommandLine);
+                    auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true);
+                    THROW_LAST_ERROR_IF(!socket);
+                    StartSecurityAudit(socket.get(), config->IncludeAuditCommandLine, true);
                 }
             }
             CATCH_LOG();

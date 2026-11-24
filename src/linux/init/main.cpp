@@ -155,14 +155,19 @@ void StartWorkerProcess(const char* Name, const std::function<void()>& Worker, s
     g_WorkerProcesses.insert(pid);
 }
 
-void StartSecurityAudit(bool includeCommandLine)
+void StartSecurityAudit(int socket, bool includeCommandLine, bool wslc)
 {
-    StartWorkerProcess("wsl-audit", [includeCommandLine] {
-        THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
-        THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
-        execl(LX_INIT_PATH, c_securityAuditName, includeCommandLine ? "1" : "0", nullptr);
-        THROW_LAST_ERROR();
-    });
+    StartWorkerProcess(
+        "wsl-audit",
+        [=] {
+            THROW_LAST_ERROR_IF(dup2(g_LogFd, STDERR_FILENO) < 0);
+            THROW_LAST_ERROR_IF(fcntl(STDERR_FILENO, F_SETFD, 0) < 0);
+            THROW_LAST_ERROR_IF(fcntl(socket, F_SETFD, 0) < 0);
+            const auto fd = std::to_string(socket);
+            execl(LX_INIT_PATH, c_securityAuditName, fd.c_str(), includeCommandLine ? "1" : "0", wslc ? "wslc" : nullptr, nullptr);
+            THROW_LAST_ERROR();
+        },
+        {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, socket});
 }
 
 int Chroot(const char* Target);
@@ -3441,9 +3446,12 @@ try
 
         if (ConfigMessage->EnableSecurityAudit)
         {
+            // Reserve the connection in mini_init's ordered bootstrap sequence, even if the worker fails to exec.
+            auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true);
+            THROW_LAST_ERROR_IF(!socket);
             try
             {
-                StartSecurityAudit(ConfigMessage->IncludeAuditCommandLine);
+                StartSecurityAudit(socket.get(), ConfigMessage->IncludeAuditCommandLine, false);
             }
             CATCH_LOG();
         }

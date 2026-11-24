@@ -199,8 +199,15 @@ int WslEntryPoint(int Argc, char* Argv[])
         {
             try
             {
-                THROW_ERRNO_IF(EINVAL, Pid == 1 || Argc != 2 || (strcmp(Argv[1], "0") != 0 && strcmp(Argv[1], "1") != 0));
-                ExitCode = RunSecurityAudit(strcmp(Argv[1], "1") == 0);
+                THROW_ERRNO_IF(
+                    EINVAL,
+                    Pid == 1 || (Argc != 3 && Argc != 4) || (Argc == 4 && strcmp(Argv[3], "wslc") != 0) ||
+                        (strcmp(Argv[2], "0") != 0 && strcmp(Argv[2], "1") != 0));
+                int socket = -1;
+                const auto* end = Argv[1] + strlen(Argv[1]);
+                const auto parsed = std::from_chars(Argv[1], end, socket);
+                THROW_ERRNO_IF(EINVAL, parsed.ec != std::errc{} || parsed.ptr != end || socket <= STDERR_FILENO);
+                ExitCode = RunSecurityAudit(wil::unique_fd{socket}, strcmp(Argv[2], "1") == 0, Argc == 4);
             }
             CATCH_LOG();
         }

@@ -180,6 +180,11 @@ void ExecutionContext::EmitUserWarning(const std::wstring& warning, const std::s
         }
     }
 
+    WriteServiceWarning(warning);
+}
+
+void wsl::windows::common::WriteServiceWarning(const std::wstring& warning) noexcept
+{
     if (g_eventLog)
     {
         auto* warningPtr = warning.c_str();

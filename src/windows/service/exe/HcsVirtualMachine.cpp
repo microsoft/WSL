@@ -26,6 +26,7 @@ Abstract:
 #include "DnsResolver.h"
 #include "string.hpp"
 #include "SecurityAudit.h"
+#include "ExecutionContext.h"
 #include "securityaudit/ProcessExecutionAudit.h"
 #include "SocketChannel.h"
 #include "message.h"
@@ -453,9 +454,12 @@ try
             includeCommandLine = securityaudit::IncludeProcessCommandLine();
         }
     }
-    CATCH_LOG();
+    catch (...)
+    {
+        ReportAuditUnavailable(wil::ResultFromCaughtException());
+    }
 
-    if (includeCommandLine)
+    if (includeCommandLine.has_value())
     {
         // The one-way bootstrap request completes before the session takes ownership of this channel.
         wsl::shared::MessageWriter<LX_MINI_INIT_CONFIG_MESSAGE> audit;
@@ -463,35 +467,57 @@ try
         audit->IncludeAuditCommandLine = *includeCommandLine;
         auto transaction = channel.StartTransaction(m_bootTimeoutMs);
         transaction.Send<LX_MINI_INIT_CONFIG_MESSAGE>(audit.Span());
-        auto auditSocket = wsl::windows::common::socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
-        THROW_HR_IF(E_ABORT, !auditSocket.has_value());
-        m_securityAuditThread = std::thread(&HcsVirtualMachine::SecurityAuditWorker, this, std::move(*auditSocket), *includeCommandLine);
+        try
+        {
+            auto auditSocket =
+                wsl::windows::common::socket::CancellableAccept(m_listenSocket.get(), m_bootTimeoutMs, m_vmExitEvent.get());
+            THROW_HR_IF(E_ABORT, !auditSocket.has_value());
+            wsl::shared::SocketChannel auditChannel{
+                std::move(*auditSocket), "WSLCSecurityAudit", {m_vmExitEvent.get(), m_securityAuditStop.get()}};
+            // Wait only for private mounts (or worker exit), not for eBPF to attach or the first event.
+            THROW_HR_IF(E_UNEXPECTED, auditChannel.ReceiveMessage<RESULT_MESSAGE<int32_t>>(nullptr, m_bootTimeoutMs).Result != 0);
+            m_securityAuditThread = std::thread(&HcsVirtualMachine::SecurityAuditWorker, this, std::move(auditChannel), *includeCommandLine);
+        }
+        catch (...)
+        {
+            ReportAuditUnavailable(wil::ResultFromCaughtException());
+        }
     }
 
+    // This VM's init listener has no further consumers. Reject any late audit connection after a timeout.
+    m_listenSocket.reset();
     *Socket = reinterpret_cast<HANDLE>(channel.Release().release());
     return S_OK;
 }
 CATCH_RETURN()
 
-void HcsVirtualMachine::SecurityAuditWorker(wil::unique_socket Socket, bool IncludeCommandLine)
+void HcsVirtualMachine::ReportAuditUnavailable(HRESULT Result) const noexcept
+try
+{
+    if (!m_vmExitEvent.is_signaled() && !m_securityAuditStop.is_signaled())
+    {
+        WSL_LOG("WSLCSecurityAuditUnavailable", TraceLoggingGuid(m_vmId, "VmId"), TraceLoggingHResult(Result, "Result"));
+        WriteServiceWarning(wsl::shared::Localization::MessageWslcAuditUnavailable(
+            m_vmIdString, std::format(L"0x{:08X}", static_cast<DWORD>(Result))));
+    }
+}
+CATCH_LOG()
+
+void HcsVirtualMachine::SecurityAuditWorker(wsl::shared::SocketChannel Channel, bool IncludeCommandLine)
 try
 {
     auto self = wil::run_as_self();
-    securityaudit::EventSource source;
-    wsl::shared::SocketChannel channel{std::move(Socket), "WSLCSecurityAudit", {m_vmExitEvent.get(), m_securityAuditStop.get()}};
+    securityaudit::EventSource source{m_vmIdString};
     for (;;)
     {
         gsl::span<gsl::byte> bytes;
-        channel.ReceiveMessage<MESSAGE_HEADER>(&bytes);
+        Channel.ReceiveMessage<MESSAGE_HEADER>(&bytes);
         securityaudit::ReportEvent(source, bytes, IncludeCommandLine);
     }
 }
 catch (...)
 {
-    if (!m_vmExitEvent.is_signaled() && !m_securityAuditStop.is_signaled())
-    {
-        LOG_CAUGHT_EXCEPTION();
-    }
+    ReportAuditUnavailable(wil::ResultFromCaughtException());
 }
 
 HRESULT HcsVirtualMachine::ConfigureNetworking(_In_ HANDLE GnsSocket, _In_opt_ HANDLE* DnsSocket)

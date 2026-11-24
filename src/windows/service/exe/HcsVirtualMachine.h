@@ -23,6 +23,7 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "RuntimeClass.h"
 #include "WslCoreConfig.h"
+#include "SocketChannel.h"
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -67,7 +68,8 @@ private:
     static void CALLBACK OnVmExitCallback(HCS_EVENT* Event, void* Context);
     void OnExit(const HCS_EVENT* Event);
     void OnCrash(const HCS_EVENT* Event);
-    void SecurityAuditWorker(wil::unique_socket Socket, bool IncludeCommandLine);
+    void SecurityAuditWorker(wsl::shared::SocketChannel Channel, bool IncludeCommandLine);
+    void ReportAuditUnavailable(HRESULT Result) const noexcept;
 
     std::filesystem::path GetCrashDumpFolder();
     void CreateVmSavedStateFile(HANDLE UserToken);

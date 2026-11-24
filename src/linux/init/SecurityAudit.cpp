@@ -133,7 +133,7 @@ void PollError(void* context, int error)
 }
 } // namespace
 
-int RunSecurityAudit(bool includeCommandLine)
+int RunSecurityAudit(wil::unique_fd socket, bool includeCommandLine, bool wslc)
 {
     THROW_LAST_ERROR_IF(signal(SIGPIPE, SIG_IGN) == SIG_ERR);
 
@@ -141,11 +141,13 @@ int RunSecurityAudit(bool includeCommandLine)
     THROW_LAST_ERROR_IF(unshare(CLONE_NEWNS) < 0);
     THROW_LAST_ERROR_IF(mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr) < 0);
 
-    // Connecting releases the host's bootstrap wait; WSLC may then move mounts into its new root.
-    auto socket = UtilConnectVsock(LX_INIT_UTILITY_VM_INIT_PORT, true);
-    THROW_LAST_ERROR_IF(!socket);
     AuditContext audit{wsl::shared::SocketChannel{std::move(socket), "SecurityAudit"}};
     audit.includeCommandLine = includeCommandLine;
+    if (wslc)
+    {
+        // WSLC may move the mounts now. Do not hold up the workload for eBPF initialization.
+        audit.channel.SendResultMessage<int32_t>(0);
+    }
 
     struct statfs filesystem{};
     THROW_LAST_ERROR_IF(statfs("/sys/kernel/tracing", &filesystem) < 0);

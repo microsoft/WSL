@@ -138,7 +138,8 @@ std::wstring FormatSyscallEventDisplay(std::string_view syscall, std::wstring_vi
         L"\n\n" + std::wstring(text));
 }
 
-EventSource::EventSource() : m_token(AcquireTokenWithPrivilege(SE_AUDIT_NAME))
+EventSource::EventSource(std::wstring wslcVmId) :
+    m_wslcVmId(std::move(wslcVmId)), m_token(AcquireTokenWithPrivilege(SE_AUDIT_NAME))
 {
     auto impersonation = wil::impersonate_token(m_token.get());
     EnsureInstalled();
@@ -152,13 +153,25 @@ void EventSource::Close(AUTHZ_SECURITY_EVENT_PROVIDER_HANDLE provider) noexcept
 
 void EventSource::Report(DWORD eventId, std::span<std::wstring> fields)
 {
-    THROW_HR_IF(E_INVALIDARG, eventId > UINT16_MAX || fields.empty() || fields.size() > USHRT_MAX);
+    THROW_HR_IF(E_INVALIDARG, eventId > UINT16_MAX || fields.size() < 2 || fields.size() >= USHRT_MAX);
+    if (!m_wslcVmId.empty())
+    {
+        fields[1] += L"\r\n" + wsl::shared::Localization::MessageWslcAuditVmId(m_wslcVmId);
+    }
     auto impersonation = wil::impersonate_token(m_token.get());
     std::vector<AUDIT_PARAM> values(fields.size());
     for (size_t index = 0; index < fields.size(); ++index)
     {
         values[index].Type = APT_String;
         values[index].String = fields[index].data();
+    }
+    if (!m_wslcVmId.empty())
+    {
+        // Append a machine-readable origin without shifting existing PID, JSON or display insertions.
+        AUDIT_PARAM origin{};
+        origin.Type = APT_String;
+        origin.String = m_wslcVmId.data();
+        values.push_back(origin);
     }
     AUDIT_PARAMS parameters{sizeof(AUDIT_PARAMS), APF_AuditSuccess, static_cast<USHORT>(values.size()), values.data()};
     THROW_IF_WIN32_BOOL_FALSE(AuthzReportSecurityEventFromParams(0, m_provider.get(), eventId, nullptr, &parameters));
