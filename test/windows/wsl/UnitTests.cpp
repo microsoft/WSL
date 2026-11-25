@@ -5562,10 +5562,10 @@ VERSION_ID="Invalid|Format"
         return LxssGenerateWslCommandLine(std::format(command, Setup).c_str());
     }
 
-    static void WaitForOutput(const PartialHandleRead& Reader, const std::string& Expected)
+    static void WaitForReady(const PartialHandleRead& Reader)
     {
         wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() { THROW_HR_IF(E_ABORT, Reader.GetData().find(Expected) == std::string::npos); },
+            [&]() { THROW_HR_IF(E_ABORT, Reader.GetData().find("ready") == std::string::npos); },
             std::chrono::milliseconds(100),
             std::chrono::seconds(30));
     }
@@ -5596,7 +5596,7 @@ VERSION_ID="Invalid|Format"
             outputWrite.reset();
 
             PartialHandleRead reader(std::move(output));
-            WaitForOutput(reader, "ready\n");
+            WaitForReady(reader);
 
             // Nothing reads the console when the standard input is a pipe, so it must keep generating Ctrl+C events.
             DWORD mode{};
@@ -5622,7 +5622,7 @@ VERSION_ID="Invalid|Format"
             const auto handle = process.Start();
 
             PartialHandleRead reader(std::move(console.OutputRead));
-            WaitForOutput(reader, "ready");
+            WaitForReady(reader);
 
             THROW_IF_WIN32_BOOL_FALSE(WriteFile(console.InputWrite.get(), "\x03", 1, nullptr, nullptr));
             VERIFY_ARE_EQUAL(SubProcess::GetExitCode(handle.get(), 30 * 1000), expectedExitCode);
