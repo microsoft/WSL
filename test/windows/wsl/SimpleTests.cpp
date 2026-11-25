@@ -57,7 +57,7 @@ class SimpleTests
 
     TEST_METHOD(Daemonize)
     {
-        WslConfigChange config(LxssGenerateTestConfig({.vmIdleTimeout = 0}));
+        WslConfigChange config(LxssGenerateTestConfig({.vmIdleTimeout = 0, .instanceIdleTimeout = 15000}));
         WslShutdown();
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"-- eval \"touch /dev/shm/backgroundmagic; daemonize $(which sleep) 30\""), (DWORD)0);
 

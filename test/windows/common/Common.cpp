@@ -1519,6 +1519,7 @@ std::wstring LxssGenerateTestConfig(TestConfigDefaults Default)
     };
 
     std::wstring newConfig =
+        L"[general]\ninstanceIdleTimeout=" + std::to_wstring(Default.instanceIdleTimeout.value_or(2 * 60 * 1000)) + L"\n" +
         L"[wsl2]\n"
         L"crashDumpFolder=" +
         EscapePath(Default.CrashDumpFolder.value_or(g_dumpFolder + L"\\linux-crashes")) + L"\nmaxCrashDumpCount=" +
