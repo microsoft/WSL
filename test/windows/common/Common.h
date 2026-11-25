@@ -81,6 +81,15 @@ using namespace std::chrono_literals;
         return; \
     }
 
+#define WINHTTP_PROXY_TEST_ONLY() \
+    { \
+        if (!TryLoadWinhttpProxyMethods()) \
+        { \
+            LogSkipped("Winhttp proxy APIs not present on this OS. Skipping test..."); \
+            return; \
+        } \
+    }
+
 #define SKIP_TEST_ARM64() \
     { \
         if constexpr (wsl::shared::Arm64) \
@@ -360,6 +369,22 @@ private:
     std::optional<std::wstring> m_originalValue;
 };
 
+class ScopedWindowsProxySettings
+{
+public:
+    ScopedWindowsProxySettings();
+    ~ScopedWindowsProxySettings();
+
+    NON_COPYABLE(ScopedWindowsProxySettings);
+    NON_MOVABLE(ScopedWindowsProxySettings);
+
+private:
+    DWORD m_flags{};
+    wil::unique_hglobal m_proxy;
+    wil::unique_hglobal m_bypasses;
+    wil::unique_hglobal m_autoconfigUrl;
+};
+
 class UniqueWebServer
 {
 public:
@@ -611,6 +636,8 @@ void RestoreTestStdHandles(_In_ const std::pair<HANDLE, HANDLE>& Handles);
 void CreateUser(_In_ const std::wstring& Username, _Out_ PULONG Uid, _Out_ PULONG Gid);
 
 bool TryLoadDnsResolverMethods() noexcept;
+
+bool TryLoadWinhttpProxyMethods() noexcept;
 
 bool AreExperimentalNetworkingFeaturesSupported();
 

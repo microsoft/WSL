@@ -34,6 +34,7 @@ set(SOURCES
     Localization.cpp
     lxssbusclient.cpp
     lxssclient.cpp
+    LxssHttpProxy.cpp
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
@@ -73,6 +74,7 @@ set(SOURCES
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
+    wslc/WSLCProxy.cpp
     wslc/settings/WSLCUserSettings.cpp
     notifications.cpp)
 
@@ -140,6 +142,7 @@ set(HEADERS
     INetworkingEngine.h
     interop.hpp
     HandleIO.h
+    LxssHttpProxy.h
     LxssMessagePort.h
     LxssPort.h
     LxssSecurity.h
@@ -184,6 +187,7 @@ set(HEADERS
     WslTelemetry.h
     wslutil.h
     wslc/EnumVariantMap.h
+    wslc/WSLCProxy.h
     wslc/settings/WSLCUserSettings.h
     wslc/WSLCSessionDefaults.h
     )
@@ -200,7 +204,7 @@ target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/
 # PUBLIC propagates them instead of making each consumer restate them.
 # yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
 # WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
-target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib wslopenvmm_client)
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib Winhttp.lib wslopenvmm_client)
 
 # Keep backend imports out of clients that only use common utilities, such as the MSIX launchers.
 set_source_files_properties(

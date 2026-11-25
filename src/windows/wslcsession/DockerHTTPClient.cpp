@@ -134,8 +134,8 @@ std::string DockerHTTPClient::URL::Escape(const std::string& Value)
     return wsl::shared::string::WideToMultiByte(escaped.c_str());
 }
 
-DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
-    m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
+DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, std::vector<HANDLE>&& CancelEvents, GUID VmId, ULONG ConnectTimeoutMs) :
+    m_cancelEvents(std::move(CancelEvents)), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
 {
 }
 
@@ -730,7 +730,9 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
 
     // Connect the new hvsocket.
     wsl::shared::SocketChannel newChannel{
-        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_exitingEvent, m_connectTimeoutMs), "DockerClient", {m_exitingEvent}};
+        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_cancelEvents, m_connectTimeoutMs),
+        "DockerClient",
+        std::vector<HANDLE>(m_cancelEvents)};
     lock.reset();
 
     // Connect that socket to the docker unix socket.
@@ -769,7 +771,12 @@ std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendReq
     auto onHttpResponse = [&](const auto& response) { responseHeader = response; };
     MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<io::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
+    // Session termination must cancel requests before shutdown waits for their VM leases.
+    for (const auto event : m_cancelEvents)
+    {
+        io.AddHandle(std::make_unique<io::EventHandle>(event, []() { THROW_HR(E_ABORT); }));
+    }
+
     io.AddHandle(std::make_unique<DockerHttpResponseHandle>(*context, std::move(onHttpResponse), std::move(OnResponse)), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
@@ -958,7 +965,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_cancelEvents, MSG_PEEK);
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
@@ -974,7 +981,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         // Consume the scanned header bytes from the socket
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_cancelEvents, 0);
         THROW_HR_IF(E_ABORT, bytesRead == 0); // E_ABORT case after peek but before consume
         THROW_HR_IF_MSG(
             E_UNEXPECTED, static_cast<size_t>(bytesRead) != toConsume, "Short read consuming HTTP header: got %d, expected %zu", bytesRead, toConsume);

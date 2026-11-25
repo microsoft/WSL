@@ -399,9 +399,10 @@ wslc_schema::Health WaitForContainerHealth(const std::wstring& containerName, co
     }
 }
 
-wslc_schema::InspectImage InspectImage(const std::wstring& imageName)
+wslc_schema::InspectImage InspectImage(const std::wstring& imageName, const std::wstring& sessionName)
 {
-    auto result = RunWslc(std::format(L"image inspect {}", imageName));
+    const auto prefix = sessionName.empty() ? L"" : std::format(L"--session \"{}\" ", sessionName);
+    auto result = RunWslc(std::format(L"{}image inspect {}", prefix, imageName));
     result.Verify({.Stderr = L"", .ExitCode = 0});
     auto inspectData = wsl::shared::FromJson<std::vector<wslc_schema::InspectImage>>(result.Stdout.value().c_str());
     VERIFY_ARE_EQUAL(1u, inspectData.size());
@@ -588,7 +589,7 @@ wil::com_ptr<IWSLCSession> OpenDefaultElevatedSession()
 }
 
 std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
-    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir)
+    IWSLCSession& session, const std::string& username, const std::string& password, USHORT port, const std::wstring& tlsCertDir, bool publishToHost)
 {
     // Check if the registry image is already loaded on this session.
     wil::unique_cotaskmem_array_ptr<WSLCImageInformation> images;
@@ -626,6 +627,10 @@ std::pair<RunningWSLCContainer, std::string> StartLocalRegistry(
     if (useTls)
     {
         launcher.AddVolume(tlsCertDir, "/certs", true);
+        if (publishToHost)
+        {
+            launcher.AddPort(port, port, AF_INET, IPPROTO_TCP, "127.0.0.1");
+        }
     }
     else
     {

@@ -716,6 +716,12 @@ Windows 버전: {}</value>
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>업데이트 확인 중입니다.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API 속도 제한에 도달했습니다. 나중에 다시 시도하세요.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API 속도 제한에 도달했습니다. Windows 업데이트를 사용하여 업데이트를 확인하는 중입니다.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>이 배포는 Microsoft Store에서만 사용할 수 있습니다.</value>
   </data>
@@ -964,7 +970,7 @@ NAT 네트워킹으로 대체합니다.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>localhost 프록시 구성이 검색되었지만 WSL로 미러링되지 않았습니다. NAT 모드의 WSL은 localhost 프록시를 지원하지 않습니다.</value>
+    <value>localhost 프록시 구성이 감지되었지만 WSL로 미러링되지 않았습니다. 이 프록시 주소는 현재 네트워크 구성에서 지원되지 않습니다.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -2273,6 +2279,9 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>포트 매핑은 컨테이너 네트워크 모드에서 지원되지 않습니다. 포트는 대상 컨테이너에서 소유합니다.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>컨테이너 네트워킹을 사용하지 않도록 설정한 경우 포트 매핑이 지원되지 않습니다. 네트워킹을 사용하도록 설정하거나 포트 매핑을 제거하십시오.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>컨테이너 네트워크 모드에는 대상 컨테이너 이름이 필요합니다.</value>
   </data>
@@ -2456,10 +2465,6 @@ VS Code 자체 내의 명령 팔레트를 통해 더 많은 VS Code 원격 옵�
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>잘못된 추가 인수가 발견됨: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>값이 있는 별칭 옵션은 별칭 체인의 마지막에 있어야 합니다. '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4184,6 +4189,14 @@ Windows 버전: {}</value>
     <value>컨테이너 '{}'의 타임스탬프 복원 실패</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>컨테이너 '{}'의 지속형 상태를 로드하지 못했습니다. 상태에 대한 변경 내용은 저장되지 않습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>컨테이너 '{}'의 지속형 상태를 저장하지 못했습니다.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>이미지 가져오기 진행률 구문 분석 실패</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4219,8 +4232,8 @@ Windows 버전: {}</value>
     <value>호스트의 신뢰할 수 있는 루트 인증서를 VM에 설치하지 못함: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC가 로컬 호스트 이름 확인을 초기화하기 위해 '{}'을(를) 쓸 수 없습니다(게스트 오류 {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC에서 게스트에 '{}'을(를) 쓸 수 없습니다(게스트 오류 {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

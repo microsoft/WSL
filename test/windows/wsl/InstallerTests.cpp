@@ -348,6 +348,44 @@ class InstallerTests
         VERIFY_ARE_EQUAL(version, expectedVersion);
         VERIFY_IS_FALSE(GetMsiProductCode().empty());
 
+        constexpr DWORD c_serviceAcgMinBuild = 27841;
+        const auto buildNumber = wsl::windows::common::helpers::GetWindowsVersion().BuildNumber;
+        if (buildNumber >= c_serviceAcgMinBuild)
+        {
+            constexpr DWORD c_acgMitigationFlag = 0x800;
+            const auto mitigationFlags =
+                ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", 0);
+
+            VERIFY_ARE_EQUAL(mitigationFlags & c_acgMitigationFlag, c_acgMitigationFlag);
+
+            const WslKeepAlive keepAlive;
+
+            const wil::unique_schandle service{OpenServiceW(m_scm.get(), L"WSLService", SERVICE_QUERY_STATUS)};
+            VERIFY_IS_NOT_NULL(service);
+            const auto [state, pid] = GetServiceState(service.get());
+
+            VERIFY_ARE_EQUAL(state, static_cast<DWORD>(SERVICE_RUNNING));
+            VERIFY_ARE_NOT_EQUAL(pid, 0u);
+
+            const auto privilegeState = wsl::windows::common::security::AcquirePrivilege(SE_DEBUG_NAME);
+            const wil::unique_handle process{OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid)};
+            THROW_LAST_ERROR_IF_NULL(process);
+
+            PROCESS_MITIGATION_DYNAMIC_CODE_POLICY dynamicCodePolicy{};
+
+            VERIFY_WIN32_BOOL_SUCCEEDED(
+                GetProcessMitigationPolicy(process.get(), ProcessDynamicCodePolicy, &dynamicCodePolicy, sizeof(dynamicCodePolicy)));
+
+            VERIFY_IS_TRUE(dynamicCodePolicy.ProhibitDynamicCode);
+            VERIFY_IS_FALSE(dynamicCodePolicy.AllowThreadOptOut);
+            VERIFY_IS_FALSE(dynamicCodePolicy.AllowRemoteDowngrade);
+        }
+        else
+        {
+            VERIFY_ARE_EQUAL(
+                -1, ReadDword(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Services\\WSLService", L"MitigationFlags", -1));
+        }
+
         // TODO: check wslsupport, wslapi and p9rdr
     }
 
@@ -822,6 +860,25 @@ class InstallerTests
         auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--update");
         VERIFY_ARE_EQUAL(
             out, L"Checking for updates.\r\nThe most recent version of Windows Subsystem for Linux is already installed.\r\n");
+    }
+
+    TEST_METHOD(WslUpdateGitHubRateLimited)
+    {
+        constexpr auto endpoint = L"http://127.0.0.1:12345/";
+        RegistryKeyChange<std::wstring> change(
+            HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Lxss", wsl::windows::common::wslutil::c_githubUrlOverrideRegistryValue, endpoint);
+
+        for (const auto statusCode : {403u, 429u})
+        {
+            UniqueWebServer server(endpoint, L"{}", statusCode);
+
+            // --pre-release does not fall back to Windows Update, so the rate limit error is reported.
+            auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"--update --pre-release", -1);
+
+            const auto context = std::format(L"statusCode: {}, output: {}", statusCode, out);
+            VERIFY_IS_TRUE(out.find(L"The GitHub API rate limit was reached. Try again later.") != std::wstring::npos, context.c_str());
+            VERIFY_IS_TRUE(out.find(L"WSL_E_GITHUB_RATE_LIMITED") != std::wstring::npos, context.c_str());
+        }
     }
 
     TEST_METHOD(InstallRemovesStaleComRegistration)

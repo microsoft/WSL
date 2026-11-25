@@ -55,7 +55,6 @@ private:
     void EnsureNotStarted() const;
     void EnsureCanStart() const;
 
-    void ApplyCallbacksToSettings();
     void StartWaitingForExit();
     winrt::Windows::Foundation::IAsyncAction StartWaitingForExitAsync();
 

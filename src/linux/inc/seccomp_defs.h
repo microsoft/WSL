@@ -10,5 +10,7 @@
 // Read socketcall.2, there is no socketcall systemcall on x86_64 systems.
 // You will not get this value with the standard defines.
 #define I386_NR_socketcall (102)
+#define I386_NR_bind (361)
+#define I386_NR_listen (363)
 #define ARMV7_NR_bind (282)
 #define ARMV7_NR_listen (284)

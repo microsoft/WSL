@@ -36,9 +36,10 @@ T ApplyTransform(T&& value, T (*transform)(T))
 }
 } // namespace
 
-DistributionRegistration DistributionRegistration::Open(HKEY LxssKey, const GUID& Id)
+DistributionRegistration DistributionRegistration::Open(const wil::shared_handle& UserToken, HKEY LxssKey, const GUID& Id)
 {
     ExecutionContext context(Context::ReadDistroConfig);
+    const auto runAsUser = wil::impersonate_token(UserToken.get());
 
     const auto distroGuidString = wsl::shared::string::GuidToString<wchar_t>(Id);
 
@@ -53,12 +54,23 @@ DistributionRegistration DistributionRegistration::Open(HKEY LxssKey, const GUID
         throw;
     }
 
-    return DistributionRegistration(Id, std::move(distroKey));
+    return DistributionRegistration(UserToken, Id, std::move(distroKey));
 }
 
 DistributionRegistration DistributionRegistration::Create(
-    HKEY LxssKey, const std::optional<GUID>& Id, LPCWSTR Name, ULONG Version, LPCWSTR BasePath, ULONG Flags, ULONG DefaultUID, LPCWSTR PackageFamilyName, LPCWSTR VhdFileName, bool EnableOobe)
+    const wil::shared_handle& UserToken,
+    HKEY LxssKey,
+    const std::optional<GUID>& Id,
+    LPCWSTR Name,
+    ULONG Version,
+    LPCWSTR BasePath,
+    ULONG Flags,
+    ULONG DefaultUID,
+    LPCWSTR PackageFamilyName,
+    LPCWSTR VhdFileName,
+    bool EnableOobe)
 {
+    const auto runAsUser = wil::impersonate_token(UserToken.get());
     std::wstring distroGuidString;
     GUID distroId{};
     wil::unique_hkey distroKey{};
@@ -85,7 +97,7 @@ DistributionRegistration DistributionRegistration::Create(
     // Set up a scope exit member to delete the key if registration fails.
     auto cleanup = wil::scope_exit([&] { wsl::windows::common::registry::DeleteKey(LxssKey, distroGuidString.c_str()); });
 
-    DistributionRegistration distribution(distroId, std::move(distroKey));
+    DistributionRegistration distribution(UserToken, distroId, std::move(distroKey));
 
     distribution.Write(Property::State, LxssDistributionStateInstalling);
 
@@ -116,8 +128,9 @@ DistributionRegistration DistributionRegistration::Create(
     return distribution;
 }
 
-std::optional<DistributionRegistration> DistributionRegistration::OpenDefault(HKEY LxssKey)
+std::optional<DistributionRegistration> DistributionRegistration::OpenDefault(const wil::shared_handle& UserToken, HKEY LxssKey)
 {
+    const auto runAsUser = wil::impersonate_token(UserToken.get());
     const auto defaultId = wsl::windows::common::registry::ReadOptionalString(LxssKey, nullptr, DefaultDistro);
     if (!defaultId.has_value())
     {
@@ -132,7 +145,7 @@ std::optional<DistributionRegistration> DistributionRegistration::OpenDefault(HK
 
     try
     {
-        return Open(LxssKey, distroGuid.value());
+        return Open(UserToken, LxssKey, distroGuid.value());
     }
     catch (...)
     {
@@ -144,33 +157,36 @@ std::optional<DistributionRegistration> DistributionRegistration::OpenDefault(HK
     }
 }
 
-DistributionRegistration DistributionRegistration::OpenOrDefault(HKEY LxssKey, const GUID* Id)
+DistributionRegistration DistributionRegistration::OpenOrDefault(const wil::shared_handle& UserToken, HKEY LxssKey, const GUID* Id)
 {
     if (Id == nullptr)
     {
-        auto defaultDistribution = OpenDefault(LxssKey);
+        auto defaultDistribution = OpenDefault(UserToken, LxssKey);
         THROW_HR_IF(WSL_E_DEFAULT_DISTRO_NOT_FOUND, !defaultDistribution.has_value());
 
         return std::move(defaultDistribution.value());
     }
     else
     {
-        return Open(LxssKey, *Id);
+        return Open(UserToken, LxssKey, *Id);
     }
 }
 
 void DistributionRegistration::SetDefault(HKEY LxssKey, const DistributionRegistration& Distro)
 {
+    const auto runAsUser = wil::impersonate_token(Distro.m_userToken.get());
     wsl::windows::common::registry::WriteString(
         LxssKey, nullptr, DefaultDistro, wsl::shared::string::GuidToString<wchar_t>(Distro.Id()).c_str());
 }
 
-void DistributionRegistration::DeleteDefault(HKEY LxssKey)
+void DistributionRegistration::DeleteDefault(HANDLE UserToken, HKEY LxssKey)
 {
+    const auto runAsUser = wil::impersonate_token(UserToken);
     wsl::windows::common::registry::DeleteKeyValue(LxssKey, DefaultDistro);
 }
 
-DistributionRegistration::DistributionRegistration(const GUID& Id, wil::unique_hkey&& key) : m_id(Id), m_key{std::move(key)}
+DistributionRegistration::DistributionRegistration(const wil::shared_handle& UserToken, const GUID& Id, wil::unique_hkey&& key) :
+    m_id(Id), m_key{std::move(key)}, m_userToken(UserToken)
 {
 }
 
@@ -181,21 +197,30 @@ const GUID& DistributionRegistration::Id() const
 
 std::wstring DistributionRegistration::Read(const DistributionPropertyWithDefault<LPCWSTR>& property) const
 {
+    const auto runAsUser = wil::impersonate_token(m_userToken.get());
     return ReadString(m_key.get(), nullptr, property.Name, property.DefaultValue);
 }
 
 DWORD DistributionRegistration::Read(const DistributionPropertyWithDefault<DWORD>& property) const
 {
-    return ApplyTransform(ReadDword(m_key.get(), nullptr, property.Name, property.DefaultValue), property.Transform);
+    DWORD value;
+    {
+        const auto runAsUser = wil::impersonate_token(m_userToken.get());
+        value = ReadDword(m_key.get(), nullptr, property.Name, property.DefaultValue);
+    }
+
+    return ApplyTransform(std::move(value), property.Transform);
 }
 
 std::optional<std::wstring> DistributionRegistration::Read(const DistributionProperty<LPCWSTR>& property) const
 {
+    const auto runAsUser = wil::impersonate_token(m_userToken.get());
     return ReadOptionalString(m_key.get(), nullptr, property.Name);
 }
 
 std::vector<std::string> DistributionRegistration::Read(const DistributionPropertyWithDefault<std::vector<std::string>>& property) const
 {
+    const auto runAsUser = wil::impersonate_token(m_userToken.get());
     return wsl::windows::common::registry::ReadStringSet(m_key.get(), nullptr, property.Name, property.DefaultValue);
 }
 
@@ -215,11 +240,13 @@ std::wstring DistributionRegistration::Read(const ExpectedProperty<LPCWSTR>& pro
 
 void DistributionRegistration::Write(const DistributionProperty<LPCWSTR>& property, LPCWSTR value) const
 {
+    const auto runAsUser = wil::impersonate_token(m_userToken.get());
     return WriteString(m_key.get(), nullptr, property.Name, value);
 }
 
 void DistributionRegistration::Write(const DistributionProperty<DWORD>& property, DWORD value) const
 {
+    const auto runAsUser = wil::impersonate_token(m_userToken.get());
     return WriteDword(m_key.get(), nullptr, property.Name, value);
 }
 
@@ -244,5 +271,6 @@ DistributionRegistration::ApplyGlobalFlagsOverride(DWORD Flags)
 
 void DistributionRegistration::Delete(HKEY LxssKey) const
 {
+    const auto runAsUser = wil::impersonate_token(m_userToken.get());
     DeleteKey(LxssKey, wsl::shared::string::GuidToString<wchar_t>(m_id).c_str());
 }

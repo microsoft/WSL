@@ -17,11 +17,13 @@ Abstract:
 #include "Common.h"
 #include "WSLCCLITestHelpers.h"
 #include "WSLCUserSettings.h"
+#include "wslc/WSLCProxy.h"
 
 #include <atomic>
 #include <fstream>
 
 using namespace wsl::windows::wslc::settings;
+using namespace wsl::windows::wslc;
 using namespace WSLCTestHelpers;
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -624,6 +626,153 @@ class WSLCCLISettingsUnitTests
 
         VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
         VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
+    }
+
+    TEST_METHOD(ProxyEnvironment_ExplicitCasingSuppressesDefaultAliases)
+    {
+        const std::vector<std::string> defaults{
+            "http_proxy=http://windows:3128",
+            "HTTP_PROXY=http://windows:3128",
+            "https_proxy=http://windows:3128",
+            "HTTPS_PROXY=http://windows:3128",
+            "no_proxy=.example.com",
+            "NO_PROXY=.example.com"};
+        std::vector<std::string> allDefaults;
+        AddProxyEnvironmentDefaults(allDefaults, defaults);
+        VERIFY_IS_TRUE(allDefaults == defaults);
+
+        for (const bool upper : {false, true})
+        {
+            const auto* name = upper ? "HTTP_PROXY" : "http_proxy";
+            for (const auto* value : {"http://manual:8080", ""})
+            {
+                std::vector<std::string> environment{std::format("{}={}", name, value), "PATH=/bin"};
+                AddProxyEnvironmentDefaults(environment, defaults);
+                const std::vector<std::string> expected{
+                    std::format("{}={}", name, value),
+                    "PATH=/bin",
+                    "https_proxy=http://windows:3128",
+                    "HTTPS_PROXY=http://windows:3128",
+                    "no_proxy=.example.com",
+                    "NO_PROXY=.example.com"};
+                VERIFY_IS_TRUE(environment == expected);
+            }
+        }
+    }
+
+    TEST_METHOD(ProxyEnvironment_EmptyAndConflictingExplicitValuesWin)
+    {
+        std::vector<std::string> environment{
+            "http_proxy=http://lower:8080", "HTTP_PROXY=http://upper:8080", "https_proxy=", "no_proxy="};
+        const auto expected = environment;
+        AddProxyEnvironmentDefaults(
+            environment,
+            {"http_proxy=http://windows:3128",
+             "HTTP_PROXY=http://windows:3128",
+             "https_proxy=http://windows:3128",
+             "HTTPS_PROXY=http://windows:3128",
+             "no_proxy=.example.com",
+             "NO_PROXY=.example.com"});
+        VERIFY_IS_TRUE(environment == expected);
+    }
+
+    TEST_METHOD(ProxyEnvironment_MixedCaseNamesDoNotSuppressDefaults)
+    {
+        std::vector<std::string> environment{"Http_Proxy=http://localhost:8080", "hTtPs_PrOxY=", "No_PrOxY=LocalHost"};
+        const std::vector<std::string> defaults{
+            "HTTP_PROXY=http://windows:3128", "https_proxy=http://windows:8443", "NO_PROXY=.example.com"};
+        auto expected = environment;
+        expected.insert(expected.end(), defaults.begin(), defaults.end());
+
+        AddProxyEnvironmentDefaults(environment, defaults);
+        VERIFY_IS_TRUE(environment == expected);
+    }
+
+    TEST_METHOD(ResolveProxyUrl_RewritesOnlyLocalhost)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+
+        VERIFY_ARE_EQUAL(std::string("http://host.wslc.internal:3128"), ResolveProxyUrl("http://localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://host.wslc.internal:3128/"), ResolveProxyUrl("http://LocalHost:3128/", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://u:p@host.wslc.internal"), ResolveProxyUrl("http://u:p@127.0.0.1", loopback));
+        VERIFY_ARE_EQUAL(std::string("https://localhost:3128"), ResolveProxyUrl("https://localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("HTTPS://127.0.0.1:3128"), ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://proxy.example.com:3128"), ResolveProxyUrl("http://proxy.example.com:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://localhost.example.com"), ResolveProxyUrl("http://localhost.example.com", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://localhost:3128"), ResolveProxyUrl("http://localhost:3128", ""));
+
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("socks5://[::1]:1080", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[::1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[0:0:0:0:0:0:0:1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.2:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("https://localhost:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", "")));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.1:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://proxy.example.com:3128"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://localhost.example.com"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://[2001:db8::1]:3128"));
+    }
+
+    TEST_METHOD(ProxyEnvironment_SchemelessLoopback)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+        for (const auto* host : {"localhost", "LocalHost", "127.0.0.1"})
+        {
+            for (const auto* suffix : {"", ":3128", ":", ":/path", ":0"})
+            {
+                const auto url = std::format("{}{}", host, suffix);
+                VERIFY_ARE_EQUAL(std::format("{}{}", loopback, suffix), ResolveProxyUrl(url, loopback));
+                VERIFY_IS_TRUE(IsLoopbackProxyUrl(url));
+            }
+        }
+        VERIFY_ARE_EQUAL(std::string("u:p@host.wslc.internal:3128"), ResolveProxyUrl("u:p@localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("localhost:3128"), ResolveProxyUrl("localhost:3128", ""));
+
+        for (const auto* url : {"[::1]:3128", "[::ffff:127.0.0.1]:3128", "127.0.0.2:3128"})
+        {
+            VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(url));
+        }
+        for (const auto* url : {"", "://localhost:3128", "localhost:65536", "localhost:abc", "[::1", "localhost.example.com:3128"})
+        {
+            VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
+            VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
+        }
+    }
+
+    TEST_METHOD(ProxyEnvironment_UrlComponents)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+        const std::vector<std::pair<std::string, std::string>> cases{
+            {"socks5h://user:p%40ss@localhost:1080/path?next=localhost#fragment",
+             "socks5h://user:p%40ss@host.wslc.internal:1080/path?next=localhost#fragment"},
+            {"http://localhost:secret@localhost:3128/", "http://localhost:secret@host.wslc.internal:3128/"},
+            {"http://localhost:3128/\xef\xbf\xbd", "http://host.wslc.internal:3128/\xef\xbf\xbd"},
+            {"http://user:p\xc3\xa4ss@127.0.0.1:3128/", "http://user:p\xc3\xa4ss@host.wslc.internal:3128/"}};
+        for (const auto& [url, expected] : cases)
+        {
+            VERIFY_ARE_EQUAL(expected, ResolveProxyUrl(url, loopback));
+        }
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl("http://localhost:secret@localhost:3128/"));
+
+        const std::string invalidAuthority = "http://user:pass@proxy.example.com@localhost:3128";
+        VERIFY_ARE_EQUAL(invalidAuthority, ResolveProxyUrl(invalidAuthority, loopback));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(invalidAuthority));
+    }
+
+    TEST_METHOD(ProxyEnvironment_MappedLoopbackClassification)
+    {
+        for (const auto* url :
+             {"http://[::ffff:127.0.0.1]:3128", "https://[::ffff:7f00:1]:3128", "http://[::ffff:127.0.0.2]:3128"})
+        {
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl(url, "host.wslc.internal")));
+        }
+        for (const auto* url : {"http://[::ffff:192.0.2.1]:3128", "http://[::ffff:c000:201]:3128"})
+        {
+            VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
+        }
     }
 
     // -----------------------------------------------------------------------

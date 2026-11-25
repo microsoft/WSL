@@ -7,6 +7,7 @@
 #include <linux/sock_diag.h>
 #include <linux/inet_diag.h>
 #include <linux/net.h>
+#include <net/if.h>
 #include <sys/syscall.h>
 #include <sys/xattr.h>
 #include "common.h" // Needs to be included before sal.h before of __reserved macro
@@ -21,8 +22,8 @@
 #define PIDFD_THREAD O_EXCL
 #endif
 
-constexpr size_t c_bind_timeout_seconds = 60;
-constexpr auto c_sock_diag_listing_delay = std::chrono::milliseconds(500);
+constexpr std::chrono::seconds c_bind_timeout_seconds{60};
+constexpr std::chrono::milliseconds c_sock_diag_listing_delay{500};
 
 GnsPortTracker::GnsPortTracker(
     std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
@@ -52,7 +53,7 @@ void GnsPortTracker::RunPortListing()
         // Netlink will sometimes return EBUSY. Don't fail for that
         try
         {
-            auto result = ListPortsResult{ListBoundPorts(), time(nullptr)};
+            auto result = ListPortsResult{ListBoundPorts(), Clock::now()};
             m_eventQueue.post(TrackerEvent{std::move(result)});
 
             m_portListingResume.get();
@@ -117,9 +118,15 @@ void GnsPortTracker::Run()
                     }
                     catch (const std::exception& e)
                     {
-                        GNS_LOG_ERROR("Failed to complete bind request, {}", e.what());
+                        GNS_LOG_ERROR("Failed to complete seccomp request, {}", e.what());
                     }
                 });
+
+                if (notification->data.nr == __NR_ioctl)
+                {
+                    result = HandleInterfaceStateChange(*notification);
+                    continue;
+                }
 
                 auto bindCall = ReadRequest(*notification);
                 if (bindCall.Request.has_value())
@@ -244,7 +251,7 @@ GnsPortTracker::ActivePorts GnsPortTracker::ListBoundPorts()
     return ports;
 }
 
-void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp)
+void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, Clock::time_point Timestamp)
 {
     // Because there's no way to get notified when the bind() call actually completes, it' possible
     // that this method is called before the bind() completion and so the port allocation may not be visible yet.
@@ -525,11 +532,20 @@ GnsPortTracker::BindCall GnsPortTracker::GetCallInfo(uint64_t CallId, pid_t Pid,
 
         return ParseSocket(Arguments[0], Arguments[1], Arguments[2]);
     }
-    // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls and the
-    // second argument is a pointer to a block of memory containing the original arguments.
+    // The i386 ABI supports direct syscalls as well as socketcall, whose first argument
+    // is SYS_BIND/SYS_LISTEN and second points to the 32-bit argument block.
     else
     {
+        if (SysCallNumber == I386_NR_bind)
+        {
+            return ParseSocket(Arguments[0], static_cast<uint32_t>(Arguments[1]), static_cast<uint32_t>(Arguments[2]));
+        }
+
+        if (SysCallNumber == I386_NR_listen)
+        {
+            return ParseListen(Arguments[0]);
+        }
+
         if (Arguments[0] == SYS_LISTEN)
         {
             // Grab the first parameter (the socket fd).
@@ -644,7 +660,7 @@ try
 {
     // Use insert_or_assign so the deallocation timeout is refreshed if the same
     // port key is already present (emplace would silently keep the old entry).
-    m_allocatedPorts.insert_or_assign(std::move(allocation), std::make_optional(time(nullptr) + c_bind_timeout_seconds));
+    m_allocatedPorts.insert_or_assign(std::move(allocation), Clock::now() + c_bind_timeout_seconds);
 }
 catch (const std::exception& e)
 {
@@ -725,4 +741,23 @@ std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBin
 std::ostream& operator<<(std::ostream& out, const GnsPortTracker::PortAllocation& entry)
 {
     return out << "Port=" << entry.Port << ", Family=" << entry.Family << ", Protocol=" << entry.Protocol;
+}
+
+int GnsPortTracker::HandleInterfaceStateChange(const seccomp_notif& Notification)
+{
+    LX_GNS_TUN_BRIDGE_REQUEST request{};
+    request.Header.MessageType = LxGnsMessageIfStateChangeRequest;
+    request.Header.MessageSize = sizeof(request);
+    auto ifreqMemory = m_seccompDispatcher->ReadProcessMemory(Notification.id, Notification.pid, Notification.data.args[2], sizeof(ifreq));
+    if (!ifreqMemory.has_value())
+    {
+        return -1;
+    }
+
+    const auto& ifRequest = *reinterpret_cast<const ifreq*>(ifreqMemory->data());
+    memcpy(request.InterfaceName, ifRequest.ifr_ifrn.ifrn_name, sizeof(request.InterfaceName));
+    request.InterfaceUp = ifRequest.ifr_ifru.ifru_flags & IFF_UP;
+    const auto& reply = m_hvSocketChannel->Transaction(request);
+
+    return reply.Result;
 }

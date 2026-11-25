@@ -710,6 +710,12 @@ Argumentos:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>A procurar atualizações.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>Foi atingido o limite de taxa da API do GitHub. Tente novamente mais tarde.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>Foi atingido o limite de taxa da API do GitHub. A verificar se há atualizações através do Windows Update.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Esta distribuição apenas está disponível na Microsoft Store.</value>
   </data>
@@ -958,7 +964,7 @@ A reverter para a rede NAT.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Foi detetada uma configuração de proxy de localhost, mas não foi espelhada no WSL. O WSL no modo NAT não suporta proxies de localhost.</value>
+    <value>Foi detetada uma configuração de proxy de localhost, mas não foi espelhada no WSL. Este endereço de proxy não é suportado pela configuração de rede atual.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -1198,7 +1204,7 @@ Este pedido excederá o tempo limite dentro de 60 segundos.</value>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
 Código de erro: {}
-Se este erro foi inesperado, considere procurar problemas existentes ou arquivar um novo problema no https://github.com/microsoft/WSL/issues.</value>
+Se este erro foi inesperado, considere procurar por problemas existentes ou registrar um novo problema em https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated{Locked="https://github.com/microsoft/WSL/issues"}</comment>
   </data>
   <data name="MessageInvalidJson" xml:space="preserve">
@@ -2267,6 +2273,9 @@ Utilização:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Os mapeamentos de portas não são suportados com o modo de rede de contentores; As portas são propriedade do contentor de destino.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Os mapeamentos de portas não são suportados quando a rede do contentor está desativada. Ative a rede ou remova os mapeamentos de portas.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>O nome do contentor de destino é necessário para o modo de rede de contentor.</value>
   </data>
@@ -2450,10 +2459,6 @@ Utilização:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Foi encontrado um argumento adicional inválido: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>As opções de alias com um valor têm de ser as últimas na cadeia de alias: "{}"</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4178,6 +4183,14 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Falha ao restaurar o carimbo de data/hora do contentor "{}"</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Falha ao carregar o estado persistente do contentor '{}'. As alterações ao estado não serão guardadas.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Falha ao guardar o estado persistente do contentor '{}'</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Falha ao analisar o progresso de importação da imagem</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4213,8 +4226,8 @@ Na primeira execução, cria o ficheiro com todas as definições comentadas nas
     <value>Falha ao instalar certificados de raiz fidedigna de anfitrião na VM: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>O WSLC não conseguiu escrever "{}" para inicializar a resolução do nome do anfitrião local (erro de convidado {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>O WSLC não conseguiu escrever "{}" no convidado (erro do convidado {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">
