@@ -77,6 +77,8 @@ unique_hcs_system CreateComputeSystem(_In_ PCWSTR Id, _In_ PCWSTR Configuration)
 
 unique_hcs_operation CreateOperation();
 
+bool IsSmallMemoryBackingPagesSupported(_In_ ULONG buildNumber, _In_ DWORD updateBuildRevision);
+
 wsl::shared::hns::HNSEndpoint GetEndpointProperties(HCN_ENDPOINT endpoint);
 
 const std::vector<std::string>& GetProcessorFeatures();

@@ -3703,6 +3703,44 @@ class WslcSdkTests
         VERIFY_ARE_EQUAL(WslcPullSessionImage(m_defaultSession, &pullOptions, nullptr), E_INVALIDARG);
     }
 
+    WSLC_TEST_METHOD(LargeMemoryBackingPages)
+    {
+        const auto storagePath = m_storagePath / "large-memory-backing-pages";
+        auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+            std::error_code error;
+            std::filesystem::remove_all(storagePath, error);
+        });
+
+        WslcSessionSettings settings;
+        VERIFY_SUCCEEDED(WslcInitSessionSettings(L"sdk-large-memory-backing-pages", storagePath.c_str(), &settings));
+        VERIFY_SUCCEEDED(WslcSetSessionSettingsFeatureFlags(&settings, WSLC_SESSION_FEATURE_FLAG_LARGE_MEMORY_BACKING_PAGES));
+
+        UniqueSession session;
+        WslcVersion version{};
+        VERIFY_SUCCEEDED(WslcGetVersion(&version));
+        if (std::tuple{version.major, version.minor, version.revision} < c_wslcFeatureMinimumVersion)
+        {
+            wil::unique_cotaskmem_string message;
+            VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, WslcCreateSession(&settings, &session, &message));
+            VERIFY_IS_NULL(session.get());
+            VERIFY_IS_NOT_NULL(message.get());
+            VERIFY_ARE_EQUAL(
+                wsl::shared::Localization::MessageWslcOperationRequiresWslVersion(
+                    std::format("{}.{}.{}", version.major, version.minor, version.revision), "3.1.0"),
+                std::wstring(message.get()));
+            VERIFY_ARE_EQUAL(WSLC_E_RUNTIME_UPDATE_NEEDED, WslcCreateSession(&settings, &session, nullptr));
+            VERIFY_IS_NULL(session.get());
+            return;
+        }
+
+        VERIFY_SUCCEEDED(WslcCreateSession(&settings, &session, nullptr));
+        VERIFY_SUCCEEDED(WslcLoadSessionImageFromFile(session.get(), GetTestImagePath("debian:latest").c_str(), nullptr, nullptr));
+
+        const auto output = RunContainerAndCapture(session.get(), "debian:latest", {"/bin/cat", "/proc/cmdline"});
+        VERIFY_IS_TRUE(output.stdoutOutput.find("page_reporting.page_reporting_order=9") != std::string::npos);
+        VERIFY_ARE_EQUAL(std::string{}, output.stderrOutput);
+    }
+
     WSLC_TEST_METHOD(ContainerGpu)
     {
         // Validate that creating a GPU container on a session without GPU support fails.

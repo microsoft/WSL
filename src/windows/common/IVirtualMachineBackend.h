@@ -108,6 +108,7 @@ enum class VmFeature
     DeferredMemoryCommit,
     ColdDiscard,
     SmallPageMemory,
+    LargePageMemory,
     PhysicalDisk,
     SerialConsole,
     VirtioConsole,
@@ -121,7 +122,7 @@ enum class VmFeature
     Count
 };
 
-static_assert(static_cast<size_t>(VmFeature::Count) == 16);
+static_assert(static_cast<size_t>(VmFeature::Count) == 17);
 
 struct VmPlatformCapabilities
 {
@@ -174,6 +175,7 @@ struct VmMemoryRequest
     VmFeatureRequest DeferredCommit = VmFeatureRequest::Disabled;
     VmFeatureRequest ColdDiscard = VmFeatureRequest::Disabled;
     VmFeatureRequest SmallPageBacking = VmFeatureRequest::Disabled;
+    VmFeatureRequest LargePageBacking = VmFeatureRequest::Disabled;
     std::optional<std::uint32_t> FaultClusterSizeShift;
     std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
     // Order of the page blocks the guest reports back to the host. Reporting blocks smaller than a
@@ -312,6 +314,7 @@ struct VmEffectiveMemory
     bool DeferredCommit = false;
     bool ColdDiscard = false;
     bool SmallPageBacking = false;
+    bool LargePageBacking = false;
     std::optional<std::uint32_t> FaultClusterSizeShift;
     std::optional<std::uint32_t> DirectMapFaultClusterSizeShift;
     std::optional<std::uint32_t> PageReportingOrder;
@@ -721,6 +724,12 @@ private:
 VmPlatformCapabilities QueryVirtualMachineBackendCapabilities(BackendKind Kind);
 
 std::unique_ptr<IVirtualMachineBackend> CreateVirtualMachineBackend(BackendKind Kind, const VmCreateRequest& Request);
+
+namespace wsl::windows::common::vm {
+
+void ConfigureMemoryBackingPages(_Inout_ VmMemoryRequest& Memory, _In_ bool LargeMemoryBackingPages, _In_ const VmPlatformCapabilities& Capabilities);
+
+} // namespace wsl::windows::common::vm
 
 namespace wsl::windows::common::vm::validation {
 
