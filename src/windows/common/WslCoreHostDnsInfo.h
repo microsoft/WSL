@@ -49,6 +49,8 @@ std::vector<std::string> GetAllDnsSuffixes(const std::vector<IpAdapterAddress>& 
 
 DWORD GetBestInterface();
 
+DWORD GetBestInterface(ADDRESS_FAMILY family);
+
 class HostDnsInfo
 {
 public:

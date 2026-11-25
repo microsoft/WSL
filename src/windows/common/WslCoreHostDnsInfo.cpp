@@ -75,23 +75,35 @@ catch (...)
     return false;
 }
 
-DWORD wsl::core::networking::GetBestInterface()
+DWORD wsl::core::networking::GetBestInterface(ADDRESS_FAMILY family)
 {
-    DWORD bestInterface = 0;
-    SOCKADDR_STORAGE address{};
-    IN4ADDR_SETANY((SOCKADDR_IN*)&address);
-    if (GetBestInterfaceEx((SOCKADDR*)&address, &bestInterface) != NO_ERROR)
+    if (family != AF_INET && family != AF_INET6)
     {
-        IN6ADDR_SETANY((SOCKADDR_IN6*)&address);
-        if (GetBestInterfaceEx((SOCKADDR*)&address, &bestInterface) != NO_ERROR)
-        {
-            bestInterface = 0;
-        }
+        return 0;
     }
 
-    WSL_LOG("wsl::core::networking::GetBestInterface [GetBestInterfaceEx]", TraceLoggingValue(bestInterface, "bestInterface"));
+    DWORD bestInterface = 0;
+    SOCKADDR_STORAGE address{};
+    address.ss_family = family;
+    auto* socketAddress = reinterpret_cast<SOCKADDR*>(&address);
+    INETADDR_SETANY(socketAddress);
+    if (GetBestInterfaceEx(socketAddress, &bestInterface) != NO_ERROR)
+    {
+        bestInterface = 0;
+    }
+
+    WSL_LOG(
+        "wsl::core::networking::GetBestInterface [GetBestInterfaceEx]",
+        TraceLoggingValue(family, "family"),
+        TraceLoggingValue(bestInterface, "bestInterface"));
 
     return bestInterface;
+}
+
+DWORD wsl::core::networking::GetBestInterface()
+{
+    const auto ipv4Index = GetBestInterface(AF_INET);
+    return ipv4Index != 0 ? ipv4Index : GetBestInterface(AF_INET6);
 }
 
 wsl::core::networking::DnsInfo wsl::core::networking::HostDnsInfo::GetDnsTunnelingSettings(const std::wstring& dnsTunnelingNameserver)
