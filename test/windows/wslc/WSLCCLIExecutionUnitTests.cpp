@@ -1247,7 +1247,7 @@ class WSLCCLIExecutionUnitTests
     }
 
     template <typename TCommand>
-    static WSLCContainerRestartPolicy ParseRestartPolicy(const std::wstring& commandLine)
+    static wsl::windows::wslc::models::RestartPolicy ParseRestartPolicy(const std::wstring& commandLine)
     {
         auto invocation = CreateInvocationFromCommandLine(commandLine);
 
@@ -1274,38 +1274,50 @@ class WSLCCLIExecutionUnitTests
         });
     }
 
-    TEST_METHOD(ContainerCommands_RestartPolicy_SetsOption)
+    template <typename TCommand>
+    static void VerifyRestartPolicy(const std::wstring& commandLine, WSLCContainerRestartPolicy policy, ULONG maximumRetryCount = 0)
     {
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerRunCommand>(L"wslc ubuntu sh"));
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerRunCommand>(L"wslc --restart no ubuntu sh"));
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, ParseRestartPolicy<ContainerRunCommand>(L"wslc --restart always ubuntu sh"));
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, ParseRestartPolicy<ContainerRunCommand>(L"wslc --restart=always -d ubuntu sh"));
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerRunCommand>(L"wslc --rm --restart no ubuntu sh"));
-
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerCreateCommand>(L"wslc ubuntu sh"));
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyAlways, ParseRestartPolicy<ContainerCreateCommand>(L"wslc --restart always ubuntu sh"));
-        VERIFY_ARE_EQUAL(WSLCContainerRestartPolicyNo, ParseRestartPolicy<ContainerCreateCommand>(L"wslc --rm --restart no ubuntu sh"));
+        const auto parsed = ParseRestartPolicy<TCommand>(commandLine);
+        VERIFY_ARE_EQUAL(policy, parsed.Policy);
+        VERIFY_ARE_EQUAL(maximumRetryCount, parsed.MaximumRetryCount);
     }
 
-    TEST_METHOD(ContainerCommands_RestartPolicy_RejectsUnsupportedInvalidAndConflicting)
+    TEST_METHOD(ContainerCommands_RestartPolicy_SetsOption)
     {
-        const auto unsupportedOnFailure = wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"on-failure");
-        const auto unsupportedUnlessStopped = wsl::shared::Localization::WSLCCLI_UnsupportedRestartPolicyError(L"unless-stopped");
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc ubuntu sh", WSLCContainerRestartPolicyNo);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --restart no ubuntu sh", WSLCContainerRestartPolicyNo);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --restart always ubuntu sh", WSLCContainerRestartPolicyAlways);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --restart=always -d ubuntu sh", WSLCContainerRestartPolicyAlways);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --restart on-failure ubuntu sh", WSLCContainerRestartPolicyOnFailure);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --restart on-failure:3 ubuntu sh", WSLCContainerRestartPolicyOnFailure, 3);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --restart unless-stopped ubuntu sh", WSLCContainerRestartPolicyUnlessStopped);
+        VerifyRestartPolicy<ContainerRunCommand>(L"wslc --rm --restart no ubuntu sh", WSLCContainerRestartPolicyNo);
+
+        VerifyRestartPolicy<ContainerCreateCommand>(L"wslc ubuntu sh", WSLCContainerRestartPolicyNo);
+        VerifyRestartPolicy<ContainerCreateCommand>(L"wslc --restart always ubuntu sh", WSLCContainerRestartPolicyAlways);
+        VerifyRestartPolicy<ContainerCreateCommand>(L"wslc --restart on-failure:5 ubuntu sh", WSLCContainerRestartPolicyOnFailure, 5);
+        VerifyRestartPolicy<ContainerCreateCommand>(L"wslc --restart unless-stopped ubuntu sh", WSLCContainerRestartPolicyUnlessStopped);
+        VerifyRestartPolicy<ContainerCreateCommand>(L"wslc --rm --restart no ubuntu sh", WSLCContainerRestartPolicyNo);
+    }
+
+    TEST_METHOD(ContainerCommands_RestartPolicy_RejectsInvalidAndConflicting)
+    {
         const auto conflict = wsl::shared::Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm");
 
-        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --restart on-failure ubuntu sh", unsupportedOnFailure);
-        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --restart on-failure:3 ubuntu sh", unsupportedOnFailure);
-        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --restart unless-stopped ubuntu sh", unsupportedUnlessStopped);
         VerifyRestartPolicyRejected<ContainerRunCommand>(
             L"wslc --restart bogus ubuntu sh", wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", L"bogus"));
         VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --rm --restart always ubuntu sh", conflict);
+        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --rm --restart on-failure ubuntu sh", conflict);
+        VerifyRestartPolicyRejected<ContainerRunCommand>(L"wslc --rm --restart unless-stopped ubuntu sh", conflict);
 
-        VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart on-failure:3 ubuntu sh", unsupportedOnFailure);
-        VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart unless-stopped ubuntu sh", unsupportedUnlessStopped);
         VerifyRestartPolicyRejected<ContainerCreateCommand>(
             L"wslc --restart always:1 ubuntu sh",
             wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", L"always:1"));
+        VerifyRestartPolicyRejected<ContainerCreateCommand>(
+            L"wslc --restart unless-stopped:1 ubuntu sh",
+            wsl::shared::Localization::WSLCCLI_InvalidRestartPolicyError(L"restart", L"unless-stopped:1"));
         VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart always --rm ubuntu sh", conflict);
+        VerifyRestartPolicyRejected<ContainerCreateCommand>(L"wslc --restart on-failure:3 --rm ubuntu sh", conflict);
     }
 
     TEST_METHOD(CreateCommand_ParseGpusAll_SetsGpuOption)

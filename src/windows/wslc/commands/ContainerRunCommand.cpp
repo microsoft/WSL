@@ -95,7 +95,8 @@ std::wstring ContainerRunCommand::LongDescription() const
 
 void ContainerRunCommand::ValidateArgumentsInternal(ArgMap& execArgs) const
 {
-    if (execArgs.GetValue<ArgType::Remove>() && execArgs.Contains(ArgType::Restart) && execArgs.GetValue<ArgType::Restart>() != WSLCContainerRestartPolicyNo)
+    if (execArgs.GetValue<ArgType::Remove>() && execArgs.Contains(ArgType::Restart) &&
+        execArgs.GetValue<ArgType::Restart>().Policy != WSLCContainerRestartPolicyNo)
     {
         throw ArgumentException(
             Localization::WSLCCLI_ConflictingOptionsError(L"--restart", L"--rm"), GetArgumentsForHelp({ArgType::Restart, ArgType::Remove}));
