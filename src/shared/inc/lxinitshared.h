@@ -430,6 +430,7 @@ typedef enum _LX_MESSAGE_TYPE
     LxMessageWSLCMountModules,
     LxMessageWSLCReadFile,
     LxMessageWSLCReadFileResult,
+    LxInitMessageSignal,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -551,6 +552,7 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMessageWSLCMountModules)
         X(LxMessageWSLCReadFile)
         X(LxMessageWSLCReadFileResult)
+        X(LxInitMessageSignal)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -1163,6 +1165,22 @@ typedef struct _LX_INIT_WINDOW_SIZE_CHANGED
 } LX_INIT_WINDOW_SIZE_CHANGED, *PLX_INIT_WINDOW_SIZE_CHANGED;
 
 using PCLX_INIT_WINDOW_SIZE_CHANGED = const LX_INIT_WINDOW_SIZE_CHANGED*;
+
+//
+// The data for sending a signal to the foreground process group of the terminal.
+//
+
+#define LX_INIT_SIGINT 2
+
+typedef struct _LX_INIT_SIGNAL
+{
+    static inline auto Type = LxInitMessageSignal;
+
+    MESSAGE_HEADER Header;
+    int Signal;
+
+    PRETTY_PRINT(FIELD(Header), FIELD(Signal));
+} LX_INIT_SIGNAL, *PLX_INIT_SIGNAL;
 
 //
 // The data for terminating an instance.

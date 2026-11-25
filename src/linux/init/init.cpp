@@ -2190,25 +2190,56 @@ Return Value:
 
         if (PollDescriptors[6].revents & POLLIN)
         {
-            auto [Message, _] = TerminalControlChannel.ReceiveMessageOrClosed<LX_INIT_WINDOW_SIZE_CHANGED>();
+            auto [Header, Span] = TerminalControlChannel.ReceiveMessageOrClosed<MESSAGE_HEADER>();
 
             //
             // A zero-byte read means that the control channel has been closed
             // and that the relay process should exit.
             //
 
-            if (Message == nullptr)
+            if (Header == nullptr)
             {
                 break;
             }
 
-            memset(&WindowSize, 0, sizeof(WindowSize));
-            WindowSize.ws_col = Message->Columns;
-            WindowSize.ws_row = Message->Rows;
-            Result = ioctl(Master, TIOCSWINSZ, &WindowSize);
-            if (Result < 0)
+            switch (Header->MessageType)
             {
-                LOG_ERROR("ioctl(TIOCSWINSZ) failed {}", errno);
+            case LxInitMessageWindowSizeChanged:
+            {
+                const auto* Message = gslhelpers::get_struct<LX_INIT_WINDOW_SIZE_CHANGED>(Span);
+                memset(&WindowSize, 0, sizeof(WindowSize));
+                WindowSize.ws_col = Message->Columns;
+                WindowSize.ws_row = Message->Rows;
+                Result = ioctl(Master, TIOCSWINSZ, &WindowSize);
+                if (Result < 0)
+                {
+                    LOG_ERROR("ioctl(TIOCSWINSZ) failed {}", errno);
+                }
+
+                break;
+            }
+
+            case LxInitMessageSignal:
+            {
+                //
+                // Signal the foreground process group like the terminal does
+                // for ^C. The child always has the pty as its controlling
+                // terminal, even when its standard file descriptors are pipes.
+                //
+
+                const auto* Message = gslhelpers::get_struct<LX_INIT_SIGNAL>(Span);
+                Result = ioctl(Master, TIOCSIG, Message->Signal);
+                if (Result < 0)
+                {
+                    LOG_ERROR("ioctl(TIOCSIG, {}) failed {}", Message->Signal, errno);
+                }
+
+                break;
+            }
+
+            default:
+                LOG_ERROR("Unexpected message {}", Header->MessageType);
+                break;
             }
         }
     }

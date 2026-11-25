@@ -36,6 +36,38 @@ BOOL GetNextCharacter(_In_ INPUT_RECORD* InputRecord, _Out_ PWCHAR NextCharacter
 BOOL IsActionableKey(_In_ PKEY_EVENT_RECORD KeyEvent);
 void SpawnWslHost(_In_ HANDLE ServerPort, _In_ const GUID& DistroId, _In_opt_ LPCGUID VmId);
 
+// SetConsoleCtrlHandler only accepts plain function pointers, so the handler reaches the terminal control channel
+// through a static.
+// N.B. The lock also serializes the handler thread with the window size updates, since a channel only supports one
+//      sender at a time.
+std::mutex g_terminalControlLock;
+std::shared_ptr<wsl::shared::SocketChannel> g_terminalControlChannel;
+
+BOOL WINAPI ConsoleControlHandler(DWORD ControlType)
+{
+    if (ControlType != CTRL_C_EVENT && ControlType != CTRL_BREAK_EVENT)
+    {
+        return FALSE;
+    }
+
+    // Interrupt the Linux process instead of terminating this process, so it exits on its own terms with its exit code.
+    try
+    {
+        std::lock_guard lock{g_terminalControlLock};
+        if (g_terminalControlChannel)
+        {
+            LX_INIT_SIGNAL Message{};
+            Message.Header.MessageType = LxInitMessageSignal;
+            Message.Header.MessageSize = sizeof(Message);
+            Message.Signal = LX_INIT_SIGINT;
+            g_terminalControlChannel->SendMessage(Message);
+        }
+    }
+    CATCH_LOG()
+
+    return TRUE;
+}
+
 struct CreateProcessArguments
 {
     CreateProcessArguments(LPCWSTR Filename, int Argc, LPCWSTR Argv[], ULONG LaunchFlags, LPCWSTR WorkingDirectory)
@@ -445,6 +477,29 @@ wsl::windows::common::SvcComm::LaunchProcess(
         auto ControlChannel = std::make_shared<wsl::shared::SocketChannel>(
             wil::unique_socket{reinterpret_cast<SOCKET>(ControlSocket.release())}, "Control");
 
+        //
+        // Forward Ctrl+C and Ctrl+Break to the Linux process as SIGINT.
+        //
+        // N.B. A process created with CREATE_NEW_PROCESS_GROUP ignores Ctrl+C, and so do its descendants, until
+        //      one opts back in. Opt back in, like a terminal: with a console standard input, Ctrl+C already
+        //      reaches the Linux process as a ^C byte no matter how this process was created. Windows processes
+        //      created via interop inherit this, and can't be interrupted from their own console otherwise.
+        //
+
+        {
+            std::lock_guard lock{g_terminalControlLock};
+            g_terminalControlChannel = ControlChannel;
+        }
+
+        auto removeControlHandler = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] {
+            SetConsoleCtrlHandler(ConsoleControlHandler, FALSE);
+            std::lock_guard lock{g_terminalControlLock};
+            g_terminalControlChannel.reset();
+        });
+
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(nullptr, FALSE));
+        LOG_IF_WIN32_BOOL_FALSE(SetConsoleCtrlHandler(ConsoleControlHandler, TRUE));
+
         auto StdIn = GetStdHandle(STD_INPUT_HANDLE);
         if (IS_VALID_HANDLE(StdIn))
         {
@@ -467,6 +522,7 @@ wsl::windows::common::SvcComm::LaunchProcess(
 
                         try
                         {
+                            std::lock_guard lock{g_terminalControlLock};
                             ControlChannel->SendMessage(WindowSizeMessage);
                         }
                         CATCH_LOG();

@@ -38,6 +38,7 @@ Abstract:
 #include "retryshared.h"
 #include "RingBuffer.h"
 #include "socket.hpp"
+#include "WSLCExecutor.h"
 
 #define LXSST_TEST_USERNAME L"kerneltest"
 
@@ -5550,6 +5551,82 @@ VERSION_ID="Invalid|Format"
         ValidateOOBEWait(true, false);
         ValidateOOBEWait(false, false);
         ValidateOOBEWait(false, true);
+    }
+
+    // The exit code is the number of SIGINT received, offset so it can't be confused with a wsl.exe failure.
+    static std::wstring CountSigintCommandLine(LPCWSTR Setup = L"")
+    {
+        constexpr auto command =
+            L"-e bash -c \"{} n=0; trap 'n=$((n+1))' INT; echo ready; sleep 2 & wait; sleep 2 & wait; exit $((40+n))\"";
+
+        return LxssGenerateWslCommandLine(std::format(command, Setup).c_str());
+    }
+
+    static void WaitForOutput(const PartialHandleRead& Reader, const std::string& Expected)
+    {
+        wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() { THROW_HR_IF(E_ABORT, Reader.GetData().find(Expected) == std::string::npos); },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(30));
+    }
+
+    WSL2_TEST_METHOD(ConsoleControlEventsAreForwardedAsSigint)
+    {
+        using wsl::windows::common::SubProcess;
+
+        constexpr DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE;
+        const wil::unique_hfile console{CreateFileW(L"CONIN$", GENERIC_READ, share, nullptr, OPEN_EXISTING, 0, nullptr)};
+
+        VERIFY_IS_TRUE(console.is_valid());
+
+        // N.B. CTRL_C_EVENT covers a process group that ignores Ctrl+C, which CREATE_NEW_PROCESS_GROUP implies.
+        for (const DWORD event : {CTRL_BREAK_EVENT, CTRL_C_EVENT})
+        {
+            DWORD expectedMode{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(console.get(), &expectedMode));
+
+            auto [input, inputWrite] = CreateSubprocessPipe(true, false);
+            auto [output, outputWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+            THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(outputWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+            SubProcess process(nullptr, CountSigintCommandLine().c_str());
+            process.SetFlags(CREATE_NEW_PROCESS_GROUP);
+            process.SetStdHandles(input.get(), outputWrite.get(), nullptr);
+            const auto handle = process.Start();
+            outputWrite.reset();
+
+            PartialHandleRead reader(std::move(output));
+            WaitForOutput(reader, "ready\n");
+
+            // Nothing reads the console when the standard input is a pipe, so it must keep generating Ctrl+C events.
+            DWORD mode{};
+            VERIFY_WIN32_BOOL_SUCCEEDED(GetConsoleMode(console.get(), &mode));
+            VERIFY_ARE_EQUAL(expectedMode, mode);
+
+            VERIFY_WIN32_BOOL_SUCCEEDED(GenerateConsoleCtrlEvent(event, GetProcessId(handle.get())));
+            VERIFY_ARE_EQUAL(SubProcess::GetExitCode(handle.get(), 30 * 1000), 41);
+        }
+    }
+
+    WSL2_TEST_METHOD(CtrlCInTerminalIsNotAConsoleControlEvent)
+    {
+        using wsl::windows::common::SubProcess;
+
+        // With a terminal, Ctrl+C reaches the Linux terminal as a ^C byte, which is what interrupts the process.
+        // It must not also be forwarded as a signal: that second SIGINT shows once the terminal stops generating its own.
+        for (const auto& [setup, expectedExitCode] : {std::pair{L"", 41}, std::pair{L"stty -isig;", 40}})
+        {
+            WSLCE2ETests::PseudoConsole console(80, 24);
+            SubProcess process(nullptr, CountSigintCommandLine(setup).c_str());
+            process.SetPseudoConsole(console.Handle.get());
+            const auto handle = process.Start();
+
+            PartialHandleRead reader(std::move(console.OutputRead));
+            WaitForOutput(reader, "ready");
+
+            THROW_IF_WIN32_BOOL_FALSE(WriteFile(console.InputWrite.get(), "\x03", 1, nullptr, nullptr));
+            VERIFY_ARE_EQUAL(SubProcess::GetExitCode(handle.get(), 30 * 1000), expectedExitCode);
+        }
     }
 
     static void ValidateDistributionStarts(LPCWSTR Name)

@@ -91,7 +91,9 @@ void ConsoleState::SetInteractiveMode()
     // Ensure console state is restored if this method throws.
     auto cleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { RestoreConsoleState(); });
 
-    if (m_InputHandle)
+    // Only take over console input when it is the standard input of this process. Otherwise nothing reads the console,
+    // and clearing ENABLE_PROCESSED_INPUT would turn Ctrl+C into a key event that is never consumed instead of a CTRL_C_EVENT.
+    if (m_InputHandle && wslutil::IsConsoleHandle(GetStdHandle(STD_INPUT_HANDLE)))
     {
         m_SavedInputCodePage = GetConsoleCP();
         LOG_IF_WIN32_BOOL_FALSE(SetConsoleCP(CP_UTF8));
