@@ -398,6 +398,8 @@ public:
     UniqueWebServer& operator=(UniqueWebServer&&) = delete;
 
 private:
+    void WaitForListenOrTerminateServer(LPCWSTR endpoint);
+
     wil::unique_handle m_process;
 };
 

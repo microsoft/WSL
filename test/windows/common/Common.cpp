@@ -23,6 +23,8 @@ Abstract:
 #include <Dbghelp.h>
 #include <winsafer.h>
 #include <winhttp.h>
+#include <winrt/Windows.Networking.h>
+#include <winrt/Windows.Networking.Sockets.h>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -2712,6 +2714,7 @@ while ($true)
         Content);
 
     m_process = LxsstuStartProcess(cmd.data());
+    WaitForListenOrTerminateServer(Endpoint);
 }
 
 UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& File)
@@ -2736,6 +2739,7 @@ while ($true)
         File.wstring());
 
     m_process = LxsstuStartProcess(cmd.data());
+    WaitForListenOrTerminateServer(Endpoint);
 }
 
 UniqueWebServer::~UniqueWebServer()
@@ -2744,6 +2748,17 @@ UniqueWebServer::~UniqueWebServer()
     {
         LogError("TerminateProcess failed, %lu", GetLastError());
     }
+}
+
+void UniqueWebServer::WaitForListenOrTerminateServer(LPCWSTR endpoint)
+{
+    auto stopOnFailure = wil::scope_exit([this] { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(m_process.get(), 0)); });
+    const winrt::Windows::Foundation::Uri uri{endpoint};
+    const winrt::Windows::Networking::HostName host{uri.Host()};
+    const auto port = winrt::to_hstring(uri.Port());
+    wsl::shared::retry::RetryWithTimeout<void>(
+        [&] { winrt::Windows::Networking::Sockets::StreamSocket{}.ConnectAsync(host, port).get(); }, 500ms, 30s);
+    stopOnFailure.release();
 }
 
 DistroFileChange::DistroFileChange(LPCWSTR Path, bool exists, LPCWSTR DistributionName) :
