@@ -44,6 +44,35 @@ struct implementation_type;
 
 namespace winrt::Microsoft::WSL::Containers::implementation {
 template <typename T>
+void ReleaseOnBackgroundThread(std::unique_ptr<T> self) noexcept
+{
+    struct Cleanup
+    {
+        std::unique_ptr<T> Object;
+        wil::unique_hmodule Module;
+    };
+
+    auto cleanup = std::make_unique<Cleanup>();
+    cleanup->Object = std::move(self);
+
+    // Hold a loader reference from submission until the worker has returned out of this module.
+    FAIL_FAST_IF_WIN32_BOOL_FALSE(GetModuleHandleExW(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<PCWSTR>(&ReleaseOnBackgroundThread<T>), cleanup->Module.put()));
+    FAIL_FAST_IF_WIN32_BOOL_FALSE(TrySubmitThreadpoolCallback(
+        [](PTP_CALLBACK_INSTANCE instance, PVOID context) noexcept {
+            std::unique_ptr<Cleanup> work{static_cast<Cleanup*>(context)};
+            FreeLibraryWhenCallbackReturns(instance, work->Module.release());
+
+            auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+            work->Object->Close();
+            work->Object.reset();
+        },
+        cleanup.get(),
+        nullptr));
+    std::ignore = cleanup.release();
+}
+
+template <typename T>
 auto GetImplementation(const T& obj)
 {
     return winrt::get_self<typename implementation_type<T>::type>(obj);

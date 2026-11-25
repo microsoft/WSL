@@ -41,7 +41,7 @@ struct Process : ProcessT<Process>
     void Exited(winrt::event_token const& token) noexcept;
 
     void Close();
-    static void final_release(std::unique_ptr<Process> self);
+    static void final_release(std::unique_ptr<Process> self) noexcept;
 
     WslcProcess ToHandle();
     ProcessOutputMode OutputMode();

@@ -56,5 +56,15 @@ add_subdirectory(testplugin)
 add_subdirectory(wsl)
 add_subdirectory(wslc)
 
+# The unload test client must not import wslcsdk.dll.
+add_executable(wslcsdkunload WslcSdkUnload.cpp)
+target_precompile_headers(wslcsdkunload REUSE_FROM common)
+target_include_directories(wslcsdkunload PRIVATE
+    ${CMAKE_BINARY_DIR}/src/windows/WslcSDK/winrt/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
+target_link_libraries(wslcsdkunload PRIVATE common ${COMMON_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES})
+add_dependencies(wslcsdkunload wslcsdk)
+add_dependencies(wsltests wslcsdkunload)
+set_target_properties(wslcsdkunload PROPERTIES FOLDER windows)
+
 # For prettier source tree browsing
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES} ${HEADERS})

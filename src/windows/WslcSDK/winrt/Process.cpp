@@ -48,17 +48,17 @@ Process::Process(winrt::Microsoft::WSL::Containers::ProcessOutputMode outputMode
 
 void Process::StartWaitingForExit()
 {
+    // Event mode receives exit notifications through the native callback.
+    if (m_outputMode == ProcessOutputMode::Event)
+    {
+        return;
+    }
+
     m_waitForExitAction = StartWaitingForExitAsync();
 }
 
 winrt::Windows::Foundation::IAsyncAction Process::StartWaitingForExitAsync()
 {
-    // Event mode uses the exit callback registered with the C API; no need to wait here.
-    if (m_outputMode == ProcessOutputMode::Event)
-    {
-        co_return;
-    }
-
     wil::unique_handle exitEventHandle;
     winrt::check_hresult(WslcGetProcessExitEvent(ToHandle(), exitEventHandle.put()));
 
@@ -278,17 +278,33 @@ void Process::Close()
     if (m_waitForExitAction)
     {
         m_waitForExitAction.Cancel();
-        m_waitForExitAction = nullptr;
     }
 
-    // Methods called after Close() will fail due to EnsureStarted().
-    m_process.reset();
+    // EnsureStarted() rejects native operations after a successful release clears the process handle.
+    if (m_process)
+    {
+        winrt::check_hresult(WslcReleaseProcess(m_process.get()));
+        std::ignore = m_process.release();
+    }
+
+    m_waitForExitAction = nullptr;
 }
 
-void Process::final_release(std::unique_ptr<Process> self)
+void Process::final_release(std::unique_ptr<Process> self) noexcept
 {
-    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
-    self->Close();
+    // Clean up when the last reference is released, including clients that omit Close().
+    try
+    {
+        self->Close();
+        return;
+    }
+    catch (winrt::hresult_error const& error)
+    {
+        FAIL_FAST_HR_IF(static_cast<HRESULT>(error.code()), error.code() != HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+    }
+
+    // Defer cleanup to a worker that can wait for the IO callback to return.
+    ReleaseOnBackgroundThread(std::move(self));
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation

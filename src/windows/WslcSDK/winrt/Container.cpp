@@ -196,17 +196,32 @@ WslcContainer Container::ToHandle()
 
 void Container::Close()
 {
-    // Release the container first: the shared IO callback holds a raw pointer to m_initProcess and must stop first.
-    // Methods called after Close() will fail due to EnsureNotClosed().
-    m_container.reset();
+    // Keep the init process callback context alive until native container release succeeds.
+    // EnsureNotClosed() rejects native operations after a successful Close().
+    if (m_container)
+    {
+        winrt::check_hresult(WslcReleaseContainer(m_container.get()));
+        std::ignore = m_container.release();
+    }
 
     m_initProcess = nullptr;
 }
 
-void Container::final_release(std::unique_ptr<Container> self)
+void Container::final_release(std::unique_ptr<Container> self) noexcept
 {
-    // Ensure cleanup when refcount drops to zero even if Close() was not called explicitly.
-    self->Close();
+    // Clean up when the last reference is released, including clients that omit Close().
+    try
+    {
+        self->Close();
+        return;
+    }
+    catch (winrt::hresult_error const& error)
+    {
+        FAIL_FAST_HR_IF(static_cast<HRESULT>(error.code()), error.code() != HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE_STATE));
+    }
+
+    // Defer cleanup to a worker that can wait for the IO callback to return.
+    ReleaseOnBackgroundThread(std::move(self));
 }
 
 } // namespace winrt::Microsoft::WSL::Containers::implementation
