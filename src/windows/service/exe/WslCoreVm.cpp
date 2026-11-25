@@ -1392,7 +1392,27 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId)
     request.EnableTelemetry = m_vmConfig.EnableTelemetry;
     request.Processor.Count = m_vmConfig.ProcessorCount;
     request.Processor.NestedVirtualization = m_vmConfig.EnableNestedVirtualization ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
-    request.Processor.PerfmonPmu = m_vmConfig.EnableHardwarePerformanceCounters ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
+
+#ifdef _AMD64_
+
+    // Windows 10 Hyper-V rejects a partition that requests both nested virtualization and child perfmon support.
+    const bool disablePerfmonForNestedVirtualization =
+        m_vmConfig.EnableNestedVirtualization && !helpers::IsWindows11OrAbove();
+
+    if (disablePerfmonForNestedVirtualization && m_vmConfig.EnableHardwarePerformanceCounters &&
+        m_vmConfig.HardwarePerformanceCountersConfigPresence == ConfigKeyPresence::Present)
+    {
+        EMIT_USER_WARNING(Localization::MessageNestedVirtualizationAndHardwarePerformanceCountersNotSupported());
+    }
+
+#else
+
+    constexpr bool disablePerfmonForNestedVirtualization = false;
+
+#endif
+
+    request.Processor.PerfmonPmu =
+        m_vmConfig.EnableHardwarePerformanceCounters && !disablePerfmonForNestedVirtualization ? VmFeatureRequest::Preferred : VmFeatureRequest::Disabled;
     request.Processor.PerfmonLbr = request.Processor.PerfmonPmu;
 
     request.Memory.SizeBytes = (m_vmConfig.MemorySizeBytes / (2 * _1MB)) * (2 * _1MB);

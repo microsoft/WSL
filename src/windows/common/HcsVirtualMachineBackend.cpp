@@ -116,7 +116,20 @@ VmEffectiveProcessor ConfigureProcessor(const VmProcessorRequest& Request, schem
             nestedVirtualizationSupported = schema::IsNestedVirtualizationSupported();
             if (!nestedVirtualizationSupported && Request.NestedVirtualization == VmFeatureRequest::Preferred)
             {
-                EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+                if constexpr (wsl::shared::Arm64)
+                {
+                    EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+                }
+                else if (!wsl::windows::common::helpers::IsWindows11OrAbove())
+                {
+                    // HCS does not expose processor capabilities on Windows 10. Preserve the x64 opt-in
+                    // and let HCS validate whether the host can create the requested partition.
+                    nestedVirtualizationSupported = true;
+                }
+                else
+                {
+                    EMIT_USER_WARNING(wsl::shared::Localization::MessageNestedVirtualizationNotSupported());
+                }
             }
         }
         catch (...)
