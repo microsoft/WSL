@@ -90,6 +90,66 @@ void ValidateFileSystemToken(HANDLE Token, HANDLE Identity)
         "OpenVMM cannot serve virtio-fs at a higher integrity level than the VM");
 }
 
+// Opens a VHD or VHDX as Token and attaches it for raw access, which lets OpenVMM access the image through the
+// returned handle with Token's rights rather than its own.
+wil::unique_handle OpenVirtualDiskForRawAccess(const std::filesystem::path& Path, bool ReadOnly, HANDLE Token)
+{
+    // N.B. Specifying unknown for device and vendor means the system will determine the type of VHD.
+    VIRTUAL_STORAGE_TYPE storageType{VIRTUAL_STORAGE_TYPE_DEVICE_UNKNOWN, VIRTUAL_STORAGE_TYPE_VENDOR_UNKNOWN};
+    OPEN_VIRTUAL_DISK_PARAMETERS parameters{};
+    parameters.Version = OPEN_VIRTUAL_DISK_VERSION_2;
+    parameters.Version2.ReadOnly = ReadOnly;
+    // A unique resiliency GUID keeps VHDMP from sharing the virtual disk with another open of the same image. Cached I/O
+    // matches how OpenVMM opens disks by path.
+    THROW_IF_FAILED(CoCreateGuid(&parameters.Version2.ResiliencyGuid));
+    auto flags = OPEN_VIRTUAL_DISK_FLAG_CACHED_IO;
+    if (wsl::windows::common::helpers::GetWindowsVersion().BuildNumber >= wsl::windows::common::helpers::WindowsBuildNumbers::Nickel_23H2)
+    {
+        WI_SetFlag(flags, OPEN_VIRTUAL_DISK_FLAG_SUPPORT_ENCRYPTED_FILES);
+    }
+
+    wil::unique_handle disk;
+    {
+        auto runAsUser = wil::impersonate_token(Token);
+        THROW_IF_WIN32_ERROR(OpenVirtualDisk(&storageType, Path.c_str(), VIRTUAL_DISK_ACCESS_NONE, flags, &parameters, &disk));
+    }
+
+    auto attachFlags = ATTACH_VIRTUAL_DISK_FLAG_NO_LOCAL_HOST;
+    WI_SetFlagIf(attachFlags, ATTACH_VIRTUAL_DISK_FLAG_READ_ONLY, ReadOnly);
+    THROW_IF_WIN32_ERROR(AttachVirtualDisk(disk.get(), nullptr, attachFlags, 0, nullptr, nullptr));
+    return disk;
+}
+
+// Fails unless Token may open Path for the access that a disk or persistent memory device needs. This authorizes
+// requests that don't open the file as the requester: OpenVMM opens persistent memory by path as the VM owner, and an
+// existing disk attachment can be reused by another requester.
+void CheckFileAccess(const std::filesystem::path& Path, bool ReadOnly, HANDLE Token)
+{
+    wil::unique_hlocal_security_descriptor securityDescriptor;
+    THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+        Path.c_str(),
+        SE_FILE_OBJECT,
+        OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        wil::out_param_ptr<PSECURITY_DESCRIPTOR*>(securityDescriptor)));
+
+    wil::unique_handle identificationToken;
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateToken(Token, SecurityIdentification, &identificationToken));
+
+    GENERIC_MAPPING mapping{FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_GENERIC_EXECUTE, FILE_ALL_ACCESS};
+    const DWORD desiredAccess = FILE_GENERIC_READ | (ReadOnly ? 0 : FILE_GENERIC_WRITE);
+    PRIVILEGE_SET privileges{};
+    DWORD privilegesLength = sizeof(privileges);
+    DWORD grantedAccess{};
+    BOOL accessStatus{};
+    THROW_IF_WIN32_BOOL_FALSE(AccessCheck(
+        securityDescriptor.get(), identificationToken.get(), desiredAccess, &mapping, &privileges, &privilegesLength, &grantedAccess, &accessStatus));
+    THROW_HR_IF(E_ACCESSDENIED, !accessStatus);
+}
+
 // OpenVMM attaches every disk as its own virtio-blk device.
 std::uint32_t GetVirtioBlkSlot(const VmDiskAttachment& Disk)
 {
@@ -535,11 +595,10 @@ void OpenVmmVirtualMachineBackend::Initialize(const VmCreateRequest& Request)
     THROW_IF_FAILED_MSG(createResult, "Failed to create OpenVMM VM");
     for (const auto& disk : Request.BootDisks)
     {
+        auto lock = m_lock.lock_exclusive();
         const auto& attachment = m_attachedDisks.at(m_description.BootDisks.at(disk.Key).Id.Value);
-        const auto instanceIdString =
-            wsl::shared::string::GuidToString<wchar_t>(attachment.Backend, wsl::shared::string::GuidToStringFlags::None);
-        THROW_IF_FAILED(WslOpenVmmVmAttachVirtioBlk(
-            m_vm.get(), instanceIdString.c_str(), GetVirtioBlkSlot(attachment), attachment.Path.c_str(), attachment.ReadOnly));
+        const auto token = disk.Disk.UserToken ? disk.Disk.UserToken->get() : m_description.Identity.UserToken.get();
+        THROW_IF_FAILED(AttachVirtioBlkLocked(attachment.Backend, GetVirtioBlkSlot(attachment), attachment.Path, attachment.ReadOnly, token));
     }
     {
         auto lock = m_lock.lock_exclusive();
@@ -877,19 +936,19 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
         std::holds_alternative<VmPhysicalDiskSource>(Request.Source),
         "OpenVMM physical-disk support is not available");
 
-    // OpenVMM opens the disk by path as the VM owner, so Request.UserToken isn't used. Unlike HCS, which grants the VM access
-    // as the requester, this lets a requester attach any file the VM owner can open, and fails for files only the requester
-    // can open, when the two differ in elevation. Passing a handle opened as the requester (DiskBackend.virtual_disk) will
-    // close this gap.
+    // As with HCS, which grants the VM access as the requester, the disk is opened with the requester's rights.
+    const auto token = Request.UserToken ? Request.UserToken->get() : m_description.Identity.UserToken.get();
+    THROW_HR_IF_MSG(E_UNEXPECTED, !token, "UserToken not set for the disk request");
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm);
 
     // WSL attaches a distribution's VHD every time an instance is created and only detaches it when the
     // disk is ejected, so the same path can be attached while a previous attachment is still present. HCS
-    // tolerates this because it shares the underlying virtual disk object between attachments, but OpenVMM
-    // opens the backing file exclusively and a second open fails with a sharing violation. Reuse the
-    // existing attachment so the guest keeps a single block device for the disk.
+    // tolerates this because it shares the underlying virtual disk object between attachments, but each
+    // OpenVMM attachment opens the image for raw access and a second open fails with a sharing violation.
+    // Reuse the existing attachment so the guest keeps a single block device for the disk, once the
+    // requester is shown to have access to it.
     auto existing = m_attachedDisks.end();
     for (auto disk = m_attachedDisks.begin(); disk != m_attachedDisks.end(); ++disk)
     {
@@ -910,6 +969,7 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
     }
     if (!Request.Placement && existing != m_attachedDisks.end())
     {
+        CheckFileAccess(path, Request.ReadOnly, token);
         WSL_LOG(
             "OpenVmmAttachDiskReused",
             TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -950,11 +1010,10 @@ VmDiskAttachment OpenVmmVirtualMachineBackend::AttachDisk(const VmDiskRequest& R
 
     GUID instanceId{};
     THROW_IF_FAILED(CoCreateGuid(&instanceId));
-    const auto instanceIdString = wsl::shared::string::GuidToString<wchar_t>(instanceId, wsl::shared::string::GuidToStringFlags::None);
     const auto [disk, inserted] = m_attachedDisks.emplace(attachment.Id.Value, AttachedDisk{attachment, instanceId});
     WI_ASSERT(inserted);
     auto rollback = wil::scope_exit([&] { m_attachedDisks.erase(disk); });
-    const auto result = WslOpenVmmVmAttachVirtioBlk(m_vm.get(), instanceIdString.c_str(), slot, path.c_str(), Request.ReadOnly);
+    const auto result = AttachVirtioBlkLocked(instanceId, slot, path, Request.ReadOnly, token);
     WSL_LOG(
         "OpenVmmAttachDiskEnd",
         TraceLoggingValue(m_description.Identity.VmId, "vmId"),
@@ -1003,7 +1062,11 @@ void OpenVmmVirtualMachineBackend::DetachDisk(VmDiskId Disk)
 VmPersistentMemoryDevice OpenVmmVirtualMachineBackend::AddPersistentMemory(const VmPersistentMemoryRequest& Request)
 {
     ExecutionContext context(Context::OpenVmm);
-    // As for disks, OpenVMM opens the file by path as the VM owner, so Request.UserToken isn't used.
+    // OpenVMM opens persistent memory by path as the VM owner, so check that the requester can open the file, as HCS
+    // does by opening it in a device host running as the requester.
+    const auto token = Request.UserToken ? Request.UserToken->get() : m_description.Identity.UserToken.get();
+    THROW_HR_IF_MSG(E_UNEXPECTED, !token, "UserToken not set for the persistent memory request");
+    CheckFileAccess(Request.Path, Request.ReadOnly, token);
 
     auto lock = m_lock.lock_exclusive();
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !m_vm || m_state == VmState::Stopped);
@@ -1176,6 +1239,27 @@ VmFileSystemShare OpenVmmVirtualMachineBackend::AddFileSystemShare(VmDeviceId De
     ++m_nextShareId;
     return share;
 }
+
+_Requires_lock_held_(m_lock)
+HRESULT OpenVmmVirtualMachineBackend::AttachVirtioBlkLocked(
+    const GUID& InstanceId, std::uint32_t Slot, const std::filesystem::path& Path, bool ReadOnly, HANDLE Token)
+try
+{
+    const auto disk = OpenVirtualDiskForRawAccess(Path, ReadOnly, Token);
+    HANDLE remoteDisk = nullptr;
+    THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(GetCurrentProcess(), disk.get(), m_process.get(), &remoteDisk, 0, FALSE, DUPLICATE_SAME_ACCESS));
+    const auto instanceId = wsl::shared::string::GuidToString<wchar_t>(InstanceId, wsl::shared::string::GuidToStringFlags::None);
+    const auto result = WslOpenVmmVmAttachVirtioBlkHandle(
+        m_vm.get(), instanceId.c_str(), Slot, static_cast<UINT64>(reinterpret_cast<ULONG_PTR>(remoteDisk)), ReadOnly);
+
+    // OpenVMM duplicates the handle while attaching the disk, and its duplicate keeps the image attached, so both handles
+    // can be closed once the call succeeds. As for file system shares, a failed call may still be in progress in OpenVMM,
+    // so the remote handle is then left open until OpenVMM exits.
+    RETURN_IF_FAILED(result);
+    LOG_IF_WIN32_BOOL_FALSE(DuplicateHandle(m_process.get(), remoteDisk, nullptr, nullptr, 0, FALSE, DUPLICATE_CLOSE_SOURCE));
+    return S_OK;
+}
+CATCH_RETURN()
 
 _Requires_lock_held_(m_lock)
 void OpenVmmVirtualMachineBackend::AddFileSystemShareLocked(const VmFileSystemShare& Share, const wil::shared_handle& Token)
