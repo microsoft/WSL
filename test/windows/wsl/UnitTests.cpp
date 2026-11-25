@@ -5554,12 +5554,15 @@ VERSION_ID="Invalid|Format"
     }
 
     // The exit code is the number of SIGINT received, offset so it can't be confused with a wsl.exe failure.
+    // N.B. This runs the installed wsl.exe directly. The inbox wsl.exe that launches it doesn't handle console control
+    //      events: it terminates with STATUS_CONTROL_C_EXIT, which also terminates the installed wsl.exe.
     static std::wstring CountSigintCommandLine(LPCWSTR Setup = L"")
     {
         constexpr auto command =
-            L"-e bash -c \"{} n=0; trap 'n=$((n+1))' INT; echo ready; sleep 2 & wait; sleep 2 & wait; exit $((40+n))\"";
+            L"\"{}\" -e bash -c \"{} n=0; trap 'n=$((n+1))' INT; echo ready; sleep 2 & wait; sleep 2 & wait; exit $((40+n))\"";
 
-        return LxssGenerateWslCommandLine(std::format(command, Setup).c_str());
+        const std::filesystem::path package{wsl::windows::common::wslutil::GetMsiPackagePath().value()};
+        return std::format(command, (package / L"wsl.exe").wstring(), Setup);
     }
 
     static void WaitForReady(const PartialHandleRead& Reader)
