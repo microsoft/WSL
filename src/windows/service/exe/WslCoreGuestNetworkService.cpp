@@ -112,13 +112,14 @@ void wsl::core::networking::GuestNetworkService::SetGuestNetworkServiceState(_In
     THROW_IF_FAILED(result);
 }
 
-std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::AllocateEphemeralPortRange()
+std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::AllocateEphemeralPortRange(uint32_t PortCount)
 {
     FAIL_FAST_IF(!IsFlowSteeringSupportedByHns());
+    THROW_HR_IF(E_INVALIDARG, PortCount < 2 || PortCount > 8192 || (PortCount % 2) != 0);
 
     const auto lock = m_dataLock.lock_exclusive();
 
-    HANDLE port{nullptr};
+    HANDLE port{};
     auto releasePortOnError = wil::scope_exit([&] {
         if (port)
         {
@@ -126,38 +127,44 @@ std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::Alloca
         }
     });
 
-    // N.B. Use an odd number of ports to avoid Linux kernel warning about preferring different parity for start / end values.
-    static constexpr auto c_ephemeralPortRangeSize = 4095;
-    static constexpr auto c_minEphemeralPortRangeSize = 511;
-    uint16_t portRangeSize = c_ephemeralPortRangeSize;
+    // HCN accepts the difference between the inclusive range endpoints, rather than the number of ports.
+    // N.B. Port counts are kept even so the range endpoints have different parity, which avoids a Linux kernel warning.
+    // If the requested range cannot be reserved, retry with smaller ranges down to c_minEphemeralPortCount.
+    static constexpr uint32_t c_minEphemeralPortCount = 512;
+    uint32_t portCount = PortCount;
     HRESULT result = E_UNEXPECTED;
-    for (; portRangeSize >= c_minEphemeralPortRangeSize; portRangeSize /= 2)
+    for (;;)
     {
+        const auto portRangeSize = static_cast<uint16_t>(portCount - 1);
         result = m_allocatePortRange.value()(m_service.get(), portRangeSize, &m_reservedPortRange, &port);
         WSL_LOG(
             "GuestNetworkService::AllocateEphemeralPortRange [HcnReserveGuestNetworkServicePortRange]",
-            TraceLoggingValue(portRangeSize + 1, "portCount"),
+            TraceLoggingValue(portCount, "portCount"),
             TraceLoggingHResult(result, "result"));
         if (SUCCEEDED(result))
         {
             break;
         }
+
+        if (portCount <= c_minEphemeralPortCount)
+        {
+            break;
+        }
+
+        portCount = std::max<uint32_t>((portCount / 2) & ~1u, c_minEphemeralPortCount);
     }
 
     if (FAILED(result))
     {
-        if (portRangeSize < c_minEphemeralPortRangeSize)
-        {
-            EMIT_USER_WARNING(Localization::MessageMirroredNetworkingPortRangeAllocationFailed(c_minEphemeralPortRangeSize + 1));
-        }
+        EMIT_USER_WARNING(Localization::MessageMirroredNetworkingPortRangeAllocationFailed(portCount));
         THROW_HR(result);
     }
 
-    WI_ASSERT(m_reservedPortRange.endingPort - m_reservedPortRange.startingPort == portRangeSize);
+    WI_ASSERT(static_cast<uint32_t>(m_reservedPortRange.endingPort - m_reservedPortRange.startingPort) == portCount - 1);
 
-    if (portRangeSize < c_ephemeralPortRangeSize)
+    if (portCount < PortCount)
     {
-        EMIT_USER_WARNING(Localization::MessageMirroredNetworkingReducedPortRange(portRangeSize + 1, c_ephemeralPortRangeSize + 1));
+        EMIT_USER_WARNING(Localization::MessageMirroredNetworkingReducedPortRange(portCount, PortCount));
     }
 
     // Count the overlap of the guest's reserved ephemeral range with the host ephemeral range
@@ -165,14 +172,14 @@ std::pair<uint16_t, uint16_t> wsl::core::networking::GuestNetworkService::Alloca
     m_hostTcpEphemeralPortsInUse = ComputeHostEphemeralOverlap(IPPROTO_TCP);
     m_hostUdpEphemeralPortsInUse = ComputeHostEphemeralOverlap(IPPROTO_UDP);
 
-    // setting the port to zero as we do not expect any bind requests to be sent to wslcore for ports in this range
+    // Port zero is a sentinel for the HCN range reservation. Guest bind requests never use this map entry because
+    // ports inside m_reservedPortRange return before the individual-reservation lookup.
     m_reservedPorts.emplace(std::make_pair(HCN_PORT_PROTOCOL_TCP, static_cast<uint16_t>(0)), HcnPortReservation{port, 1});
-
-    // ownership of the port was transferred successfully
     releasePortOnError.release();
 
     WSL_LOG(
         "GuestNetworkService::AllocateEphemeralPortRange",
+        TraceLoggingValue(PortCount, "requestedPortCount"),
         TraceLoggingValue(m_reservedPortRange.startingPort, "startingPort"),
         TraceLoggingValue(m_reservedPortRange.endingPort, "endingPort"));
 
