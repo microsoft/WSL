@@ -71,34 +71,56 @@ std::thread wsl::windows::common::relay::CreateThread(
     });
 }
 
+namespace {
+
+// Relays from a socket. An AF_UNIX peer's close doesn't complete a pending read, so it is also watched for explicitly.
+void RelayFromSocket(_In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
+{
+    wsl::windows::common::wslutil::SetThreadDescription(L"Socket IO Relay");
+
+    const auto socket = reinterpret_cast<SOCKET>(InputHandle);
+    SOCKADDR_STORAGE address{};
+    int addressLength = sizeof(address);
+    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), getsockname(socket, reinterpret_cast<SOCKADDR*>(&address), &addressLength) == SOCKET_ERROR);
+    if (address.ss_family != AF_UNIX)
+    {
+        wsl::windows::common::relay::InterruptableRelay(InputHandle, OutputHandle, ExitHandle, BufferSize);
+        return;
+    }
+
+    const auto closeEvent = WSACreateEvent();
+    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), closeEvent == WSA_INVALID_EVENT);
+
+    auto cleanup = wil::scope_exit([&] {
+        WSAEventSelect(socket, nullptr, 0);
+        WSACloseEvent(closeEvent);
+    });
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), WSAEventSelect(socket, closeEvent, FD_CLOSE) == SOCKET_ERROR);
+    wsl::windows::common::relay::InterruptableRelay(InputHandle, OutputHandle, ExitHandle, BufferSize, closeEvent);
+}
+
+} // namespace
+
 std::thread wsl::windows::common::relay::CreateSocketThread(
     _In_ wil::unique_handle&& InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
 {
     return std::thread([InputHandle = std::move(InputHandle), OutputHandle, ExitHandle, BufferSize]() {
         try
         {
-            wsl::windows::common::wslutil::SetThreadDescription(L"Socket IO Relay");
+            RelayFromSocket(InputHandle.get(), OutputHandle, ExitHandle, BufferSize);
+        }
+        CATCH_LOG()
+    });
+}
 
-            const auto socket = reinterpret_cast<SOCKET>(InputHandle.get());
-            SOCKADDR_STORAGE address{};
-            int addressLength = sizeof(address);
-            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), getsockname(socket, reinterpret_cast<SOCKADDR*>(&address), &addressLength) == SOCKET_ERROR);
-            if (address.ss_family != AF_UNIX)
-            {
-                InterruptableRelay(InputHandle.get(), OutputHandle, ExitHandle, BufferSize);
-                return;
-            }
-
-            const auto closeEvent = WSACreateEvent();
-            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), closeEvent == WSA_INVALID_EVENT);
-
-            auto cleanup = wil::scope_exit([&] {
-                WSAEventSelect(socket, nullptr, 0);
-                WSACloseEvent(closeEvent);
-            });
-
-            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), WSAEventSelect(socket, closeEvent, FD_CLOSE) == SOCKET_ERROR);
-            InterruptableRelay(InputHandle.get(), OutputHandle, ExitHandle, BufferSize, closeEvent);
+std::thread wsl::windows::common::relay::CreateSocketThread(
+    _In_ wil::unique_handle&& InputHandle, _In_ wil::unique_handle&& OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
+{
+    return std::thread([InputHandle = std::move(InputHandle), OutputHandle = std::move(OutputHandle), ExitHandle, BufferSize]() {
+        try
+        {
+            RelayFromSocket(InputHandle.get(), OutputHandle.get(), ExitHandle, BufferSize);
         }
         CATCH_LOG()
     });

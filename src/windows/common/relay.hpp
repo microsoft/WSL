@@ -37,6 +37,12 @@ std::thread CreateThread(
 std::thread CreateSocketThread(
     _In_ wil::unique_handle&& InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle = nullptr, _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE);
 
+std::thread CreateSocketThread(
+    _In_ wil::unique_handle&& InputHandle,
+    _In_ wil::unique_handle&& OutputHandle,
+    _In_opt_ HANDLE ExitHandle = nullptr,
+    _In_ size_t BufferSize = LX_RELAY_BUFFER_SIZE);
+
 DWORD
 InterruptableRead(
     _In_ HANDLE InputHandle,

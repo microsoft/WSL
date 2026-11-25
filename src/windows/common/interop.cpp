@@ -306,7 +306,7 @@ void CreateProcessVmMode(_In_ const wsl::windows::common::GuestConnector& Connec
             if (Parsed.CreatePseudoconsole == FALSE)
             {
                 auto Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(0, false, true);
-                Relays.push_back(wsl::windows::common::relay::CreateThread(std::move(StdIn), wil::unique_handle{Pipe.second.release()}));
+                Relays.push_back(wsl::windows::common::relay::CreateSocketThread(std::move(StdIn), wil::unique_handle{Pipe.second.release()}));
                 StdIn.reset(Pipe.first.release());
 
                 Pipe = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
