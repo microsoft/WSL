@@ -710,6 +710,12 @@ Bağımsız değişkenler:
   <data name="MessageCheckingForUpdates" xml:space="preserve">
     <value>Güncelleştirmeler denetleniyor.</value>
   </data>
+  <data name="MessageGitHubRateLimited" xml:space="preserve">
+    <value>GitHub API'si hız sınırına ulaşıldı. Daha sonra yeniden deneyin.</value>
+  </data>
+  <data name="MessageGitHubRateLimitedFallback" xml:space="preserve">
+    <value>GitHub API'si hız sınırına ulaşıldı. Windows Update kullanarak güncelleştirmeler denetleniyor.</value>
+  </data>
   <data name="MessageDistroOnlyAvailableFromStore" xml:space="preserve">
     <value>Bu dağıtım yalnızca Microsoft Store’dan kullanılabilir.</value>
   </data>
@@ -958,7 +964,7 @@ NAT ağ bağlantısına geri dönülüyor.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyLocalhostSettingsDropped" xml:space="preserve">
-    <value>Bir localhost proxy yapılandırması algılandı ancak WSL'ye yansıtılmadı. NAT modundaki WSL, localhost proxy'lerini desteklemez.</value>
+    <value>Bir localhost ara sunucu yapılandırması algılandı ancak WSL'ye yansıtılmadı. Bu ara sunucu adresi geçerli ağ yapılandırması tarafından desteklenmiyor.</value>
     <comment>"proxy" refers to a network proxy server. Use the standard networking term in your locale.</comment>
   </data>
   <data name="MessageProxyV6SettingsDropped" xml:space="preserve">
@@ -2267,6 +2273,9 @@ Kullanım:
   <data name="MessageWslcContainerModeNoPorts" xml:space="preserve">
     <value>Bağlantı noktası eşlemeleri kapsayıcı ağ modunda desteklenmez; bağlantı noktalarının sahibi hedef kapsayıcıdır.</value>
   </data>
+  <data name="MessageWslcNetworkingDisabledNoPorts" xml:space="preserve">
+    <value>Kapsayıcı ağı devre dışı bırakıldığında bağlantı noktası eşleme desteklenmez. Ağı etkinleştirin veya bağlantı noktası eşlemelerini kaldırın.</value>
+  </data>
   <data name="MessageWslcContainerModeRequiresTarget" xml:space="preserve">
     <value>Kapsayıcı ağ modu için hedef kapsayıcı adı gereklidir.</value>
   </data>
@@ -2450,10 +2459,6 @@ Kullanım:
   </data>
   <data name="WSLCCLI_CommandHasNoForwardArgumentsError" xml:space="preserve">
      <value>Geçersiz ek bağımsız değişkenle karşılaşıldı: '{}'</value>
-     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
-  </data>
-  <data name="WSLCCLI_ValueMustBeLastInAliasChainError" xml:space="preserve">
-     <value>Değeri olan diğer ad seçenekleri, diğer ad zincirinin en sonunda olmalıdır: '{}'</value>
      <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="WSLCCLI_CopyrightHeader" xml:space="preserve">
@@ -4178,6 +4183,14 @@ Windows sürümü: {}</value>
     <value>'{}' kapsayıcısı için zaman damgası geri yüklenemedi</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageWslcContainerStateLoadFailed" xml:space="preserve">
+    <value>Kapsayıcı “{}” için kalıcı durum yüklenemedi. Durumunda yapılan değişiklikler kaydedilmez.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
+  <data name="MessageWslcContainerStateSaveFailed" xml:space="preserve">
+    <value>Kapsayıcı “{}” için kalıcı durum kaydedilemedi.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageWslcImportProgressParseFailed" xml:space="preserve">
     <value>Görüntü içeri aktarma ilerleme durumu ayrıştırılamadı</value>
     <comment>"Image" means a container image, as in Docker, not a picture or photo.</comment>
@@ -4213,8 +4226,8 @@ Windows sürümü: {}</value>
     <value>Ana bilgisayar güvenilen kök sertifikaları sanal makineye yüklenemedi: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageWslcLocalhostWriteFailed" xml:space="preserve">
-    <value>WSLC, yerel ana bilgisayar adı çözümlemesini başlatmak için '{}' yazamadı (konuk hatası {}).</value>
+  <data name="MessageWslcGuestFileWriteFailed" xml:space="preserve">
+    <value>WSLC konuğa '{}' yazamadı (konuk hatası {}).</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageWslcDockerStartupTimedOut" xml:space="preserve">

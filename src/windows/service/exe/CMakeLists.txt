@@ -4,7 +4,6 @@ set(SOURCES
     LxssUserSession.cpp
     LxssUserSessionFactory.cpp
     LxssIptables.cpp
-    LxssHttpProxy.cpp
     LxssInstance.cpp
     PluginManager.cpp
     ServiceMain.cpp
@@ -20,7 +19,7 @@ set(SOURCES
     WslMirroredNetworking.cpp
     WslCoreTcpIpStateTracking.cpp
     WslCoreVm.cpp
-    HcsVirtualMachine.cpp
+    WSLCVirtualMachineHost.cpp
     WSLCSessionManager.cpp
     WSLCSessionManagerFactory.cpp
     WSLCPluginNotifier.cpp
@@ -35,7 +34,6 @@ set(HEADERS
     LxssUserSession.h
     LxssUserSessionFactory.h
     LxssIptables.h
-    LxssHttpProxy.h
     PluginManager.h
     LxssInstance.h
     BridgedNetworking.h
@@ -52,7 +50,7 @@ set(HEADERS
     WslCoreNetworkEndpoint.h
     WslCoreTcpIpStateTracking.h
     WslCoreVm.h
-    HcsVirtualMachine.h
+    WSLCVirtualMachineHost.h
     WSLCSessionManager.h
     WSLCSessionManagerFactory.h
     WSLCPluginNotifier.h)

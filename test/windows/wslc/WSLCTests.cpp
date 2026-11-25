@@ -27,6 +27,7 @@ Abstract:
 #include "HttpHeaderEndDetector.h"
 #include "WSLCSessionDefaults.h"
 #include <nlohmann/json.hpp>
+#include <TlHelp32.h>
 
 using namespace std::chrono;
 using namespace std::literals::chrono_literals;
@@ -212,7 +213,7 @@ class WSLCTests
         return RunningWSLCContainer(std::move(rawContainer), {});
     }
 
-    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name)
+    RunningWSLCContainer LaunchContainerWithBlockingStopHandler(IWSLCSession& session, const std::string& name, WSLCContainerFlags flags = WSLCContainerFlagsNone)
     {
         WSLCContainerLauncher launcher(
             "debian:latest",
@@ -221,6 +222,8 @@ class WSLCTests
             {},
             "host",
             WSLCProcessFlagsStdin);
+
+        launcher.SetContainerFlags(flags);
 
         return launcher.Launch(session);
     }
@@ -4050,6 +4053,119 @@ sys.exit(1 if queries else 0)
     TEST_METHOD(PortMappingConsomme)
     {
         ValidatePortMapping(WSLCNetworkingModeConsomme);
+    }
+
+    // Returns the IDs of the wslrelay.exe processes launched by WSLC sessions.
+    static std::set<DWORD> ListSessionRelays()
+    {
+        const wil::unique_hfile snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)};
+        THROW_LAST_ERROR_IF(!snapshot);
+
+        std::vector<PROCESSENTRY32W> processes;
+        PROCESSENTRY32W entry{};
+        entry.dwSize = sizeof(entry);
+        for (auto result = Process32FirstW(snapshot.get(), &entry); result; result = Process32NextW(snapshot.get(), &entry))
+        {
+            processes.push_back(entry);
+        }
+
+        auto hasName = [](const PROCESSENTRY32W& process, std::wstring_view name) {
+            return wsl::shared::string::IsEqual(process.szExeFile, name, true);
+        };
+
+        std::set<DWORD> relays;
+        for (const auto& relay : processes)
+        {
+            if (!hasName(relay, L"wslrelay.exe"))
+            {
+                continue;
+            }
+
+            if (std::ranges::any_of(processes, [&](const auto& parent) {
+                    return parent.th32ProcessID == relay.th32ParentProcessID && hasName(parent, L"wslcsession.exe");
+                }))
+            {
+                relays.insert(relay.th32ProcessID);
+            }
+        }
+
+        return relays;
+    }
+
+    static DWORD GetNewSessionRelay(const std::set<DWORD>& ExistingRelays)
+    {
+        auto relays = ListSessionRelays();
+        std::erase_if(relays, [&](DWORD pid) { return ExistingRelays.contains(pid); });
+        VERIFY_ARE_EQUAL(relays.size(), 1u);
+
+        return *relays.begin();
+    }
+
+    static void SuspendProcessThreads(DWORD Pid)
+    {
+        const wil::unique_hfile snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)};
+        THROW_LAST_ERROR_IF(!snapshot);
+
+        THREADENTRY32 entry{};
+        entry.dwSize = sizeof(entry);
+        for (auto result = Thread32First(snapshot.get(), &entry); result; result = Thread32Next(snapshot.get(), &entry))
+        {
+            if (entry.th32OwnerProcessID != Pid)
+            {
+                continue;
+            }
+
+            const wil::unique_handle thread{OpenThread(THREAD_SUSPEND_RESUME, FALSE, entry.th32ThreadID)};
+            THROW_LAST_ERROR_IF(!thread);
+            THROW_LAST_ERROR_IF(SuspendThread(thread.get()) == static_cast<DWORD>(-1));
+        }
+    }
+
+    WSLC_TEST_METHOD(PortRelayHangDoesNotBlockTermination)
+    {
+        const auto existingRelays = ListSessionRelays();
+
+        // NAT mode always forwards ports through wslrelay.
+        auto session = CreateSession(GetDefaultSessionSettings(L"port-relay-hang", false, WSLCNetworkingModeNAT));
+
+        // Map a port to confirm the relay is running and responsive.
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
+
+        // Suspend wslrelay so it never answers the next request.
+        SuspendProcessThreads(GetNewSessionRelay(existingRelays));
+
+        auto mapResult = std::async(std::launch::async, [&]() { return session->MapVmPort(AF_INET, 1235, 81); });
+        VERIFY_ARE_EQUAL(mapResult.wait_for(5s), std::future_status::timeout);
+
+        auto terminateResult = std::async(std::launch::async, [&]() { return session->Terminate(); });
+
+        VERIFY_ARE_EQUAL(mapResult.get(), E_ABORT);
+        VERIFY_SUCCEEDED(terminateResult.get());
+    }
+
+    WSLC_TEST_METHOD(PortRelayExitFailsPortMapping)
+    {
+        const auto existingRelays = ListSessionRelays();
+
+        // NAT mode always forwards ports through wslrelay.
+        auto session = CreateSession(GetDefaultSessionSettings(L"port-relay-exit", false, WSLCNetworkingModeNAT));
+
+        wil::unique_handle sessionProcess;
+        VERIFY_SUCCEEDED(session->GetProcessHandle(&sessionProcess));
+
+        // Map a port to confirm the relay is running and responsive.
+        VERIFY_SUCCEEDED(session->MapVmPort(AF_INET, 1234, 80));
+
+        const wil::unique_handle relay{OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, GetNewSessionRelay(existingRelays))};
+        VERIFY_IS_TRUE(!!relay);
+        VERIFY_WIN32_BOOL_SUCCEEDED(TerminateProcess(relay.get(), 1));
+        VERIFY_ARE_EQUAL(WaitForSingleObject(relay.get(), 60 * 1000), WAIT_OBJECT_0);
+
+        // With the relay gone, the request must fail on the broken pipe instead of waiting for a response.
+        VERIFY_ARE_EQUAL(session->MapVmPort(AF_INET, 1235, 81), E_ABORT);
+
+        VERIFY_ARE_EQUAL(WaitForSingleObject(sessionProcess.get(), 0), WAIT_TIMEOUT);
+        VERIFY_SUCCEEDED(session->Terminate());
     }
 
     WSLC_TEST_METHOD(StuckVmTermination)
@@ -8419,6 +8535,220 @@ sys.exit(1 if queries else 0)
         VERIFY_IS_FALSE(IsVmRunning(c_sessionName));
     }
 
+    static std::string ContainerStatePath(const std::string& ContainerId)
+    {
+        return std::format("/var/lib/docker/containers/{}/wslc-container-state.json", ContainerId);
+    }
+
+    static std::optional<std::string> TryReadGuestFile(IWSLCSession* Session, const std::string& Path)
+    {
+        auto result = RunCommand(Session, {"/bin/cat", Path});
+        if (result.Code != 0)
+        {
+            return std::nullopt;
+        }
+
+        return std::move(result.Output[1]);
+    }
+
+    static bool GuestFileExists(IWSLCSession* Session, const std::string& Path)
+    {
+        return RunCommand(Session, {"/bin/sh", "-c", std::format("test -e '{}'", Path)}).Code == 0;
+    }
+
+    // Content must not contain single quotes.
+    static void WriteGuestFile(IWSLCSession* Session, const std::string& Path, const std::string& Content)
+    {
+        auto result = ExpectCommandResult(Session, {"/bin/sh", "-c", std::format("printf '%s' '{}' > '{}' && sync", Content, Path)}, 0);
+        VERIFY_ARE_EQUAL(0, result.Code);
+    }
+
+    static std::optional<std::uint32_t> TryReadPersistedRestartCount(IWSLCSession* Session, const std::string& Path)
+    {
+        const auto content = TryReadGuestFile(Session, Path);
+        if (!content.has_value())
+        {
+            return std::nullopt;
+        }
+
+        const auto json = nlohmann::json::parse(content.value(), nullptr, false);
+        if (!json.is_object() || !json.contains("RestartCount") || !json["RestartCount"].is_number_unsigned())
+        {
+            return std::nullopt;
+        }
+
+        return json["RestartCount"].get<std::uint32_t>();
+    }
+
+    // Policy restarts save the count after the restart completes, so it may land shortly after the container runs.
+    static void WaitForPersistedRestartCount(IWSLCSession* Session, const std::string& Path, std::uint32_t Expected, std::chrono::milliseconds timeout = 30s)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (TryReadPersistedRestartCount(Session, Path) != Expected && std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(100ms);
+        }
+
+        const auto actual = TryReadPersistedRestartCount(Session, Path);
+        VERIFY_IS_TRUE(actual.has_value(), wsl::shared::string::MultiByteToWide(Path).c_str());
+        VERIFY_ARE_EQUAL(Expected, actual.value());
+    }
+
+    WSLC_TEST_METHOD(ContainerPersistentStateRestartCount)
+    {
+        // Every start cycle exits twice, then keeps running from its third run on.
+        WSLCContainerLauncher launcher(
+            "debian:latest",
+            "test-persistent-state-restart-count",
+            {"sh",
+             "-c",
+             "n=$(($(cat /runs 2>/dev/null || echo 0) + 1)); "
+             "if [ $n -ge 3 ]; then rm -f /runs; echo run; exec sleep 99999; fi; echo $n > /runs; echo run; exit 1"});
+        launcher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+        auto container = launcher.Create(*m_defaultSession);
+        container.SetDeleteOnClose(false);
+
+        // The state document is created with the container.
+        const auto statePath = ContainerStatePath(container.Id());
+        WaitForPersistedRestartCount(m_defaultSession.get(), statePath, 0u);
+        VERIFY_ARE_EQUAL(0u, container.Inspect().RestartCount);
+
+        // Each policy restart increments the count.
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        WaitForContainerRuns(container, 3);
+        WaitForContainerState(container, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
+        WaitForPersistedRestartCount(m_defaultSession.get(), statePath, 2u);
+
+        // An explicit restart resets the count before the next cycle's policy restarts.
+        VERIFY_SUCCEEDED(container.Get().Restart(WSLCSignalSIGKILL, 0, nullptr));
+        WaitForContainerRuns(container, 6);
+        WaitForContainerState(container, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
+
+        // A stop keeps the count.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
+        WaitForPersistedRestartCount(m_defaultSession.get(), statePath, 2u);
+
+        // An explicit start resets the count.
+        VERIFY_SUCCEEDED(container.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        WaitForContainerRuns(container, 9);
+        WaitForContainerState(container, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(2u, container.Inspect().RestartCount);
+        WaitForPersistedRestartCount(m_defaultSession.get(), statePath, 2u);
+
+        // Deleting the container removes its document.
+        VERIFY_SUCCEEDED(container.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_SUCCEEDED(container.Get().Delete(WSLCDeleteFlagsNone));
+        VERIFY_IS_FALSE(GuestFileExists(m_defaultSession.get(), statePath));
+    }
+
+    WSLC_TEST_METHOD(ContainerPersistentStateSurvivesSession)
+    {
+        auto restore = ResetTestSession(); // Required to access the storage folder.
+
+        constexpr auto c_sessionName = L"persistent-state-session-test";
+        std::string createdStatePath;
+        std::string corruptStatePath;
+        std::string oversizedStatePath;
+        std::string missingStatePath;
+        std::string runningStatePath;
+        const std::string corruptContent = "{\"RestartCount\":";
+        constexpr size_t c_oversizedLength = 64 * 1024 + 1;
+
+        {
+            auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+
+            WSLCContainerLauncher createdLauncher("debian:latest", "test-persistent-state-created", {"sleep", "99999"});
+            auto created = createdLauncher.Create(*session);
+            created.SetDeleteOnClose(false);
+            createdStatePath = ContainerStatePath(created.Id());
+
+            WSLCContainerLauncher corruptLauncher("debian:latest", "test-persistent-state-corrupt", {"sleep", "99999"});
+            auto corrupt = corruptLauncher.Create(*session);
+            corrupt.SetDeleteOnClose(false);
+            corruptStatePath = ContainerStatePath(corrupt.Id());
+
+            WSLCContainerLauncher oversizedLauncher("debian:latest", "test-persistent-state-oversized", {"sleep", "99999"});
+            auto oversized = oversizedLauncher.Create(*session);
+            oversized.SetDeleteOnClose(false);
+            oversizedStatePath = ContainerStatePath(oversized.Id());
+
+            WSLCContainerLauncher missingLauncher("debian:latest", "test-persistent-state-missing", {"sleep", "99999"});
+            auto missing = missingLauncher.Create(*session);
+            missing.SetDeleteOnClose(false);
+            missingStatePath = ContainerStatePath(missing.Id());
+
+            WSLCContainerLauncher runningLauncher("debian:latest", "test-persistent-state-running", {"sleep", "99999"});
+            runningLauncher.SetRestartPolicy(WSLCContainerRestartPolicyAlways);
+            auto running = runningLauncher.Launch(*session, WSLCContainerStartFlagsNone);
+            running.SetDeleteOnClose(false);
+            runningStatePath = ContainerStatePath(running.Id());
+            VERIFY_ARE_EQUAL(0u, running.Inspect().RestartCount);
+            WaitForPersistedRestartCount(session.get(), runningStatePath, 0u);
+
+            // Simulate state recorded by an earlier session and a damaged document.
+            WriteGuestFile(session.get(), createdStatePath, nlohmann::json{{"RestartCount", 5}}.dump());
+            WriteGuestFile(session.get(), corruptStatePath, corruptContent);
+            auto result = ExpectCommandResult(
+                session.get(),
+                {"/bin/sh", "-c", std::format("head -c {} /dev/zero | tr '\\0' ' ' > '{}' && sync", c_oversizedLength, oversizedStatePath)},
+                0);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            result = ExpectCommandResult(session.get(), {"/bin/sh", "-c", std::format("rm -f '{}' && sync", missingStatePath)}, 0);
+            VERIFY_ARE_EQUAL(0, result.Code);
+        }
+
+        auto session = CreateSession(GetDefaultSessionSettings(c_sessionName, true));
+        auto created = OpenContainer(session.get(), "test-persistent-state-created");
+        auto corrupt = OpenContainer(session.get(), "test-persistent-state-corrupt");
+        auto oversized = OpenContainer(session.get(), "test-persistent-state-oversized");
+        auto missing = OpenContainer(session.get(), "test-persistent-state-missing");
+        auto running = OpenContainer(session.get(), "test-persistent-state-running");
+
+        VERIFY_ARE_EQUAL(5u, created.Inspect().RestartCount);
+
+        // A damaged document does not block the container, and is kept until the container is deleted.
+        VERIFY_ARE_EQUAL(0u, corrupt.Inspect().RestartCount);
+        VERIFY_SUCCEEDED(corrupt.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(corrupt.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_ARE_EQUAL(corruptContent, TryReadGuestFile(session.get(), corruptStatePath).value_or(""));
+
+        // An oversized document is treated as damaged.
+        VERIFY_ARE_EQUAL(0u, oversized.Inspect().RestartCount);
+        VERIFY_SUCCEEDED(oversized.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(oversized.Get().Stop(WSLCSignalSIGKILL, 0));
+        auto oversizedSize = ExpectCommandResult(session.get(), {"/bin/sh", "-c", std::format("wc -c < '{}'", oversizedStatePath)}, 0);
+        VERIFY_ARE_EQUAL(std::format("{}\n", c_oversizedLength), oversizedSize.Output[1]);
+
+        // A document that is expected but missing is never recreated.
+        VERIFY_ARE_EQUAL(0u, missing.Inspect().RestartCount);
+        VERIFY_SUCCEEDED(missing.Get().Start(WSLCContainerStartFlagsNone, nullptr, nullptr));
+        VERIFY_SUCCEEDED(missing.Get().Stop(WSLCSignalSIGKILL, 0));
+        VERIFY_IS_FALSE(GuestFileExists(session.get(), missingStatePath));
+
+        // The policy start performed when the session starts counts as a restart.
+        WaitForContainerState(running, WslcContainerStateRunning);
+        VERIFY_ARE_EQUAL(1u, running.Inspect().RestartCount);
+        WaitForPersistedRestartCount(session.get(), runningStatePath, 1u);
+
+        created.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(created.Get().Delete(WSLCDeleteFlagsNone));
+        VERIFY_IS_FALSE(GuestFileExists(session.get(), createdStatePath));
+
+        corrupt.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(corrupt.Get().Delete(WSLCDeleteFlagsNone));
+        VERIFY_IS_FALSE(GuestFileExists(session.get(), corruptStatePath));
+
+        oversized.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(oversized.Get().Delete(WSLCDeleteFlagsNone));
+        VERIFY_IS_FALSE(GuestFileExists(session.get(), oversizedStatePath));
+
+        missing.SetDeleteOnClose(false);
+        VERIFY_SUCCEEDED(missing.Get().Delete(WSLCDeleteFlagsNone));
+    }
+
     WSLC_TEST_METHOD(EventStream)
     {
         constexpr auto c_containerName = "wslc-test-events";
@@ -10952,6 +11282,33 @@ sys.exit(1 if queries else 0)
 
         VERIFY_SUCCEEDED(stopResult);
         VERIFY_ARE_EQUAL(container.State(), WslcContainerStateExited);
+    }
+
+    // Validate that a blocked container stop request doesn't prevent session termination.
+    WSLC_TEST_METHOD(SessionTerminationCancelsContainerStop)
+    {
+        auto restoreSession = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { ResetTestSession(); });
+
+        auto container = LaunchContainerWithBlockingStopHandler(*m_defaultSession, "test-terminate-pending-stop", WSLCContainerFlagsRm);
+        auto initProcess = container.GetInitProcess();
+        auto outputHandle = initProcess.GetStdHandle(1);
+
+        PartialHandleRead output{outputHandle.Get()};
+        output.ExpectConsume("ready\n");
+
+        HRESULT stopResult = E_UNEXPECTED;
+        std::thread stopThread([&]() { stopResult = container.Get().Stop(WSLCSignalSIGTERM, WSLC_STOP_TIMEOUT_NONE); });
+
+        auto cleanup = wil::scope_exit([&]() { stopThread.join(); });
+
+        output.ExpectConsume("stopping\n");
+        VERIFY_SUCCEEDED(m_defaultSession->Terminate());
+        container.SetDeleteOnClose(false);
+
+        stopThread.join();
+        cleanup.release();
+
+        VERIFY_ARE_EQUAL(stopResult, E_ABORT);
     }
 
     WSLC_TEST_METHOD(ConcurrentContainerStopAndIgnoredSignal)
@@ -14841,6 +15198,7 @@ sys.exit(1 if queries else 0)
         constexpr auto c_createdName = "test-recovery-auto-remove-created";
         constexpr auto c_retainedName = "test-recovery-retained";
         std::string removedId;
+        std::string removedStatePath;
         std::string anonymousVolume;
 
         {
@@ -14853,6 +15211,8 @@ sys.exit(1 if queries else 0)
             auto container = launcher.Launch(*session);
             container.SetDeleteOnClose(false);
             removedId = container.Id();
+            removedStatePath = ContainerStatePath(removedId);
+            VERIFY_IS_TRUE(GuestFileExists(session.get(), removedStatePath));
             const auto inspect = container.Inspect();
             VERIFY_ARE_EQUAL(inspect.Mounts.size(), 1u);
             anonymousVolume = inspect.Mounts[0].Name;
@@ -14882,6 +15242,7 @@ sys.exit(1 if queries else 0)
             wil::com_ptr<IWSLCContainer> notFound;
             VERIFY_ARE_EQUAL(session->OpenContainer(c_removedName, &notFound), WSLC_E_CONTAINER_NOT_FOUND);
             VERIFY_ARE_EQUAL(session->OpenContainer(removedId.c_str(), &notFound), WSLC_E_CONTAINER_NOT_FOUND);
+            VERIFY_IS_FALSE(GuestFileExists(session.get(), removedStatePath));
 
             auto [containers, ports] = ListContainers(session.get());
             VERIFY_ARE_EQUAL(containers.size(), 2u);
@@ -17856,17 +18217,122 @@ sys.exit(1 if queries else 0)
         VERIFY_IS_TRUE(process.GetExitEvent().wait(30000));
     }
 
+    void VerifyWindowsProxyDefaults(WSLCNetworkingMode NetworkingMode, const std::string& Host, bool Supported = false)
+    {
+        ScopedWindowsProxySettings originalSettings;
+        const auto proxy = std::format("http://{}:3128", Host);
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"Set-WinhttpProxy -SettingScope User -Proxy \\\"{}\\\" -ProxyBypass \\\".windows.invalid\\\" -AutoconfigUrl \\\"\\\"", wsl::shared::string::MultiByteToWide(proxy)));
+
+        const auto sessionName = std::format(L"windows-proxy-{}-{}", static_cast<int>(NetworkingMode), Supported);
+        auto session = CreateSession(GetDefaultSessionSettings(sessionName.c_str(), false, NetworkingMode));
+        auto terminate = wil::scope_exit([&]() { LOG_IF_FAILED(session->Terminate()); });
+        LoadTestImage(*session, "alpine:latest");
+
+        const auto readEnvironment = [&](const std::vector<std::string>& environment) {
+            WSLCContainerLauncher launcher("alpine:latest", "", {"env"}, environment, "bridge");
+            auto container = launcher.Launch(*session);
+            auto process = container.GetInitProcess();
+            const auto result = process.WaitAndCaptureOutput(30000);
+            VERIFY_ARE_EQUAL(0, result.Code);
+            return "\n" + result.Output.at(1);
+        };
+        const auto environment = readEnvironment({});
+        for (const auto* name : {"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"})
+        {
+            if (Supported)
+            {
+                VERIFY_IS_TRUE(environment.find(std::format("\n{}={}\n", name, proxy)) != std::string::npos);
+            }
+            else
+            {
+                VERIFY_IS_TRUE(environment.find(std::format("\n{}=", name)) == std::string::npos);
+            }
+        }
+        for (const auto* name : {"no_proxy", "NO_PROXY"})
+        {
+            VERIFY_IS_TRUE(environment.find(std::format("\n{}=.windows.invalid\n", name)) != std::string::npos);
+        }
+
+        const std::vector<std::string> overrides{"http_proxy=http://localhost:8081", "HTTPS_PROXY=", "no_proxy="};
+        const auto overriddenEnvironment = readEnvironment(overrides);
+        for (const auto& value : overrides)
+        {
+            VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}\n", value)) != std::string::npos);
+        }
+        for (const auto* name : {"HTTP_PROXY", "https_proxy", "NO_PROXY"})
+        {
+            VERIFY_IS_TRUE(overriddenEnvironment.find(std::format("\n{}=", name)) == std::string::npos);
+        }
+    }
+
+    WSLC_TEST_METHOD(WindowsProxySettingsRestored)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        ScopedWindowsProxySettings originalSettings;
+        LxsstuLaunchPowershellAndCaptureOutput(
+            L"Set-WinhttpProxy -SettingScope User -Proxy 'http=original.proxy.invalid:3128;https=secure.proxy.invalid:3129' "
+            L"-ProxyBypass '<local>;*.original.invalid' -AutoconfigUrl 'http://127.0.0.1:9/original.pac?token=synthetic' "
+            L"-AutoDetect");
+        const auto expected = LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first;
+
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "192.0.2.1", true);
+
+        VERIFY_ARE_EQUAL(expected, LxsstuLaunchPowershellAndCaptureOutput(L"netsh winhttp show advproxy").first);
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyLoopbackDefaultsNAT)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "127.0.0.1");
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyLoopbackDefaultsWithoutHostLoopback)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "127.0.0.1");
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyIpv6DefaultsNAT)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "[2001:db8::1]");
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeNAT, "192.0.2.1", true);
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyIpv6DefaultsConsomme)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[2001:db8::1]", true);
+    }
+
+    WSLC_TEST_METHOD(WindowsProxyMappedLoopbackDefaultsConsomme)
+    {
+        SKIP_TEST_SERVER();
+        WINHTTP_PROXY_TEST_ONLY();
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:127.0.0.1]");
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:7f00:1]");
+        VerifyWindowsProxyDefaults(WSLCNetworkingModeConsomme, "[::ffff:192.0.2.1]", true);
+    }
+
     // Helper: COM callback that captures all warnings received.
     class CapturingWarningCallback
         : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IWarningCallback, IFastRundown>
     {
     public:
         HRESULT OnWarning(LPCWSTR Message) override
+        try
         {
             std::lock_guard lock(m_lock);
             m_warnings.emplace_back(Message);
             return S_OK;
         }
+        CATCH_RETURN();
 
         std::vector<std::wstring> GetWarnings()
         {

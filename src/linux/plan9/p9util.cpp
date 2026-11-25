@@ -35,7 +35,13 @@ inline int sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 
 inline int sys_faccessat(int dirFd, const char* pathName, int mode, int flags)
 {
-    return syscall(SYS_faccessat, dirFd, pathName, mode, flags);
+    int result = syscall(SYS_faccessat2, dirFd, pathName, mode, flags);
+    if (result < 0 && errno == ENOSYS)
+    {
+        result = syscall(SYS_faccessat, dirFd, pathName, mode, flags);
+    }
+
+    return result;
 }
 
 inline int sys_setgroups(size_t size, const gid_t* list)

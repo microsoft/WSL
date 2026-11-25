@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+#include <chrono>
 #include <map>
 #include <set>
 #include <utility>
@@ -9,7 +10,6 @@
 #include <NetlinkChannel.h>
 #include <functional>
 #include <memory>
-#include <time.h>
 #include "util.h"
 #include <linux/seccomp.h>
 #include "waitablevalue.h"
@@ -122,6 +122,7 @@ public:
     };
 
 private:
+    using Clock = std::chrono::steady_clock;
     using ActivePortSet = std::set<std::pair<std::uint16_t, int>>;
 
     struct ActivePorts
@@ -133,7 +134,7 @@ private:
     struct ListPortsResult
     {
         ActivePorts Ports;
-        time_t Timestamp;
+        Clock::time_point Timestamp;
     };
 
     using TrackerEvent = std::variant<seccomp_notif, ListPortsResult>;
@@ -143,7 +144,7 @@ private:
         return m_networkingMode == LxMiniInitNetworkingModeMirrored;
     }
 
-    void ReconcileAllocatedPorts(const ActivePorts& Ports, time_t Timestamp);
+    void ReconcileAllocatedPorts(const ActivePorts& Ports, Clock::time_point Timestamp);
 
     void RunPortListing();
 
@@ -167,7 +168,9 @@ private:
 
     void TrackPort(PortAllocation allocation);
 
-    std::map<PortAllocation, std::optional<time_t>> m_allocatedPorts;
+    int HandleInterfaceStateChange(const seccomp_notif& Notification);
+
+    std::map<PortAllocation, std::optional<Clock::time_point>> m_allocatedPorts;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
 

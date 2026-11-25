@@ -1,5 +1,9 @@
 <Project>
   <ItemGroup>
+    <FrameworkReference Update="Microsoft.NETCore.App" RuntimeFrameworkVersion="${WSL_SETTINGS_RUNTIME_VERSION}" />
+    <KnownAppHostPack Update="Microsoft.NETCore.App">
+      <AppHostPackVersion Condition="'%(TargetFramework)' == 'net8.0'">${WSL_SETTINGS_RUNTIME_VERSION}</AppHostPackVersion>
+    </KnownAppHostPack>
     <FrameworkReference Update="Microsoft.Windows.SDK.NET.Ref" RuntimeFrameworkVersion="${WINDOWS_SDK_DOTNET_VERSION}" TargetingPackVersion="${WINDOWS_SDK_DOTNET_VERSION}" />
     <!-- The below can be removed when the OneBranch pipeline container image is updated to use a newer version of the dotnet SDK -->
     <WindowsSdkSupportedTargetPlatformVersion Include="10.0.26100.0" Exclude="@(WindowsSdkSupportedTargetPlatformVersion)" WindowsSdkPackageVersion="10.0.26100.0" MinimumNETVersion="6.0" />

@@ -27,10 +27,12 @@ Abstract:
 #include "DockerHTTPClient.h"
 #include "EventStore.h"
 #include "IORelay.h"
+#include "LxssHttpProxy.h"
 #include "RuntimeClass.h"
 #include <atomic>
 #include <ctxtcall.h>
 #include <list>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 
@@ -309,6 +311,8 @@ public:
         return m_runtime;
     }
 
+    std::vector<std::string> GetProxyEnvironment() const;
+
     bool IsTerminating() const noexcept
     {
         return m_terminating.load();
@@ -410,7 +414,11 @@ private:
     void OnContainerdExited();
     void OnDockerdExited();
     ServiceRunningProcess StartProcess(
-        const std::string& Executable, const std::vector<std::string>& Args, PCSTR LogSource, std::function<void()>&& ExitCallback);
+        const std::string& Executable,
+        const std::vector<std::string>& Args,
+        PCSTR LogSource,
+        std::function<void()>&& ExitCallback,
+        const std::vector<std::string>& ExtraEnvironment = {});
     void InstallTrustedRootCertificates();
     void StartContainerd();
     void StartDockerd();
@@ -462,6 +470,8 @@ private:
     std::optional<std::wstring> m_settingsCreatorProcessName;
     std::optional<std::wstring> m_settingsStoragePath;
     std::optional<std::string> m_settingsRootVhdTypeOverride;
+    std::optional<std::string> m_settingsHostLoopback;
+    std::unique_ptr<HttpProxyStateTracker> m_httpProxyStateTracker;
     std::vector<BYTE> m_userSid;
 
     WSLCFeatureFlags m_featureFlags{};

@@ -31,36 +31,6 @@ using wsl::shared::hns::GuestEndpointResourceType;
 using wsl::shared::hns::ModifyGuestEndpointSettingRequest;
 using wsl::shared::hns::ModifyRequestType;
 
-bool TryLoadWinhttpProxyMethods() noexcept
-{
-    constexpr auto winhttpModuleName = L"Winhttp.dll";
-    const wil::shared_hmodule winhttpModule{LoadLibraryEx(winhttpModuleName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)};
-    if (!winhttpModule)
-    {
-        return false;
-    }
-
-    try
-    {
-        // attempt to find the functions for the Winhttp proxy APIs.
-        static LxssDynamicFunction<decltype(WinHttpRegisterProxyChangeNotification)> WinHttpRegisterProxyChangeNotification{
-            winhttpModule, "WinHttpRegisterProxyChangeNotification"};
-        static LxssDynamicFunction<decltype(WinHttpUnregisterProxyChangeNotification)> WinHttpUnregisterProxyChangeNotification{
-            winhttpModule, "WinHttpUnregisterProxyChangeNotification"};
-        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsEx)> WinHttpGetProxySettingsEx{
-            winhttpModule, "WinHttpGetProxySettingsEx"};
-        static LxssDynamicFunction<decltype(WinHttpGetProxySettingsResultEx)> WinHttpGetProxySettingsResultEx{
-            winhttpModule, "WinHttpGetProxySettingsResultEx"};
-        static LxssDynamicFunction<decltype(WinHttpFreeProxySettingsEx)> WinHttpFreeProxySettingsEx{
-            winhttpModule, "WinHttpFreeProxySettingsEx"};
-    }
-    catch (...)
-    {
-        return false;
-    }
-    return true;
-}
-
 #define HYPERV_FIREWALL_TEST_ONLY() \
     { \
         WINDOWS_11_TEST_ONLY(); \
@@ -91,15 +61,6 @@ bool TryLoadWinhttpProxyMethods() noexcept
         if (!TryLoadDnsResolverMethods()) \
         { \
             LogSkipped("DNS tunneling APIs not present on this OS. Skipping test..."); \
-            return; \
-        } \
-    }
-
-#define WINHTTP_PROXY_TEST_ONLY() \
-    { \
-        if (!TryLoadWinhttpProxyMethods()) \
-        { \
-            LogSkipped("Winhttp proxy APIs not present on this OS. Skipping test..."); \
             return; \
         } \
     }
@@ -2407,6 +2368,59 @@ class NetworkTests
         return {std::move(process), assignedPort};
     }
 
+    static void VerifyI386PortIsTracked(bool bindSocket)
+    {
+        WslKeepAlive keepAlive;
+
+        for (const auto* abi : {L"direct", L"socketcall"})
+        {
+            LogInfo("Testing i386 %ls via %ls", bindSocket ? L"bind" : L"listen", abi);
+            uint16_t selectedPort{};
+            if (bindSocket)
+            {
+                auto availablePort = BindHostPort(0, SOCK_DGRAM, IPPROTO_UDP, true);
+                SOCKADDR_IN availableAddress{};
+                int addressLength = sizeof(availableAddress);
+                VERIFY_ARE_EQUAL(getsockname(availablePort.get(), reinterpret_cast<SOCKADDR*>(&availableAddress), &addressLength), 0);
+                selectedPort = ntohs(availableAddress.sin_port);
+            }
+
+            auto [read, write] = CreateSubprocessPipe(false, true);
+            auto command = LxssGenerateWslCommandLine(
+                std::format(L"--exec timeout --signal=KILL 90s /data/test/socket_i386 {} {} {}", bindSocket ? L"bind" : L"listen", abi, selectedPort)
+                    .c_str());
+            unique_kill_process process(LxsstuStartProcess(command.data(), nullptr, write.get()));
+            write.reset();
+            PartialHandleRead output{read.get()};
+
+            std::string portBytes;
+            VERIFY_NO_THROW(portBytes = output.ConsumeBytes(sizeof(uint16_t)));
+            uint16_t networkPort{};
+            memcpy(&networkPort, portBytes.data(), sizeof(networkPort));
+            const auto port = ntohs(networkPort);
+            VERIFY_ARE_NOT_EQUAL(port, 0);
+            if (bindSocket)
+            {
+                VERIFY_ARE_EQUAL(port, selectedPort);
+                BindHostPort(port, SOCK_DGRAM, IPPROTO_UDP, false);
+                continue;
+            }
+
+            const auto connectToGuest = [&]() {
+                wil::unique_socket clientSocket(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+                THROW_LAST_ERROR_IF(!clientSocket);
+
+                SOCKADDR_IN address{};
+                address.sin_family = AF_INET;
+                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                address.sin_port = networkPort;
+                THROW_LAST_ERROR_IF(connect(clientSocket.get(), reinterpret_cast<SOCKADDR*>(&address), sizeof(address)) == SOCKET_ERROR);
+            };
+
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(connectToGuest, std::chrono::seconds(1), std::chrono::seconds(30)));
+        }
+    }
+
     // Verifies that a listen() call with no preceding bind() (implicit autobind) is tracked
     // by the host port tracker, mirroring VerifyPortZeroBindIsTracked's coverage of the
     // pre-existing explicit bind(0) path.
@@ -4234,6 +4248,44 @@ class NetworkTests
         RunGns(ncsiDnsOnlyName, AdapterId, LxGnsMessageConnectTestRequest, testErrorCode);
     }
 
+    TEST_METHOD(HttpProxyTracksChangesWithoutNetworkingMode)
+    {
+        WINHTTP_PROXY_TEST_ONLY();
+        VERIFY_SUCCEEDED(HttpProxyStateTracker::s_LoadWinHttpProxyMethods());
+
+        ScopedWindowsProxySettings originalSettings;
+        SetHttpProxySettings(c_httpProxyLocalhostv4, L"", L"", true);
+
+        wil::unique_handle userToken;
+        VERIFY_WIN32_BOOL_SUCCEEDED(OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY, &userToken));
+        HttpProxyStateTracker tracker(10000, userToken.get());
+
+        const auto verifyProxy = [&](const std::string& expectedProxy) {
+            std::optional<HttpProxySettings> settings;
+            Stopwatch<std::chrono::seconds> watchdog(std::chrono::seconds(30));
+            do
+            {
+                settings = tracker.WaitForInitialProxySettings();
+                if (settings && settings->Proxy == expectedProxy && settings->SecureProxy == expectedProxy)
+                {
+                    break;
+                }
+            } while (Sleep(100), !watchdog.IsExpired());
+
+            VERIFY_IS_TRUE(settings.has_value());
+            VERIFY_ARE_EQUAL(expectedProxy, settings->Proxy);
+            VERIFY_ARE_EQUAL(expectedProxy, settings->SecureProxy);
+        };
+
+        verifyProxy(wsl::shared::string::WideToMultiByte(c_httpProxyLocalhostv4));
+
+        SetHttpProxySettings(c_httpProxyString2, L"", L"", true);
+        verifyProxy(wsl::shared::string::WideToMultiByte(c_httpProxyString2));
+
+        ClearHttpProxySettings(true);
+        verifyProxy("");
+    }
+
     TEST_METHOD(HttpProxyRestoredAfterNatFallback)
     {
         WINHTTP_PROXY_TEST_ONLY();
@@ -5695,6 +5747,17 @@ class MirroredTests
                 ToString(wsl::core::NetworkingMode::Mirrored), ToString(wsl::core::NetworkingMode::None)));
         VERIFY_ARE_EQUAL(expectedWarnings, warnings);
     }
+
+    WSL2_TEST_METHOD(I386BindIsTracked)
+    {
+        SKIP_TEST_ARM64();
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        NetworkTests::VerifyI386PortIsTracked(true);
+    }
 };
 
 class BridgedTests
@@ -6033,6 +6096,73 @@ class ConsommeTests
         auto tcpPort = NetworkTests::BindGuestPort(L"TCP4-LISTEN:2345", true);
     }
 
+    WSL2_TEST_METHOD(WildcardAndLoopbackRebindAfterClose)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        const auto bindAndClose = [](uint16_t port, std::wstring_view address) {
+            auto [listener, read] =
+                NetworkTests::BindGuestPort(std::format(L"TCP4-LISTEN:{},bind={},accept-timeout=0.001", port, address), true);
+            VERIFY_ARE_EQUAL(WaitForSingleObject(listener.m_process.get(), 30000), WAIT_OBJECT_0);
+        };
+
+        bindAndClose(12345, L"0.0.0.0");
+        bindAndClose(12345, L"127.0.0.1");
+
+        bindAndClose(12346, L"127.0.0.1");
+        bindAndClose(12346, L"0.0.0.0");
+    }
+
+    WSL2_TEST_METHOD(GuestOnlyAddressBind)
+    {
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+
+        WslKeepAlive keepAlive;
+        constexpr auto c_ipv4Address = L"192.0.2.1";
+        constexpr auto c_ipv6Address = L"2001:db8::1";
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link add bind-test type bridge"), 0L);
+
+        auto cleanup =
+            wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [] { VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link delete bind-test"), 0L); });
+
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"ip addr add {}/32 dev bind-test", c_ipv4Address)), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"ip -6 addr add {}/128 dev bind-test nodad", c_ipv6Address)), 0L);
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip link set bind-test up"), 0L);
+
+        const std::map<std::wstring, std::wstring> cases = {
+            {std::format(L"TCP4-LISTEN:1234,bind={}", c_ipv4Address), std::format(L"TCP4-CONNECT:{}:1234,connect-timeout=5", c_ipv4Address)},
+            {std::format(L"UDP4-LISTEN:1234,bind={}", c_ipv4Address), std::format(L"UDP4-SENDTO:{}:1234", c_ipv4Address)},
+            {std::format(L"TCP6-LISTEN:1235,bind=[::ffff:{}],ipv6only=0", c_ipv4Address),
+             std::format(L"TCP4-CONNECT:{}:1235,connect-timeout=5", c_ipv4Address)},
+            {std::format(L"UDP6-LISTEN:1235,bind=[::ffff:{}],ipv6only=0", c_ipv4Address), std::format(L"UDP4-SENDTO:{}:1235", c_ipv4Address)},
+            {std::format(L"TCP6-LISTEN:1237,bind=[{}],ipv6only=1", c_ipv6Address),
+             std::format(L"TCP6-CONNECT:[{}]:1237,connect-timeout=5", c_ipv6Address)},
+            {std::format(L"UDP6-LISTEN:1237,bind=[{}],ipv6only=1", c_ipv6Address), std::format(L"UDP6-SENDTO:[{}]:1237", c_ipv6Address)},
+        };
+
+        for (const auto& [bindSpec, connectSpec] : cases)
+        {
+            auto [process, read] = NetworkTests::BindGuestPort(std::format(L"-u -T5 {}", bindSpec), true);
+
+            VERIFY_ARE_EQUAL(LxsstuLaunchWsl(std::format(L"echo guest-only | socat -T5 -u - {}", connectSpec)), 0L);
+
+            VERIFY_ARE_EQUAL(WaitForSingleObject(process.m_process.get(), 60 * 1000), WAIT_OBJECT_0);
+            VERIFY_ARE_EQUAL(ReadToString(read.get()), std::string("guest-only\n"));
+        }
+
+        // Validate the binding addresses that the guest doesn't have fails.
+        {
+            const auto [output, error] = LxsstuLaunchWslAndCaptureOutput(L"socat TCP4-LISTEN:1236,bind=1.1.1.1 STDOUT", 1);
+            VERIFY_IS_TRUE(output.empty());
+            VERIFY_ARE_NOT_EQUAL(error.find(L"Cannot assign requested address"), std::wstring::npos);
+        }
+    }
+
     static auto SetTestEphemeralPortRange()
     {
         auto [originalRange, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /proc/sys/net/ipv4/ip_local_port_range", 0);
@@ -6235,6 +6365,25 @@ class ConsommeTests
             },
             std::chrono::seconds(1),
             std::chrono::minutes(2));
+    }
+
+    WSL2_TEST_METHOD(I386BindIsTracked)
+    {
+        SKIP_TEST_ARM64();
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        NetworkTests::VerifyI386PortIsTracked(true);
+    }
+
+    WSL2_TEST_METHOD(I386ListenWithoutBindIsTracked)
+    {
+        SKIP_TEST_ARM64();
+        CONSOMME_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+        auto revertEphemeralPortRange = SetTestEphemeralPortRange();
+        NetworkTests::VerifyI386PortIsTracked(false);
     }
 
     WSL2_TEST_METHOD(ConfigurationV6DnsServers)

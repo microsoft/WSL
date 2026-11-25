@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "Common.h"
+#include "WindowsUpdateIntegration.h"
 #include "wslcsdk.h"
 #include "WslcsdkPrivate.h"
 #include "WSLCContainerLauncher.h"
@@ -2565,6 +2566,15 @@ class WslcSdkTests
 
     WSLC_TEST_METHOD(InstallWithDependencies_WslPackage_GhFallback404)
     {
+        // An applicable WUA update is valid when the published package is newer than the build under test.
+        // Discovery is sufficient: installation would replace the runtime used by the rest of the suite.
+        wsl::windows::common::WindowsUpdateContext wuContext;
+        if (wuContext.SearchForUpdates() != 0)
+        {
+            LogInfo("An applicable Windows Update was found. Leaving the test runtime unchanged.");
+            return;
+        }
+
         // Without repair semantics, DCAT uses EnsureProductRegistration so it should find no update
         // (the product is already registered at the current version). The code then falls back to the
         // GitHub release endpoint. This test intercepts that fallback: the fake API server returns a

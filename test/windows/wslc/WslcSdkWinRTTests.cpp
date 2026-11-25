@@ -1586,7 +1586,9 @@ class WslcSdkWinRtTests
             containerSettings.PortMappings(winrt::single_threaded_vector<WSLCSDK::ContainerPortMapping>(
                 {WSLCSDK::ContainerPortMapping(12342, 8000, WSLCSDK::PortProtocol::TCP)}));
 
-            VERIFY_THROWS_HR(m_defaultSession.CreateContainer(containerSettings), E_INVALIDARG);
+            VERIFY_THROWS_SPECIFIC(m_defaultSession.CreateContainer(containerSettings), winrt::hresult_error, [](winrt::hresult_error const& e) {
+                return e.code() == E_INVALIDARG && e.message() == wsl::shared::Localization::MessageWslcNetworkingDisabledNoPorts();
+            });
         }
 
         // Functional: BRIDGED networking with port mapping; HTTP server must be reachable.
@@ -2322,6 +2324,113 @@ class WslcSdkWinRtTests
         VERIFY_ARE_EQUAL(stderrData, "EXEC_ERR\n");
     }
 
+    WSLC_TEST_METHOD(ProcessIoEventsSharedSettingsReleaseUnstarted)
+    {
+        auto initProcSettings = WSLCSDK::ProcessSettings();
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(initProcSettings);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        container.Start();
+
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto execProcSettings = WSLCSDK::ProcessSettings();
+        execProcSettings.CommandLine(
+            winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo EXEC_OUT && echo EXEC_ERR >&2"}));
+        execProcSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
+
+        // Declared before the processes so the buffers outlive the IO callbacks on every exit path.
+        std::string stdoutData, stderrData;
+
+        auto process1 = container.CreateProcess(execProcSettings);
+        auto process2 = container.CreateProcess(execProcSettings);
+
+        // Releasing the last reference to the unstarted second process must not affect the first one.
+        process2 = nullptr;
+
+        process1.OutputReceived([&](winrt::array_view<uint8_t const> data) {
+            stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
+        });
+        process1.ErrorReceived([&](winrt::array_view<uint8_t const> data) {
+            stderrData.append(reinterpret_cast<const char*>(data.data()), data.size());
+        });
+
+        StartProcessAndWaitForExit(process1);
+
+        VERIFY_ARE_EQUAL(stdoutData, "EXEC_OUT\n");
+        VERIFY_ARE_EQUAL(stderrData, "EXEC_ERR\n");
+    }
+
+    WSLC_TEST_METHOD(ProcessIoEventsSharedSettingsRouting)
+    {
+        auto initProcSettings = WSLCSDK::ProcessSettings();
+        initProcSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sleep", L"99"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(initProcSettings);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        container.Start();
+
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto execProcSettings = WSLCSDK::ProcessSettings();
+        execProcSettings.CommandLine(
+            winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo EXEC_OUT && echo EXEC_ERR >&2"}));
+        execProcSettings.OutputMode(WSLCSDK::ProcessOutputMode::Event);
+
+        struct ProcessEvents
+        {
+            std::mutex lock;
+            std::string stdoutData;
+            std::string stderrData;
+            int exitCount = 0;
+        };
+
+        auto subscribe = [](WSLCSDK::Process const& process, ProcessEvents& events) {
+            process.OutputReceived([&events](winrt::array_view<uint8_t const> data) {
+                std::lock_guard guard{events.lock};
+                events.stdoutData.append(reinterpret_cast<const char*>(data.data()), data.size());
+            });
+            process.ErrorReceived([&events](winrt::array_view<uint8_t const> data) {
+                std::lock_guard guard{events.lock};
+                events.stderrData.append(reinterpret_cast<const char*>(data.data()), data.size());
+            });
+            process.Exited([&events](int32_t) {
+                std::lock_guard guard{events.lock};
+                events.exitCount++;
+            });
+        };
+
+        auto verifyEvents = [](ProcessEvents& events, bool expectEvents) {
+            std::lock_guard guard{events.lock};
+            VERIFY_ARE_EQUAL(events.stdoutData, std::string{expectEvents ? "EXEC_OUT\n" : ""});
+            VERIFY_ARE_EQUAL(events.stderrData, std::string{expectEvents ? "EXEC_ERR\n" : ""});
+            VERIFY_ARE_EQUAL(events.exitCount, expectEvents ? 1 : 0);
+        };
+
+        ProcessEvents events1, events2;
+
+        // Keep both processes alive and verify each one only receives its own events.
+        auto process1 = container.CreateProcess(execProcSettings);
+        auto process2 = container.CreateProcess(execProcSettings);
+        subscribe(process1, events1);
+        subscribe(process2, events2);
+
+        StartProcessAndWaitForExit(process1);
+
+        verifyEvents(events1, true);
+        verifyEvents(events2, false);
+
+        StartProcessAndWaitForExit(process2);
+
+        verifyEvents(events1, true);
+        verifyEvents(events2, true);
+    }
+
     WSLC_TEST_METHOD(ProcessIoEventsHandleExclusion)
     {
         // Register an OutputReceived handler only. The IOCallback acquires ALL pipe handles
@@ -2977,5 +3086,77 @@ class WslcSdkWinRtTests
 
         VERIFY_ARE_EQUAL(stdoutAccum, "EVENT_OUT\n");
         VERIFY_ARE_EQUAL(stderrAccum, "EVENT_ERR\n");
+    }
+
+    WSLC_TEST_METHOD(OpenContainerEventModeCloseDuringOutputCallback)
+    {
+        // Verify that closing a running Event-mode container does not destroy its init process
+        // while an output callback is still executing on the IO thread.
+        constexpr auto c_containerName = L"wslc-winrt-open-event-close-test";
+
+        auto procSettings = WSLCSDK::ProcessSettings();
+        procSettings.CommandLine(winrt::single_threaded_vector<winrt::hstring>({L"/bin/sh", L"-c", L"echo OUT && sleep 99"}));
+
+        auto containerSettings = WSLCSDK::ContainerSettings(L"debian:latest");
+        containerSettings.InitProcess(procSettings);
+        containerSettings.Name(c_containerName);
+
+        auto container = m_defaultSession.CreateContainer(containerSettings);
+        auto cleanup = DELETE_CONTAINER_ON_SCOPE_EXIT(container);
+
+        auto opened = m_defaultSession.OpenContainer(c_containerName, WSLCSDK::ProcessOutputMode::Event);
+
+        struct DestructionSignal
+        {
+            HANDLE Event;
+            ~DestructionSignal()
+            {
+                SetEvent(Event);
+            }
+        };
+
+        wil::unique_event outputReceived{wil::EventOptions::ManualReset};
+        wil::unique_event resumeCallback{wil::EventOptions::ManualReset};
+        wil::unique_event processDestroyed{wil::EventOptions::ManualReset};
+
+        // Release the container while the events are still alive.
+        auto releaseOpened = wil::scope_exit([&]() {
+            resumeCallback.SetEvent();
+            opened = nullptr;
+        });
+
+        {
+            auto initProcess = opened.InitProcess();
+
+            initProcess.OutputReceived([&](winrt::array_view<const uint8_t>) {
+                outputReceived.SetEvent();
+                resumeCallback.wait(60 * 1000);
+            });
+
+            // The handler is only destroyed when the init process is destroyed.
+            auto signal = std::make_shared<DestructionSignal>(processDestroyed.get());
+            initProcess.Exited([signal](int32_t) {});
+        }
+
+        opened.Start();
+        VERIFY_IS_TRUE(outputReceived.wait(30 * 1000));
+
+        std::thread closeThread([&opened]() {
+            auto coInit = wil::CoInitializeEx(COINIT_MULTITHREADED);
+            opened.Close();
+        });
+
+        auto joinCloseThread = wil::scope_exit([&]() {
+            resumeCallback.SetEvent();
+            closeThread.join();
+        });
+
+        // The output callback is blocked, so the init process must remain alive.
+        VERIFY_IS_FALSE(processDestroyed.wait(2 * 1000));
+
+        joinCloseThread.reset();
+
+        opened = nullptr;
+        VERIFY_IS_TRUE(processDestroyed.wait(30 * 1000));
     }
 };

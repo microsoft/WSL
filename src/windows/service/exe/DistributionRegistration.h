@@ -46,6 +46,7 @@ class DistributionRegistration
 {
 public:
     static DistributionRegistration Create(
+        const wil::shared_handle& UserToken,
         HKEY LxssKey,
         const std::optional<GUID>& Id,
         LPCWSTR Name,
@@ -57,11 +58,11 @@ public:
         LPCWSTR VhdFileName,
         bool EnableOobe);
 
-    static DistributionRegistration Open(HKEY LxssKey, const GUID& Id);
-    static DistributionRegistration OpenOrDefault(HKEY LxssKey, const GUID* Id);
-    static std::optional<DistributionRegistration> OpenDefault(HKEY LxssKey);
+    static DistributionRegistration Open(const wil::shared_handle& UserToken, HKEY LxssKey, const GUID& Id);
+    static DistributionRegistration OpenOrDefault(const wil::shared_handle& UserToken, HKEY LxssKey, const GUID* Id);
+    static std::optional<DistributionRegistration> OpenDefault(const wil::shared_handle& UserToken, HKEY LxssKey);
     static void SetDefault(HKEY LxssKey, const DistributionRegistration& Distro);
-    static void DeleteDefault(HKEY LxssKey);
+    static void DeleteDefault(HANDLE UserToken, HKEY LxssKey);
 
     DistributionRegistration() = default;
     const GUID& Id() const;
@@ -81,10 +82,11 @@ public:
     static DWORD ApplyGlobalFlagsOverride(DWORD Flags);
 
 private:
-    DistributionRegistration(const GUID& Id, wil::unique_hkey&& key);
+    DistributionRegistration(const wil::shared_handle& UserToken, const GUID& Id, wil::unique_hkey&& key);
 
     GUID m_id{};
     wil::unique_hkey m_key;
+    wil::shared_handle m_userToken;
 };
 
 namespace Property {
