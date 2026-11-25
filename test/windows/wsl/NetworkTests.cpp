@@ -1131,7 +1131,8 @@ class NetworkTests
         VerifyDnsQueries();
     }
 
-    WSL2_TEST_METHOD(NatDnsTunneling)
+    // OpenVMM uses Consomme, which tunnels DNS through the gateway (see ConsommeTests::DnsTunnelingResolvConfUsesGateway).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunneling)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -1140,7 +1141,8 @@ class NetworkTests
         VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
     }
 
-    WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
+    // OpenVMM uses Consomme, which tunnels DNS through the gateway and ignores dnsTunnelingIpAddress.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -1520,7 +1522,8 @@ class NetworkTests
         VerifyHttpProxyAndWslEnv();
     }
 
-    WSL2_TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
+    // OpenVMM uses Consomme, which supports loopback proxies (see ConsommeTests::HttpProxyLoopback).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));

@@ -2380,11 +2380,10 @@ Usage:
         // Some cases need a config without the test defaults. When running against OpenVMM, that config still has to
         // select the OpenVMM backend with the same overrides that LxssGenerateTestConfig() applies.
         const std::wstring minimalConfig =
-            LxsstuOpenVmmMode()
-                ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
-                  L"\ngpuSupport=false\nguiApplications=false\nnestedVirtualization=false\nvirtiofs=true\nfirewall=false\n"
-                  L"dnsTunneling=false\nhardwarePerformanceCounters=false\n"
-                : L"[wsl2]\n";
+            LxsstuOpenVmmMode() ? L"[experimental]\nopenVmm=true\nvirtioFsAggregateShares=false\n[wsl2]"
+                                  L"\ngpuSupport=false\nguiApplications=false\nnestedVirtualization=false\nvirtiofs=true\n"
+                                  L"hardwarePerformanceCounters=false\n"
+                                : L"[wsl2]\n";
 
         // .wslconfig line numbers of the first line appended to each prefix.
         const auto firstLine = [](const std::wstring& prefix) { return std::ranges::count(prefix, L'\n') + 1; };
@@ -2488,8 +2487,10 @@ Usage:
             L"ipv6=true\nipv6=false",
             std::format(L"wsl: Duplicated config key 'wsl2.ipv6' in {}:{} (Conflicting key: 'wsl2.ipv6' in {}:{})\r\n", wslConfigPath, line + 1, wslConfigPath, line));
 
+        // OpenVMM only supports Consomme and None, so use Consomme as the value that takes effect.
         validateWarnings(
-            L"networkingMode=NAT\n[experimental]\nnetworkingMode=Mirrored",
+            LxsstuOpenVmmMode() ? L"networkingMode=Consomme\n[experimental]\nnetworkingMode=Mirrored"
+                                : L"networkingMode=NAT\n[experimental]\nnetworkingMode=Mirrored",
             std::format(L"wsl: Duplicated config key 'experimental.networkingMode' in {}:{} (Conflicting key: 'wsl2.networkingMode' in {}:{})\r\n", wslConfigPath, minimalLine + 2, wslConfigPath, minimalLine),
             minimalConfig);
 
@@ -2535,8 +2536,7 @@ Usage:
         }
         else
         {
-            // OpenVMM doesn't support DNS tunneling, and its test configuration already sets experimental.dnsTunneling.
-            if (TryLoadDnsResolverMethods() && !LxsstuOpenVmmMode())
+            if (TryLoadDnsResolverMethods())
             {
                 // Verify DNS tunneling settings are parsed correctly
                 validateWarnings(L"[experimental]\ndnsTunneling=true\nbestEffortDnsParsing=true", dnsTunnelingDisabledWarning);
@@ -2558,16 +2558,18 @@ Usage:
 
         // Verify experimental.swiotlb parsing and validation.
         //
-        // With wsl2.virtio enabled (the default), a valid swiotlb value is accepted silently.
+        // With wsl2.virtio enabled (the default), a valid swiotlb value is accepted silently. OpenVMM rejects a nonzero swiotlb.
+        if (!LxsstuOpenVmmMode())
+        {
+            validateWarnings(L"[experimental]\nswiotlb=64M", L"");
 
-        validateWarnings(L"[experimental]\nswiotlb=64M", L"");
+            constexpr auto expectedWarning =
+                wsl::shared::Arm64 ? L"wsl: The running kernel is missing a patch that significantly improves virtio device "
+                                     L"performance. Update to a more recent WSL kernel to enable this optimization.\r\n"
+                                   : L"";
 
-        constexpr auto expectedWarning =
-            wsl::shared::Arm64 ? L"wsl: The running kernel is missing a patch that significantly improves virtio device "
-                                 L"performance. Update to a more recent WSL kernel to enable this optimization.\r\n"
-                               : L"";
-
-        validateWarnings(L"[experimental]\nswiotlb=4096K", expectedWarning);
+            validateWarnings(L"[experimental]\nswiotlb=4096K", expectedWarning);
+        }
 
         // Malformed values are rejected by the parser; only the parser warning is reported.
         validateWarnings(
