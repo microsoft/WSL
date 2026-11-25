@@ -180,7 +180,7 @@ try
     GUID distroId{GUID_NULL};
     wil::unique_handle handle{};
     wil::unique_handle parent{};
-    GUID vmId{GUID_NULL};
+    std::wstring guestConnection;
     wil::unique_com_class_object_cookie cookie;
 
     wsl::shared::ArgumentParser parser(GetCommandLineW(), wslhost::binary_name);
@@ -188,7 +188,7 @@ try
     parser.AddArgument(Handle(handle), wslhost::handle_option);
     parser.AddArgument(Handle(event), wslhost::event_option);
     parser.AddArgument(Handle(parent), wslhost::parent_option);
-    parser.AddArgument(vmId, wslhost::vm_id_option);
+    parser.AddArgument(guestConnection, wslhost::guest_connection_option);
     parser.AddArgument(
         [&](auto) {
             // Create an event to be signaled when the last COM object is released.
@@ -245,7 +245,7 @@ try
     }
 
     // Begin handling interop requests.
-    if (IsEqualGUID(vmId, GUID_NULL))
+    if (guestConnection.empty())
     {
         wsl::windows::common::interop::WorkerThread(std::move(handle));
     }
@@ -256,7 +256,7 @@ try
         // This is required because there could have been messages between the process and wsl.exe, and wslhost has no way to know what the sequence numbers were.
         channel.IgnoreSequenceNumbers();
 
-        wsl::windows::common::interop::VmModeWorkerThread(channel, vmId, true);
+        wsl::windows::common::interop::VmModeWorkerThread(channel, wsl::windows::common::GuestConnector::Deserialize(guestConnection), true);
     }
 
     return 0;

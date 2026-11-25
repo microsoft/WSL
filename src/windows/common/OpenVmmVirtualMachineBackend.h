@@ -128,6 +128,8 @@ private:
     };
 
     _Requires_lock_held_(m_lock)
+    HRESULT AttachVirtioBlkLocked(const GUID& InstanceId, std::uint32_t Slot, const std::filesystem::path& Path, bool ReadOnly, HANDLE Token);
+    _Requires_lock_held_(m_lock)
     void AddFileSystemShareLocked(const VmFileSystemShare& Share, const wil::shared_handle& Token);
     _Requires_lock_held_(m_lock)
     void RemoveFileSystemShareLocked(VmShareId Share);

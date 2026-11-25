@@ -73,7 +73,8 @@ class SimpleTests
         VERIFY_IS_TRUE(WI_IsFlagSet(attributes, FILE_ATTRIBUTE_SPARSE_FILE) == sparse);
     }
 
-    WSL2_TEST_METHOD(CheckSparse)
+    // The OpenVMM VHDX backing path does not support sparse files.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(CheckSparse)
     {
         WslConfigChange config(LxssGenerateTestConfig({.sparse = true}));
 

@@ -907,7 +907,7 @@ class NetworkTests
               L"fc00::1"}});
     }
 
-    WSL2_TEST_METHOD(MacAddressChangeAndBack)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(MacAddressChangeAndBack)
     {
         const auto originalMac = GetMacAddress();
 
@@ -1131,7 +1131,8 @@ class NetworkTests
         VerifyDnsQueries();
     }
 
-    WSL2_TEST_METHOD(NatDnsTunneling)
+    // OpenVMM uses Consomme, which tunnels DNS through the gateway (see ConsommeTests::DnsTunnelingResolvConfUsesGateway).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunneling)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -1140,7 +1141,8 @@ class NetworkTests
         VerifyDnsTunneling(c_dnsTunnelingDefaultIp);
     }
 
-    WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
+    // OpenVMM uses Consomme, which tunnels DNS through the gateway and ignores dnsTunnelingIpAddress.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatDnsTunnelingWithSpecificIp)
     {
         DNS_TUNNELING_TEST_ONLY();
 
@@ -1520,7 +1522,8 @@ class NetworkTests
         VerifyHttpProxyAndWslEnv();
     }
 
-    WSL2_TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
+    // OpenVMM uses Consomme, which supports loopback proxies (see ConsommeTests::HttpProxyLoopback).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatHttpProxyFilterByNetworkConfiguration)
     {
         WINHTTP_PROXY_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.autoProxy = true}));
@@ -1705,6 +1708,10 @@ class NetworkTests
     */
     WSL2_TEST_METHOD(LoopbackGetRoute)
     {
+        // OpenVMM configures loopback routing at boot when localhost forwarding is enabled.
+        WslConfigChange config(LxssGenerateTestConfig({.localhostForwarding = false}));
+        AdapterId = NetworkTests::QueryAdapterId();
+
         // Verify that before configurations are applied, the route chosen for 127.0.0.1 tcp/udp uses the local routing table
         const bool loopbackTcpUsesLocalTable =
             LxsstuLaunchWsl(L"ip route get from 127.0.0.1 127.0.0.1 ipproto tcp | grep local") == (DWORD)0;
@@ -1825,7 +1832,9 @@ class NetworkTests
         VERIFY_THROWS(wsl::core::networking::IsAcceptableNetworkRange(L"InvalidRange"), wil::ResultException);
     }
 
-    WSL2_TEST_METHOD(NatInvalidRange)
+    // TODO: OpenVMM NAT doesn't use an HNS network, so these tests are skipped there. OpenVMM needs equivalent behavior
+    // for the persisted NAT network range, gateway and address (including the fallback when they're invalid).
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidRange)
     {
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration(L"InvalidRange", {}, {L"delete"});
@@ -1846,7 +1855,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    WSL2_TEST_METHOD(NatInvalidGateway)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidGateway)
     {
         WslConfigChange config(LxssGenerateTestConfig());
         WriteNatConfiguration({}, L"InvalidGateway", {});
@@ -1867,7 +1876,7 @@ class NetworkTests
         VERIFY_ARE_EQUAL(state.Gateway.value_or(L""), networkConfiguration.gatewayIpAddress);
     }
 
-    WSL2_TEST_METHOD(NatInvalidAddress)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatInvalidAddress)
     {
         WslConfigChange config(LxssGenerateTestConfig());
 
@@ -2003,6 +2012,12 @@ class NetworkTests
         int networkingModeVal = 0;
         WEX::TestExecution::TestData::TryGetValue(L"NetConfig", networkingModeVal);
         auto networkingMode = static_cast<wsl::core::NetworkingMode>(networkingModeVal);
+        if (LxsstuOpenVmmMode() && networkingMode != wsl::core::NetworkingMode::Consomme)
+        {
+            LogSkipped("OpenVMM only supports Consomme networking");
+            return;
+        }
+
         switch (networkingMode)
         {
         case wsl::core::NetworkingMode::Bridged:
@@ -2810,13 +2825,30 @@ class NetworkTests
 
         {
             // Validate that the guest received the correct data.
+            // N.B. Poll the pipe so lost traffic fails the test instead of blocking forever.
             std::string content(strlen(buffer), '\0');
 
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(1);
             DWORD totalRead{};
             while (totalRead < content.size())
             {
+                DWORD available{};
+                VERIFY_IS_TRUE(PeekNamedPipe(read, nullptr, 0, nullptr, &available, nullptr));
+                if (available == 0)
+                {
+                    if (std::chrono::steady_clock::now() > deadline)
+                    {
+                        LogError("Timed out waiting for the guest to receive relayed data");
+                        VERIFY_FAIL();
+                    }
+
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+
                 DWORD bytesRead{};
-                VERIFY_IS_TRUE(ReadFile(read, content.data() + totalRead, static_cast<DWORD>(content.size()) - totalRead, &bytesRead, nullptr));
+                const DWORD toRead = std::min(available, static_cast<DWORD>(content.size()) - totalRead);
+                VERIFY_IS_TRUE(ReadFile(read, content.data() + totalRead, toRead, &bytesRead, nullptr));
                 LogInfo("Read %lu bytes", bytesRead);
 
                 totalRead += bytesRead;
@@ -2838,10 +2870,19 @@ class NetworkTests
         WslKeepAlive keepAlive;
 
         ValidateLocalhostRelayTraffic(AF_INET);
-        ValidateLocalhostRelayTraffic(AF_INET6);
+        if (LxsstuOpenVmmMode())
+        {
+            // Linux drops inbound packets addressed to ::1 on non-loopback interfaces, so OpenVMM Consomme can't relay IPv6 loopback.
+            LogInfo("Skipping IPv6 loopback forwarding on OpenVMM Consomme");
+        }
+        else
+        {
+            ValidateLocalhostRelayTraffic(AF_INET6);
+        }
     }
 
-    WSL2_TEST_METHOD(NatLocalhostRelayDualStack)
+    // OpenVMM doesn't support NAT networking.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatLocalhostRelayDualStack)
     {
         WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
         WslKeepAlive keepAlive;
@@ -2860,7 +2901,8 @@ class NetworkTests
         }
     }
 
-    WSL2_TEST_METHOD(NatLocalhostRelayIpv6Only)
+    // OpenVMM doesn't support NAT networking.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatLocalhostRelayIpv6Only)
     {
         WslConfigChange config(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Nat}));
         WslKeepAlive keepAlive;
@@ -2944,7 +2986,8 @@ class NetworkTests
         VERIFY_ARE_NOT_EQUAL(warnings.find(L"starting data transfer loop"), std::string::npos);
     }
 
-    WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
+    // Requires GUI applications, which OpenVMM doesn't support yet.
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatNonRootNamespaceEphemeralBind)
     {
         // Because the test creates a new network namespace, the resolv.conf from the root network namespace
         // is copied in the resolv.conf of the new network namespace. The DNS tunneling listener running in the root namespace
@@ -3152,7 +3195,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(hyperVBlockRule, expectedConnectivity);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlock)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3161,7 +3204,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Blocked);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -3172,7 +3215,7 @@ class NetworkTests
         FirewallRuleBlockedTests(FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedBlockFirewallDisabledByPolicy)
     {
         HYPERV_FIREWALL_TEST_ONLY();
 
@@ -3212,7 +3255,7 @@ class NetworkTests
         AddFirewallRuleAndValidateTraffic(allowHyperVRule, expectedConnectivity);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedAllow)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3221,7 +3264,7 @@ class NetworkTests
         FirewallRuleAllowedTests(FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesExpectedAllowFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -3299,7 +3342,7 @@ class NetworkTests
             blockRule, isHyperVFirewallEnabled ? FirewallTestConnectivity::Blocked : FirewallTestConnectivity::Allowed);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesEnabledSetting)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         WslConfigChange config(LxssGenerateTestConfig({.firewall = true}));
@@ -3308,7 +3351,7 @@ class NetworkTests
         FirewallSettingEnabledTests(true);
     }
 
-    WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
+    OPENVMM_UNSUPPORTED_WSL2_TEST_METHOD(NatFirewallRulesEnabledSettingFirewallDisabled)
     {
         HYPERV_FIREWALL_TEST_ONLY();
         SKIP_TEST_UNSTABLE();
@@ -4301,7 +4344,7 @@ class GnsCallbackResultTests
 
 class MirroredTests
 {
-    WSL_TEST_CLASS(MirroredTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(MirroredTests)
 
     std::optional<WslConfigChange> m_config;
     GUID AdapterId;
@@ -5699,7 +5742,7 @@ class MirroredTests
 
 class BridgedTests
 {
-    WSL_TEST_CLASS(BridgedTests)
+    OPENVMM_UNSUPPORTED_TEST_CLASS(BridgedTests)
 
     std::optional<WslConfigChange> m_config;
 
@@ -5952,6 +5995,21 @@ class ConsommeTests
     {
         CONSOMME_TEST_ONLY();
 
+        if (LxsstuOpenVmmMode())
+        {
+            // OpenVMM's Consomme uses wsl2.macAddress.
+            m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .macAddress = L"02:11:22:33:44:56"}));
+            VERIFY_ARE_EQUAL(GetMacAddress(L"eth0"), std::wstring(L"02:11:22:33:44:56"));
+
+            // Without one, WSL generates a locally administered unicast address that persists across restarts.
+            m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
+            const auto generated = GetMacAddress(L"eth0");
+            VERIFY_ARE_EQUAL(0x02ul, std::stoul(generated.substr(0, 2), nullptr, 16) & 0x03);
+            RestartWslService();
+            VERIFY_ARE_EQUAL(generated, GetMacAddress(L"eth0"));
+            return;
+        }
+
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme}));
 
         // eth0 should have wsldevicehost's default client MAC. Update if that default changes.
@@ -6122,13 +6180,13 @@ class ConsommeTests
         CONSOMME_TEST_ONLY();
         WINHTTP_PROXY_TEST_ONLY();
 
-        const auto config = LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Consomme, .autoProxy = true});
         auto restoreProxySettings = wil::scope_exit([&] { NetworkTests::ClearHttpProxySettings(true); });
         NetworkTests::SetHttpProxySettings(NetworkTests::c_httpProxyLocalhostv4, L"", L"", true);
 
         for (const bool localhostForwarding : {true, false})
         {
-            m_config->Update(config + std::format(L"localhostForwarding={}\n", localhostForwarding));
+            m_config->Update(LxssGenerateTestConfig(
+                {.networkingMode = wsl::core::NetworkingMode::Consomme, .localhostForwarding = localhostForwarding, .autoProxy = true}));
             NetworkTests::VerifyHttpProxyEnvVariables(localhostForwarding ? NetworkTests::c_httpProxyLocalhostv4 : L"", L"", L"");
         }
     }

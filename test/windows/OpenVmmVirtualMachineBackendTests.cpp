@@ -3,8 +3,9 @@
 #include "precomp.h"
 #include <fstream>
 #include "Common.h"
-#include "OpenVmmNatNetworking.h"
+#include "OpenVmmConsommeNetworking.h"
 #include "OpenVmmVirtualMachineBackend.h"
+#include "WslInstall.h"
 #include "VirtualMachineBackendTestHelpers.h"
 #include "WslCoreHostDnsInfo.h"
 #include "vsock.hpp"
@@ -64,6 +65,27 @@ bool CanBindPort(std::uint16_t Port, ULONG Address, int Protocol)
     return false;
 }
 
+bool CanBindPortIpv6Any(std::uint16_t Port, int Protocol)
+{
+    wil::unique_socket socket{::socket(AF_INET6, Protocol == IPPROTO_TCP ? SOCK_STREAM : SOCK_DGRAM, Protocol)};
+    THROW_WIN32_IF(static_cast<DWORD>(WSAGetLastError()), !socket);
+    BOOL exclusive = TRUE;
+    THROW_WIN32_IF(
+        static_cast<DWORD>(WSAGetLastError()),
+        setsockopt(socket.get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR);
+    SOCKADDR_IN6 address{};
+    address.sin6_family = AF_INET6;
+    address.sin6_port = htons(Port);
+    if (bind(socket.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0)
+    {
+        return true;
+    }
+
+    const auto error = WSAGetLastError();
+    THROW_WIN32_IF(static_cast<DWORD>(error), error != WSAEADDRINUSE && error != WSAEACCES);
+    return false;
+}
+
 HRESULT DescribeResult(const VmCreateRequest& Request)
 {
     return wil::ResultFromException([&] { ValidateCreateRequest(Request); });
@@ -75,7 +97,7 @@ namespace OpenVmmVirtualMachineBackendTests {
 
 class OpenVmmVirtualMachineBackendTests
 {
-    WSL_TEST_CLASS(OpenVmmVirtualMachineBackendTests)
+    OPENVMM_TEST_CLASS(OpenVmmVirtualMachineBackendTests)
 
     TEST_CLASS_SETUP(TestClassSetup)
     {
@@ -104,6 +126,100 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_IS_TRUE(WI_IsFlagSet(error.Context, Context::OpenVmm));
     }
 
+    TEST_METHOD(CreationErrorsIncludeBackend)
+    {
+        using namespace wsl::windows::common;
+        ExecutionContext context(Context::Wsl);
+        ExecutionContext serviceContext(Context::Service);
+        const VmCreateRequest request;
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { OpenVmmVirtualMachineBackend::Create(request); }));
+        VERIFY_IS_TRUE(context.ReportedError().has_value());
+        VERIFY_ARE_EQUAL(
+            std::wstring{L"Wsl/Service/OpenVmm/E_INVALIDARG"}, wslutil::ErrorToString(context.ReportedError().value()).Code);
+        VERIFY_ARE_EQUAL(static_cast<ULONGLONG>(Context::Wsl | Context::Service), serviceContext.CurrentContext());
+    }
+
+    TEST_METHOD(OperationErrorsIncludeBackend)
+    {
+        SKIP_TEST_ARM64();
+        using namespace wsl::windows::common;
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto verifyError = [&](auto&& Operation, HRESULT ExpectedResult, PCWSTR ExpectedCode, std::optional<Context> CallerContext = {}) {
+            ExecutionContext context(Context::Wsl);
+            ExecutionContext serviceContext(Context::Service);
+            std::optional<ExecutionContext> callerContext;
+            if (CallerContext)
+            {
+                callerContext.emplace(CallerContext.value());
+            }
+
+            VERIFY_ARE_EQUAL(ExpectedResult, OperationResult([&] { Operation(); }));
+            VERIFY_IS_TRUE(context.ReportedError().has_value());
+            VERIFY_ARE_EQUAL(std::wstring{ExpectedCode}, wslutil::ErrorToString(context.ReportedError().value()).Code);
+        };
+
+        constexpr auto invalidState = HRESULT_FROM_WIN32(ERROR_INVALID_STATE);
+        verifyError([&] { backend->DetachDisk({}); }, E_INVALIDARG, L"Wsl/Service/OpenVmm/E_INVALIDARG");
+        verifyError([&] { backend->GetTerminationReason(); }, invalidState, L"Wsl/Service/OpenVmm/ERROR_INVALID_STATE");
+        verifyError([&] { backend->AddGpu({}); }, c_notSupported, L"Wsl/Service/OpenVmm/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->AddSharedMemory({}); }, c_notSupported, L"Wsl/Service/OpenVmm/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->ConfigureGuestDma({}); }, c_notSupported, L"Wsl/Service/OpenVmm/ERROR_NOT_SUPPORTED");
+        VmDiskRequest physicalDisk;
+        physicalDisk.Source = VmPhysicalDiskSource{L"\\\\.\\PhysicalDrive0"};
+        verifyError(
+            [&] { backend->AttachDisk(physicalDisk); }, c_notSupported, L"Wsl/Service/AttachDisk/OpenVmm/ERROR_NOT_SUPPORTED", Context::AttachDisk);
+        verifyError([&] { backend->CreateFileSystemDevice({}); }, c_notSupported, L"Wsl/Service/OpenVmm/ERROR_NOT_SUPPORTED");
+        verifyError([&] { backend->GetFileSystemDeviceStatus({}); }, E_INVALIDARG, L"Wsl/Service/OpenVmm/E_INVALIDARG");
+        verifyError([&] { backend->AddFileSystemShare({}, {}); }, E_INVALIDARG, L"Wsl/Service/OpenVmm/E_INVALIDARG");
+        verifyError([&] { backend->RemoveFileSystemShare({}); }, E_INVALIDARG, L"Wsl/Service/OpenVmm/E_INVALIDARG");
+        verifyError([&] { backend->RemoveDevice({}); }, E_INVALIDARG, L"Wsl/Service/OpenVmm/E_INVALIDARG");
+        verifyError([&] { backend->CloseHostSocket({}); }, E_INVALIDARG, L"Wsl/Service/OpenVmm/E_INVALIDARG");
+
+        // Networking callers add the ConfigureNetworking context; the backend adds its own.
+        constexpr auto networking = Context::ConfigureNetworking;
+        verifyError(
+            [&] { backend->AddNetworkAdapter({}); },
+            c_notSupported,
+            L"Wsl/Service/ConfigureNetworking/OpenVmm/ERROR_NOT_SUPPORTED",
+            networking);
+        verifyError(
+            [&] { backend->UpdateNetworkAdapter({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVmm/E_INVALIDARG", networking);
+        verifyError(
+            [&] { backend->RemoveNetworkAdapter({}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVmm/E_INVALIDARG", networking);
+        verifyError([&] { backend->BindPort({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVmm/E_INVALIDARG", networking);
+        verifyError([&] { backend->UnbindPort({}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVmm/E_INVALIDARG", networking);
+        verifyError(
+            [&] { backend->CreateVirtualAddress({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVmm/E_INVALIDARG", networking);
+        verifyError(
+            [&] { backend->CreateDnsRecord({}, {}); }, E_INVALIDARG, L"Wsl/Service/ConfigureNetworking/OpenVmm/E_INVALIDARG", networking);
+
+        backend->Terminate();
+        verifyError([&] { backend->Start(); }, invalidState, L"Wsl/Service/OpenVmm/ERROR_INVALID_STATE");
+        verifyError([&] { backend->CreateGuestListener({1234}); }, invalidState, L"Wsl/Service/OpenVmm/ERROR_INVALID_STATE");
+        verifyError([&] { backend->ConnectGuest({1234}); }, invalidState, L"Wsl/Service/OpenVmm/ERROR_INVALID_STATE");
+        verifyError([&] { backend->CreateHostSocket({1234}); }, invalidState, L"Wsl/Service/OpenVmm/ERROR_INVALID_STATE");
+    }
+
+    TEST_METHOD(NestedVirtualizationConflictIncludesUserError)
+    {
+        SKIP_TEST_ARM64();
+        using namespace wsl::windows::common;
+        for (const auto feature : {VmFeatureRequest::Preferred, VmFeatureRequest::Required})
+        {
+            ExecutionContext context(Context::Wsl);
+            auto request = CreateRequest();
+            request.Processor.NestedVirtualization = feature;
+            VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { OpenVmmVirtualMachineBackend::Create(request); }));
+            VERIFY_IS_TRUE(context.ReportedError().has_value());
+            const auto& error = context.ReportedError().value();
+            VERIFY_IS_TRUE(error.Message.has_value());
+            VERIFY_IS_TRUE(error.Message->find(L"experimental.openVmm=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(error.Message->find(L"wsl2.nestedVirtualization=true") != std::wstring::npos);
+            VERIFY_IS_TRUE(error.Message->find(L"wsl2.nestedVirtualization=false") != std::wstring::npos);
+            VERIFY_ARE_EQUAL(std::wstring{L"Wsl/OpenVmm/ERROR_NOT_SUPPORTED"}, wslutil::ErrorToString(error).Code);
+        }
+    }
+
     TEST_METHOD(RejectsIncompatibleOpenVmmSettings)
     {
         using wsl::windows::common::filesystem::TempFile;
@@ -116,9 +232,7 @@ class OpenVmmVirtualMachineBackendTests
             "virtioFs=true\n"
             "virtio9p=false\n"
             "hardwarePerformanceCounters=false\n"
-            "networkingMode=nat\n"
-            "firewall=false\n"
-            "dnsTunneling=false\n"
+            "networkingMode=consomme\n"
             "ipv6=false\n"
             "[experimental]\n"
             "openVmm=true\n"
@@ -131,6 +245,10 @@ class OpenVmmVirtualMachineBackendTests
             WriteFileContent(file.Path, std::string{Override} + std::string{validConfig});
             return OperationResult([&] {
                 wsl::core::Config config{file.Path.c_str(), token.get()};
+                if (config.EnableOpenVmm)
+                {
+                    config.ValidateOpenVmmSupport();
+                }
                 if (Inspect)
                 {
                     Inspect(config);
@@ -147,6 +265,8 @@ class OpenVmmVirtualMachineBackendTests
                              VERIFY_IS_TRUE((wsl::shared::string::MacAddress{0x02, 0x11, 0x22, 0x33, 0x44, 0x56}) == Config.MacAddress);
                          }));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nnetworkingMode=none\nfirewall=true\ndnsTunneling=true\nipv6=true\n"));
+        // As with Consomme on HCS, the Hyper-V firewall settings don't apply. DNS tunneling uses OpenVMM's DnsQueryRaw resolver.
+        VERIFY_ARE_EQUAL(S_OK, configure("\n[wsl2]\nfirewall=true\ndnsTunneling=true\n"));
         VERIFY_ARE_EQUAL(S_OK, configure("\n[experimental]\nopenVmm=false\n[wsl2]\ngpuSupport=true\n"));
         bool openVmmEnabled = true;
         VERIFY_ARE_EQUAL(
@@ -158,19 +278,23 @@ class OpenVmmVirtualMachineBackendTests
                  "\n[wsl2]\nnestedVirtualization=true\n",
                  "\n[wsl2]\nvirtio=false\n",
                  "\n[wsl2]\nvirtioFs=false\n",
-                 "\n[wsl2]\nvirtio9p=true\n",
                  "\n[wsl2]\nhardwarePerformanceCounters=true\n",
                  "\n[wsl2]\nnetworkingMode=mirrored\n",
                  "\n[wsl2]\nnetworkingMode=bridged\n",
-                 "\n[wsl2]\nnetworkingMode=consomme\n",
-                 "\n[wsl2]\nfirewall=true\n",
-                 "\n[wsl2]\ndnsTunneling=true\n",
-                 "\n[wsl2]\nipv6=true\n",
+                 "\n[wsl2]\nnetworkingMode=nat\n",
                  "\n[experimental]\nvirtioFsAggregateShares=true\n",
                  "\n[experimental]\nswiotlb=1M\n",
              })
         {
             VERIFY_ARE_EQUAL(c_notSupported, configure(setting));
+        }
+
+        // Parsing accepts a conflicting configuration, since libwsl reads and edits .wslconfig without creating a VM.
+        {
+            TempFile file{GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS};
+            file.Handle.reset();
+            WriteFileContent(file.Path, std::string{"\n[wsl2]\nnetworkingMode=mirrored\n"} + std::string{validConfig});
+            VERIFY_ARE_EQUAL(S_OK, OperationResult([&] { wsl::core::Config config{file.Path.c_str(), token.get()}; }));
         }
 
         const wsl::windows::common::ExecutionContext context(wsl::windows::common::Context::CreateVm);
@@ -245,17 +369,15 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
     }
 
-    TEST_METHOD(BootDiskUsesVmOwnerToken)
+    TEST_METHOD(BootDiskAcceptsRequesterToken)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRequest();
         request.BootDisks.push_back(CreateDisk(L"disk"));
         auto& token = request.BootDisks.front().Disk.UserToken;
-        token.emplace();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+
+        // The service passes a copy of the caller's token, which is never the VM owner's token instance.
         token = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, DescribeResult(request));
-        token = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
         VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
         token.reset();
         VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
@@ -350,6 +472,54 @@ class OpenVmmVirtualMachineBackendTests
         request.NetworkAdapters.back().Tag = L"eth0";
         VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
         request.NetworkAdapters.back().Tag.clear();
+        VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
+    }
+
+    TEST_METHOD(OpenVmmConsommeUsesCreationTimeAdaptersAndStaticConfiguration)
+    {
+        SKIP_TEST_ARM64();
+        constexpr wsl::shared::string::MacAddress clientMac{0x02, 0x15, 0x5d, 0x01, 0x02, 0x03};
+        VERIFY_IS_TRUE(
+            std::get<VmUserModeNatNetwork>(wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(true, clientMac).Configuration).InternalDns);
+        const auto request = wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(false, clientMac);
+        const auto& network = std::get<VmUserModeNatNetwork>(request.Configuration);
+        VERIFY_IS_FALSE(network.InternalDns);
+        VERIFY_ARE_EQUAL(std::wstring{L"eth0"}, request.Tag);
+        VERIFY_IS_TRUE(network.ClientMacAddress() == clientMac);
+
+        auto backendRequest = CreateRunnableRequest();
+        backendRequest.NetworkAdapters.push_back(request);
+        backendRequest.NetworkAdapters.push_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
+        auto backend = OpenVmmVirtualMachineBackend::Create(backendRequest);
+        const auto description = backend->GetDescription();
+        auto [client, server] = MakeSocketPair();
+        wsl::core::OpenVmmConsommeNetworking networking(
+            *backend,
+            description.NetworkAdapters.at(L"eth0"),
+            description.NetworkAdapters.at(L"loopback0"),
+            wsl::core::GnsChannel(std::move(server)),
+            true,
+            false,
+            true);
+        LX_MINI_INIT_NETWORKING_CONFIGURATION configuration{};
+        networking.FillInitialConfiguration(configuration);
+
+        VERIFY_ARE_EQUAL(LxMiniInitNetworkingModeConsomme, configuration.NetworkingMode);
+        VERIFY_IS_FALSE(configuration.DisableIpv6);
+        VERIFY_IS_FALSE(configuration.EnableDhcpClient);
+        VERIFY_ARE_EQUAL(LxMiniInitPortTrackerTypeMirrored, configuration.PortTrackerType);
+        backend->Terminate();
+    }
+
+    TEST_METHOD(AllowsGuestAndSavedStateCrashCapture)
+    {
+        SKIP_TEST_ARM64();
+        auto request = CreateRequest();
+        request.CrashCapture = VmCrashCaptureRequest{L"C:\\crashes"};
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        request.CrashCapture->SavedStateFolder = L"C:\\saved-state";
+        VERIFY_ARE_EQUAL(S_OK, DescribeResult(request));
+        request.CrashCapture->SavedStateFolder = std::filesystem::path{};
         VERIFY_ARE_EQUAL(E_INVALIDARG, DescribeResult(request));
     }
 
@@ -501,6 +671,113 @@ class OpenVmmVirtualMachineBackendTests
         }
     }
 
+    TEST_METHOD(BootsWithVirtioBlkDiskAndReattachesIt)
+    {
+        SKIP_TEST_ARM64();
+        using wsl::windows::common::filesystem::TempFile;
+        TempFile file{GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS};
+        LARGE_INTEGER size{};
+        size.QuadPart = 2 * c_mib;
+        THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(file.Handle.get(), size, nullptr, FILE_BEGIN));
+        THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.Handle.get()));
+        file.Handle.reset();
+
+        auto request = CreateRunnableRequest();
+        auto disk = CreateDisk(L"boot-disk");
+        disk.Disk.Source = VmVirtualDiskSource{file.Path};
+        disk.Disk.Placement = VmDiskPlacement{VmVirtioBlkAddress{7}};
+        request.BootDisks.push_back(disk);
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        const auto bootDisk = backend->GetDescription().BootDisks.at(disk.Key);
+        VERIFY_ARE_EQUAL(VmDiskTransport::VirtioBlk, GetDiskTransport(bootDisk.GuestAddress));
+        VERIFY_ARE_EQUAL(UINT32{7}, GetSlot(bootDisk));
+        VERIFY_ARE_EQUAL(size_t{1}, backend->GetAttachedDisks().size());
+
+        auto guest = StartGuest(*backend);
+        backend->DetachDisk(bootDisk.Id);
+        VERIFY_IS_TRUE(backend->GetAttachedDisks().empty());
+        const auto reattached = backend->AttachDisk(disk.Disk);
+        VERIFY_ARE_EQUAL(VmDiskTransport::VirtioBlk, GetDiskTransport(reattached.GuestAddress));
+        VERIFY_ARE_EQUAL(GetSlot(bootDisk), GetSlot(reattached));
+        backend->DetachDisk(reattached.Id);
+        VERIFY_IS_TRUE(backend->GetAttachedDisks().empty());
+        backend->Terminate();
+    }
+
+    TEST_METHOD(DestructionDrainsTerminationCallback)
+    {
+        SKIP_TEST_ARM64();
+        wil::unique_event callbackStarted{wil::EventOptions::ManualReset};
+        wil::unique_event releaseCallback{wil::EventOptions::ManualReset};
+        wil::unique_event destroyed{wil::EventOptions::ManualReset};
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        std::thread destructionThread;
+        auto cleanup = wil::scope_exit([&] {
+            releaseCallback.SetEvent();
+            if (destructionThread.joinable())
+            {
+                destructionThread.join();
+            }
+        });
+
+        backend->RegisterTerminationCallback([&](GUID) {
+            callbackStarted.SetEvent();
+            releaseCallback.wait();
+        });
+
+        {
+            auto guest = StartGuest(*backend);
+        }
+
+        VERIFY_IS_TRUE(callbackStarted.wait(30 * 1000));
+        destructionThread = std::thread([backend = std::move(backend), &destroyed]() mutable {
+            backend.reset();
+            destroyed.SetEvent();
+        });
+
+        VERIFY_IS_FALSE(destroyed.wait(100));
+        releaseCallback.SetEvent();
+        VERIFY_IS_TRUE(destroyed.wait(30 * 1000));
+    }
+
+    TEST_METHOD(AddsPersistentMemoryInGuestOrder)
+    {
+        SKIP_TEST_ARM64();
+        using wsl::windows::common::filesystem::TempFile;
+        std::vector<TempFile> files;
+        for (int index = 0; index < 2; ++index)
+        {
+            auto& file = files.emplace_back(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS);
+            LARGE_INTEGER size{};
+            size.QuadPart = 2 * c_mib;
+            THROW_IF_WIN32_BOOL_FALSE(SetFilePointerEx(file.Handle.get(), size, nullptr, FILE_BEGIN));
+            THROW_IF_WIN32_BOOL_FALSE(SetEndOfFile(file.Handle.get()));
+            file.Handle.reset();
+        }
+
+        const auto request = CreateRunnableRequest();
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        auto guest = StartGuest(*backend);
+
+        VmPersistentMemoryRequest firstRequest{};
+        firstRequest.Path = files[0].Path;
+        firstRequest.ReadOnly = true;
+        const auto first = backend->AddPersistentMemory(firstRequest);
+
+        VmPersistentMemoryRequest secondRequest{};
+        secondRequest.Path = files[1].Path;
+        secondRequest.ReadOnly = false;
+        const auto second = backend->AddPersistentMemory(secondRequest);
+
+        VERIFY_ARE_EQUAL(UINT32{0}, first.Index);
+        VERIFY_ARE_EQUAL(UINT32{1}, second.Index);
+        VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, first.Id.Owner.VmId));
+        VERIFY_IS_TRUE(IsEqualGUID(request.Identity.VmId, second.Id.Owner.VmId));
+        VERIFY_IS_TRUE(first.ReadOnly);
+        VERIFY_IS_FALSE(second.ReadOnly);
+        backend->Terminate();
+    }
+
     TEST_METHOD(ManagesFileSystemNetworkAndPortResources)
     {
         SKIP_TEST_ARM64();
@@ -591,12 +868,13 @@ class OpenVmmVirtualMachineBackendTests
         VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->UnbindPort(binding.Id); }));
 
         backend->BindPort(network.Id, bindingRequest);
-        VERIFY_ARE_EQUAL(E_FAIL, OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
+        VERIFY_ARE_EQUAL(
+            HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->BindPort(network.Id, bindingRequest); }));
 
         backend->Terminate();
     }
 
-    TEST_METHOD(EnforcesStorageIdentityAndDiskOwnership)
+    TEST_METHOD(EnforcesDiskOwnership)
     {
         SKIP_TEST_ARM64();
         using wsl::windows::common::filesystem::TempFile;
@@ -612,15 +890,11 @@ class OpenVmmVirtualMachineBackendTests
         auto guest = StartGuest(*backend);
         VmDiskRequest disk{};
         disk.Source = VmVirtualDiskSource{file.Path};
-        disk.UserToken.emplace();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AttachDisk(disk); }));
+
+        // The service passes a copy of the caller's token, which is never the VM owner's token instance.
         disk.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AttachDisk(disk); }));
-        disk.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
         const auto managed = backend->AttachDisk(disk);
         VERIFY_ARE_EQUAL(managed.Id.Value, backend->AttachDisk(disk).Id.Value);
-        disk.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AttachDisk(disk); }));
         disk.UserToken.reset();
 
         disk.UserDisk = true;
@@ -646,21 +920,19 @@ class OpenVmmVirtualMachineBackendTests
 
         VmPersistentMemoryRequest memory{};
         memory.Path = file.Path;
-        memory.UserToken.emplace();
-        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->AddPersistentMemory(memory); }));
         memory.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
-        VERIFY_ARE_EQUAL(c_notSupported, OperationResult([&] { backend->AddPersistentMemory(memory); }));
-        memory.UserToken = wil::shared_handle{wsl::windows::common::wslutil::DuplicateHandle(request.Identity.UserToken.get())};
         const auto device = backend->AddPersistentMemory(memory);
         VERIFY_ARE_EQUAL(file.Path.wstring(), device.EffectiveHostPath.wstring());
         backend->Terminate();
     }
 
-    TEST_METHOD(ForwardsOnlySupportedLocalhostBindings)
+    // As with Consomme on HCS, binds to 127.0.0.1 are relayed from the host's 127.0.0.1, and wildcard binds also reserve
+    // the port on the host's addresses. Other binds stay in the guest.
+    TEST_METHOD(ForwardsLoopbackAndWildcardBindings)
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
         request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmLoopbackNetworkAdapterRequest());
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         auto guest = StartGuest(*backend);
@@ -669,57 +941,84 @@ class OpenVmmVirtualMachineBackendTests
         {
             int Family;
             const char* Address;
-            bool Forwarded;
+            bool Relayed;
+            bool Ipv4Wildcard;
+            bool Ipv6Wildcard;
         };
         constexpr PortCase cases[] = {
-            {AF_INET, "0.0.0.0", true},
-            {AF_INET, "127.0.0.1", true},
-            {AF_INET6, "::ffff:0.0.0.0", true},
-            {AF_INET6, "::ffff:127.0.0.1", true},
-            {AF_INET6, "::", false},
-            {AF_INET6, "::1", false},
-            {AF_INET, "127.0.0.2", false},
-            {AF_INET, "10.0.0.2", false},
-            {AF_INET, "192.0.2.1", false},
-            {AF_INET6, "::ffff:192.0.2.1", false},
-            {AF_INET6, "2001:db8::1", false},
+            {AF_INET, "0.0.0.0", true, true, false},
+            {AF_INET, "127.0.0.1", true, false, false},
+            {AF_INET6, "::ffff:0.0.0.0", true, true, false},
+            {AF_INET6, "::ffff:127.0.0.1", true, false, false},
+            {AF_INET6, "::", false, false, true},
+            {AF_INET6, "::1", false, false, false},
+            {AF_INET, "127.0.0.2", false, false, false},
+            {AF_INET, "10.0.0.2", false, false, false},
+            {AF_INET, "192.0.2.1", false, false, false},
+            {AF_INET6, "::ffff:192.0.2.1", false, false, false},
+            {AF_INET6, "2001:db8::1", false, false, false},
         };
-        for (const bool enabled : {false, true})
+        for (const bool relay : {false, true})
         {
-            wsl::core::OpenVmmNatNetworking networking{
-                *backend,
-                adapters.at(L"eth0"),
-                enabled ? std::optional{adapters.at(L"loopback0")} : std::nullopt,
-                wsl::core::GnsChannel{wil::unique_socket{}},
-                enabled,
-                false};
-            auto [client, server] = MakeSocketPair();
-            networking.StartPortTracker(std::move(server));
-            wsl::shared::SocketChannel channel{std::move(client), "PortTrackerTest"};
-            for (const int protocol : {IPPROTO_TCP, IPPROTO_UDP})
+            for (const bool ipv6 : {false, true})
             {
-                for (const auto& test : cases)
+                wsl::core::OpenVmmConsommeNetworking networking{
+                    *backend,
+                    adapters.at(L"eth0"),
+                    relay ? std::optional{adapters.at(L"loopback0")} : std::nullopt,
+                    wsl::core::GnsChannel{wil::unique_socket{}},
+                    relay,
+                    false,
+                    ipv6};
+                auto [client, server] = MakeSocketPair();
+                networking.StartPortTracker(std::move(server));
+                wsl::shared::SocketChannel channel{std::move(client), "PortTrackerTest"};
+                for (const int protocol : {IPPROTO_TCP, IPPROTO_UDP})
                 {
-                    LX_GNS_PORT_ALLOCATION_REQUEST notification{};
-                    notification.Header.MessageType = LxGnsMessagePortMappingRequest;
-                    notification.Header.MessageSize = sizeof(notification);
-                    notification.Protocol = protocol;
-                    notification.Port = ReservePort(protocol);
-                    notification.Af = test.Family;
-                    THROW_HR_IF(E_FAIL, inet_pton(test.Family, test.Address, notification.Address32) != 1);
-                    notification.Allocate = true;
-                    VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
-                    VERIFY_ARE_EQUAL(!(enabled && test.Forwarded), CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
-                    VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK + 1, protocol));
-                    if (enabled && test.Family == AF_INET6 && test.Forwarded)
+                    for (const auto& test : cases)
                     {
-                        notification.Af = AF_INET;
-                        notification.Address32[0] = notification.Address32[3];
-                        VERIFY_ARE_NOT_EQUAL(0, channel.Transaction(notification).Result);
+                        const bool relayed = relay && test.Relayed;
+                        const bool ipv6Wildcard = ipv6 && test.Ipv6Wildcard;
+                        LX_GNS_PORT_ALLOCATION_REQUEST notification{};
+                        notification.Header.MessageType = LxGnsMessagePortMappingRequest;
+                        notification.Header.MessageSize = sizeof(notification);
+                        notification.Protocol = protocol;
+                        notification.Port = ReservePort(protocol);
+                        notification.Af = test.Family;
+                        THROW_HR_IF(E_FAIL, inet_pton(test.Family, test.Address, notification.Address32) != 1);
+                        notification.Allocate = true;
+                        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+                        VERIFY_ARE_EQUAL(!ipv6Wildcard, CanBindPortIpv6Any(notification.Port, protocol));
+                        if (test.Ipv4Wildcard)
+                        {
+                            VERIFY_IS_FALSE(CanBindPort(notification.Port, INADDR_ANY, protocol));
+                        }
+
+                        if (relayed)
+                        {
+                            VERIFY_IS_FALSE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
+                        }
+                        else if (!test.Ipv4Wildcard)
+                        {
+                            // Nothing is held on IPv4.
+                            VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
+                            VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_ANY, protocol));
+                        }
+
+                        // An IPv4-mapped bind reserves the same host ports as the IPv4 bind.
+                        if (test.Family == AF_INET6 && (relayed || test.Ipv4Wildcard))
+                        {
+                            notification.Af = AF_INET;
+                            notification.Address32[0] = notification.Address32[3];
+                            VERIFY_ARE_NOT_EQUAL(0, channel.Transaction(notification).Result);
+                        }
+
+                        notification.Allocate = false;
+                        VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
+                        VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_ANY, protocol));
+                        VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
+                        VERIFY_IS_TRUE(CanBindPortIpv6Any(notification.Port, protocol));
                     }
-                    notification.Allocate = false;
-                    VERIFY_ARE_EQUAL(0, channel.Transaction(notification).Result);
-                    VERIFY_IS_TRUE(CanBindPort(notification.Port, INADDR_LOOPBACK, protocol));
                 }
             }
         }
@@ -731,7 +1030,7 @@ class OpenVmmVirtualMachineBackendTests
     {
         SKIP_TEST_ARM64();
         auto request = CreateRunnableRequest();
-        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmNatNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
+        request.NetworkAdapters.push_back(wsl::core::CreateOpenVmmConsommeNetworkAdapterRequest(false, {0x02, 0x15, 0x5d, 0x01, 0x02, 0x03}));
         auto backend = OpenVmmVirtualMachineBackend::Create(request);
         auto guest = StartGuest(*backend);
         const auto description = backend->GetDescription();
@@ -765,7 +1064,8 @@ class OpenVmmVirtualMachineBackendTests
         });
         auto join = wil::scope_exit([&] { receiver.join(); });
         {
-            wsl::core::OpenVmmNatNetworking networking{*backend, adapter, std::nullopt, wsl::core::GnsChannel{std::move(host)}, false, false};
+            wsl::core::OpenVmmConsommeNetworking networking{
+                *backend, adapter, std::nullopt, wsl::core::GnsChannel{std::move(host)}, false, false, true};
             networking.Initialize();
             VERIFY_IS_TRUE(refreshed.wait(30000));
         }
@@ -802,6 +1102,67 @@ class OpenVmmVirtualMachineBackendTests
         replacement = VmGuestListener{};
     }
 
+    TEST_METHOD(ManagesHostSocketLifetime)
+    {
+        SKIP_TEST_ARM64();
+        const auto exists = [](const std::filesystem::path& Path) {
+            return GetFileAttributesW(Path.c_str()) != INVALID_FILE_ATTRIBUTES;
+        };
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+        const auto socket = backend->CreateHostSocket({50000});
+        VERIFY_IS_TRUE(socket.has_value());
+        VERIFY_IS_TRUE(exists(socket->Path));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS), OperationResult([&] { backend->CreateHostSocket(socket->Port); }));
+        VERIFY_IS_TRUE(exists(socket->Path));
+
+        auto foreignSocket = socket->Id;
+        THROW_IF_FAILED(CoCreateGuid(&foreignSocket.Owner.VmId));
+        VERIFY_ARE_EQUAL(E_INVALIDARG, OperationResult([&] { backend->CloseHostSocket(foreignSocket); }));
+        backend->CloseHostSocket(socket->Id);
+        VERIFY_IS_FALSE(exists(socket->Path));
+        VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_NOT_FOUND), OperationResult([&] { backend->CloseHostSocket(socket->Id); }));
+
+        const auto replacement = backend->CreateHostSocket(socket->Port);
+        VERIFY_IS_TRUE(replacement.has_value());
+        VERIFY_ARE_NOT_EQUAL(socket->Id.Value, replacement->Id.Value);
+
+        // Host socket files outlive Terminate and are deleted when the backend is destroyed.
+        backend->Terminate();
+        backend.reset();
+        VERIFY_IS_FALSE(exists(replacement->Path));
+    }
+
+    TEST_METHOD(ServesFileSystemShareUnderUnelevatedToken)
+    {
+        SKIP_TEST_ARM64();
+        // A VM created by an elevated session serves an unelevated session's share under that session's token.
+        auto request = CreateRunnableRequest();
+        request.Identity.UserToken = wil::shared_handle{GetElevatedTestToken().release()};
+        GUID directoryId{};
+        THROW_IF_FAILED(CoCreateGuid(&directoryId));
+        const auto sharePath =
+            wsl::windows::common::filesystem::GetTempFolderPath(GetCurrentProcessToken()) /
+            (L"OpenVmmBackendTest-" + wsl::shared::string::GuidToString<wchar_t>(directoryId, wsl::shared::string::GuidToStringFlags::None));
+        THROW_IF_WIN32_BOOL_FALSE(CreateDirectoryW(sharePath.c_str(), nullptr));
+        auto removeShareDirectory = wil::scope_exit([&] { LOG_IF_WIN32_BOOL_FALSE(RemoveDirectoryW(sharePath.c_str())); });
+
+        auto backend = OpenVmmVirtualMachineBackend::Create(request);
+        VmFileSystemDeviceRequest deviceRequest{VmVirtioFsDevice{L"unelevated-share", VmVirtioFsLayout::SingleShare}};
+        deviceRequest.UserToken = wil::shared_handle{GetNonElevatedToken(TokenImpersonation).release()};
+        const auto device = backend->CreateFileSystemDevice(deviceRequest);
+        VERIFY_IS_FALSE(device.Elevated);
+
+        VmFileSystemShareRequest shareRequest;
+        shareRequest.HostPath = sharePath;
+        shareRequest.Options = VmVirtioFsShareOptions{};
+        const auto share = backend->AddFileSystemShare(device.Id, shareRequest);
+        VERIFY_IS_FALSE(share.Elevated);
+        VERIFY_ARE_EQUAL(VmFileSystemDeviceState::Serving, backend->GetFileSystemDeviceStatus(device.Id).State);
+        backend->RemoveFileSystemShare(share.Id);
+        backend->Terminate();
+    }
+
     TEST_METHOD(CapabilitiesReflectVmServiceProtocol)
     {
         const auto capabilities = OpenVmmVirtualMachineBackend::QueryCapabilities();
@@ -821,6 +1182,64 @@ class OpenVmmVirtualMachineBackendTests
             expectedFeatures.set(static_cast<size_t>(feature));
         }
         VERIFY_IS_TRUE(capabilities.Features == expectedFeatures);
+    }
+};
+
+// Runs in the HCS WSL2 pass of every image, including Windows 10 and images without the Windows Hypervisor Platform, to
+// verify that OpenVMM either boots or reports the unmet host requirement instead of failing with an unrelated error.
+class OpenVmmHypervisorAvailabilityTests
+{
+    WSL_TEST_CLASS(OpenVmmHypervisorAvailabilityTests)
+
+    TEST_METHOD(BootsOrReportsUnsupportedHost)
+    {
+        SKIP_TEST_ARM64();
+        if (!LxsstuVmMode())
+        {
+            LogSkipped("OpenVMM requires WSL2");
+            return;
+        }
+        using namespace wsl::windows::common;
+
+        std::optional<bool> whpInstalled;
+        try
+        {
+            whpInstalled = WslInstall::IsOptionalComponentInstalled(L"HypervisorPlatform");
+        }
+        CATCH_LOG()
+
+        ExecutionContext context(Context::Wsl);
+        std::unique_ptr<OpenVmmVirtualMachineBackend> backend;
+        const auto result = wil::ResultFromException([&] {
+            backend = OpenVmmVirtualMachineBackend::Create(CreateRunnableRequest());
+            auto guest = StartGuest(*backend);
+        });
+
+        const auto error = context.ReportedError();
+        LogInfo(
+            "HypervisorPlatform installed: %ls, OpenVMM boot result: 0x%08x, error: %ls, message: %ls",
+            whpInstalled ? (*whpInstalled ? L"yes" : L"no") : L"unknown",
+            result,
+            error ? wslutil::ErrorToString(*error).Code.c_str() : L"none",
+            error && error->Message ? error->Message->c_str() : L"none");
+
+        if (backend)
+        {
+            backend->Terminate();
+        }
+
+        if (!helpers::IsWindows11OrAbove())
+        {
+            VERIFY_ARE_EQUAL(WSL_E_OPENVMM_REQUIRES_WINDOWS_11, result);
+        }
+        else if (whpInstalled == false)
+        {
+            VERIFY_ARE_EQUAL(WSL_E_HYPERVISOR_PLATFORM_NOT_INSTALLED, result);
+        }
+        else if (FAILED(result))
+        {
+            VERIFY_ARE_EQUAL(HRESULT_FROM_WIN32(ERROR_HV_NOT_PRESENT), result);
+        }
     }
 };
 

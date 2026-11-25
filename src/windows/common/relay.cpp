@@ -71,9 +71,69 @@ std::thread wsl::windows::common::relay::CreateThread(
     });
 }
 
+namespace {
+
+// Relays from a socket. An AF_UNIX peer's close doesn't complete a pending read, so it is also watched for explicitly.
+void RelayFromSocket(_In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
+{
+    wsl::windows::common::wslutil::SetThreadDescription(L"Socket IO Relay");
+
+    const auto socket = reinterpret_cast<SOCKET>(InputHandle);
+    SOCKADDR_STORAGE address{};
+    int addressLength = sizeof(address);
+    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), getsockname(socket, reinterpret_cast<SOCKADDR*>(&address), &addressLength) == SOCKET_ERROR);
+    if (address.ss_family != AF_UNIX)
+    {
+        wsl::windows::common::relay::InterruptableRelay(InputHandle, OutputHandle, ExitHandle, BufferSize);
+        return;
+    }
+
+    const auto closeEvent = WSACreateEvent();
+    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), closeEvent == WSA_INVALID_EVENT);
+
+    auto cleanup = wil::scope_exit([&] {
+        WSAEventSelect(socket, nullptr, 0);
+        WSACloseEvent(closeEvent);
+    });
+
+    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), WSAEventSelect(socket, closeEvent, FD_CLOSE) == SOCKET_ERROR);
+    wsl::windows::common::relay::InterruptableRelay(InputHandle, OutputHandle, ExitHandle, BufferSize, closeEvent);
+}
+
+} // namespace
+
+std::thread wsl::windows::common::relay::CreateSocketThread(
+    _In_ wil::unique_handle&& InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
+{
+    return std::thread([InputHandle = std::move(InputHandle), OutputHandle, ExitHandle, BufferSize]() {
+        try
+        {
+            RelayFromSocket(InputHandle.get(), OutputHandle, ExitHandle, BufferSize);
+        }
+        CATCH_LOG()
+    });
+}
+
+std::thread wsl::windows::common::relay::CreateSocketThread(
+    _In_ wil::unique_handle&& InputHandle, _In_ wil::unique_handle&& OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
+{
+    return std::thread([InputHandle = std::move(InputHandle), OutputHandle = std::move(OutputHandle), ExitHandle, BufferSize]() {
+        try
+        {
+            RelayFromSocket(InputHandle.get(), OutputHandle.get(), ExitHandle, BufferSize);
+        }
+        CATCH_LOG()
+    });
+}
+
 DWORD
 wsl::windows::common::relay::InterruptableRead(
-    _In_ HANDLE InputHandle, _In_ gsl::span<gsl::byte> Buffer, _In_ const std::vector<HANDLE>& ExitHandles, _In_opt_ LPOVERLAPPED Overlapped)
+    _In_ HANDLE InputHandle,
+    _In_ gsl::span<gsl::byte> Buffer,
+    _In_ const std::vector<HANDLE>& ExitHandles,
+    _In_opt_ LPOVERLAPPED Overlapped,
+    _In_opt_ HANDLE SocketCloseEvent,
+    _Inout_opt_ bool* SocketClosed)
 {
     // Initialize an overlapped structure if one was not provided by the caller.
     OVERLAPPED overlapped = {};
@@ -83,6 +143,27 @@ wsl::windows::common::relay::InterruptableRead(
         overlappedEvent.create(wil::EventOptions::ManualReset);
         overlapped.hEvent = overlappedEvent.get();
         Overlapped = &overlapped;
+    }
+
+    if (SocketCloseEvent != nullptr)
+    {
+        THROW_HR_IF(E_INVALIDARG, SocketClosed == nullptr);
+        WSAPOLLFD pollSocket{reinterpret_cast<SOCKET>(InputHandle), POLLRDNORM, 0};
+        THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), WSAPoll(&pollSocket, 1, 0) == SOCKET_ERROR);
+        if ((pollSocket.revents & POLLHUP) != 0)
+        {
+            *SocketClosed = true;
+        }
+
+        if (*SocketClosed)
+        {
+            u_long bytesAvailable = 0;
+            THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), ioctlsocket(reinterpret_cast<SOCKET>(InputHandle), FIONREAD, &bytesAvailable) == SOCKET_ERROR);
+            if (bytesAvailable == 0)
+            {
+                return 0;
+            }
+        }
     }
 
     DWORD bytesRead = 0;
@@ -102,9 +183,70 @@ wsl::windows::common::relay::InterruptableRead(
         });
 
         // Wait for the read to complete, or the client to exit.
-        if (!InterruptableWait(Overlapped->hEvent, ExitHandles))
+        if (SocketCloseEvent == nullptr)
         {
-            return 0;
+            if (!InterruptableWait(Overlapped->hEvent, ExitHandles))
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            std::vector<HANDLE> waitObjects{Overlapped->hEvent, SocketCloseEvent};
+            waitObjects.insert(waitObjects.end(), ExitHandles.begin(), ExitHandles.end());
+            for (;;)
+            {
+                const DWORD waitResult =
+                    WaitForMultipleObjects(gsl::narrow_cast<DWORD>(waitObjects.size()), waitObjects.data(), FALSE, INFINITE);
+                if (waitResult == WAIT_OBJECT_0 + 1)
+                {
+                    WSANETWORKEVENTS networkEvents{};
+                    const auto socket = reinterpret_cast<SOCKET>(InputHandle);
+                    const auto event = reinterpret_cast<WSAEVENT>(SocketCloseEvent);
+                    THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), WSAEnumNetworkEvents(socket, event, &networkEvents) == SOCKET_ERROR);
+                    if ((networkEvents.lNetworkEvents & FD_CLOSE) != 0)
+                    {
+                        const auto error = networkEvents.iErrorCode[FD_CLOSE_BIT];
+                        THROW_HR_IF(HRESULT_FROM_WIN32(error), error != 0);
+                        *SocketClosed = true;
+
+                        u_long bytesAvailable = 0;
+                        THROW_HR_IF(HRESULT_FROM_WIN32(WSAGetLastError()), ioctlsocket(socket, FIONREAD, &bytesAvailable) == SOCKET_ERROR);
+                        if (bytesAvailable == 0)
+                        {
+                            CancelIoEx(InputHandle, Overlapped);
+                            if (GetOverlappedResult(InputHandle, Overlapped, &bytesRead, TRUE))
+                            {
+                                cancelRead.release();
+                                return bytesRead;
+                            }
+
+                            lastError = GetLastError();
+                            if ((lastError == ERROR_OPERATION_ABORTED) || (lastError == ERROR_HANDLE_EOF) || (lastError == ERROR_BROKEN_PIPE))
+                            {
+                                cancelRead.release();
+                                return 0;
+                            }
+
+                            THROW_LAST_ERROR();
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (waitResult != WAIT_OBJECT_0)
+                {
+                    if (waitResult > WAIT_OBJECT_0 + 1 && waitResult < WAIT_OBJECT_0 + waitObjects.size())
+                    {
+                        return 0;
+                    }
+
+                    THROW_HR_MSG(E_FAIL, "WaitForMultipleObjects %d", waitResult);
+                }
+
+                break;
+            }
         }
 
         if (!GetOverlappedResult(InputHandle, Overlapped, &bytesRead, FALSE))
@@ -124,7 +266,8 @@ wsl::windows::common::relay::InterruptableRead(
     return bytesRead;
 }
 
-void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
+void wsl::windows::common::relay::InterruptableRelay(
+    _In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize, _In_opt_ HANDLE SocketCloseEvent)
 {
     LARGE_INTEGER readOffset = InitializeFileOffset(InputHandle);
 
@@ -140,11 +283,12 @@ void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _I
     OVERLAPPED overlapped = {0};
     const wil::unique_event overlappedEvent(wil::EventOptions::ManualReset);
     overlapped.hEvent = overlappedEvent.get();
+    bool socketClosed = false;
     for (;;)
     {
         overlapped.Offset = readOffset.LowPart;
         overlapped.OffsetHigh = readOffset.HighPart;
-        const auto bytesRead = InterruptableRead(InputHandle, readSpan, exitHandles, &overlapped);
+        const auto bytesRead = InterruptableRead(InputHandle, readSpan, exitHandles, &overlapped, SocketCloseEvent, &socketClosed);
         if (bytesRead == 0)
         {
             break;

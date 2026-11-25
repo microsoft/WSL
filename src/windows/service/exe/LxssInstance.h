@@ -73,6 +73,11 @@ public:
     /// </returns>
     GUID GetDistributionId() const override;
 
+    wsl::windows::common::GuestConnector GetGuestConnector() const override
+    {
+        return {};
+    }
+
     /// <returns>
     /// The message port to the init daemon.
     /// </returns>
