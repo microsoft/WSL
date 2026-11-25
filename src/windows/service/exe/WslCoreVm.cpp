@@ -1561,7 +1561,13 @@ VmCreateRequest WslCoreVm::GenerateBackendRequest(const GUID& VmId, BackendKind 
         highMmioGapInMB += RequiredExtraMmioSpaceForPmemFileInMb(m_vmConfig.SystemDistroPath.c_str());
     }
     request.Mmio.HighWindowSizeBytes = static_cast<std::uint64_t>(highMmioGapInMB) * _1MB;
-    request.Mmio.MaximumGuestAddressBits = 36;
+    // HCS places the high MMIO window at the top of the minimum 36-bit address space so the guest can reach it on any host.
+    // OpenVMM places it directly above RAM and itself checks that the layout fits the address width the guest reports, so
+    // a 36-bit cap would only reject large-memory VMs.
+    if (Backend == BackendKind::Hcs)
+    {
+        request.Mmio.MaximumGuestAddressBits = 36;
+    }
 
     WSL_LOG(
         "InitializeSystemDistro",
