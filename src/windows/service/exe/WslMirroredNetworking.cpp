@@ -524,6 +524,7 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessInterfaceChange()
         const auto metricUpdate = originalMinimumMetric != minimumMetric;
 
         endpoint.Network->PendingIPInterfaceUpdate |= connectedStateUpdated || mtuUpdated || metricUpdate;
+        // A metric-only change affects route preference but does not delete guest IP addresses.
         endpoint.Network->PendingAddressRefresh |= connectedStateUpdated || mtuUpdated;
 
         if (disableDefaultRoutesUpdated || connectedStateUpdated || mtuUpdated || metricUpdate)
@@ -1635,7 +1636,7 @@ try
             endpoint.Network->IsHidden = true;
             // setting PendingIPInterfaceUpdate to tell SyncIpStateWithLinux to update the Interface state
             endpoint.Network->PendingIPInterfaceUpdate = true;
-            endpoint.Network->PendingAddressRefresh = true;
+            // No address refresh is needed because SyncIpStateWithLinux removes addresses from hidden interfaces.
         }
 
         if (!SyncIpStateWithLinux(endpoint))
