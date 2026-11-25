@@ -13,8 +13,10 @@ Abstract:
 --*/
 
 #include "lxtcommon.h"
+#include "lxtfs.h"
 #include "unittests.h"
 #include <fcntl.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mount.h>
@@ -38,6 +40,10 @@ Abstract:
 #define WSLPATH_ESCAPE_LX_DIR_WIN WSLPATH_DISTRO_PREFIX "\\data\\" WSLPATH_ESCAPE_NAME_ESCAPED
 #define WSLPATH_MOUNT_POINT "/data/wslpath_mount"
 
+LXT_VARIATION_HANDLER WslPathTestDrvFsRecursiveBind;
+
+LXT_VARIATION_HANDLER WslPathTestDrvFsShadowedMounts;
+
 LXT_VARIATION_HANDLER WslPathTestDrvFsEscaped;
 
 LXT_VARIATION_HANDLER WslPathTestDrvFsToWinPath;
@@ -58,6 +64,8 @@ LXT_VARIATION_HANDLER WslPathTestRemovedCwd;
 
 static const LXT_VARIATION g_LxtVariations[] = {
     {"WslPath - Windows to DrvFs", WslPathTestDrvFsFromWinPath},
+    {"WslPath - Windows to DrvFs with a recursive bind", WslPathTestDrvFsRecursiveBind},
+    {"WslPath - Windows to DrvFs with shadowed mounts", WslPathTestDrvFsShadowedMounts},
     {"WslPath - DrvFs to Windows", WslPathTestDrvFsToWinPath},
     {"WslPath - DrvFs escaped characters", WslPathTestDrvFsEscaped},
     {"WslPath - DrvFs symlinks", WslPathTestDrvFsSymlink},
@@ -94,7 +102,7 @@ Return Value:
     int Result;
 
     LxtCheckResult(LxtInitialize(Argc, Argv, &Args, LXT_NAME));
-    LxtCheckResult(LxtRunVariations(&Args, g_LxtVariations, LXT_COUNT_OF(g_LxtVariations)));
+    LxtCheckResult(LxtRunVariationsForked(&Args, g_LxtVariations, LXT_COUNT_OF(g_LxtVariations)));
 
 ErrorExit:
     LxtUninitialize();
@@ -178,6 +186,137 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows\\.\\..\\Users", "/mnt/c/Users", true));
 
 ErrorExit:
+    return Result;
+}
+
+int WslPathTestDrvFsRecursiveBind(PLXT_ARGS Args)
+
+/*++
+
+Description:
+
+    This routine verifies that a recursive bind does not change the Windows
+    drive's Linux path and that the bind alias still translates to Windows.
+
+Arguments:
+
+    Args - Supplies the command line arguments.
+
+Return Value:
+
+    Returns 0 on success, -1 on failure.
+
+--*/
+
+{
+    char Alias[sizeof("/data/wslpath-rbind-XXXXXX/c/Windows")];
+    char Target[] = "/data/wslpath-rbind-XXXXXX";
+    bool Mounted = false;
+    bool OverlayMounted = false;
+    char* PointerResult = NULL;
+    int Result;
+
+    if (LxtWslVersion() == 1)
+    {
+        LxtLogInfo("Test skipped on WSL1.");
+        return 0;
+    }
+
+    // Isolate shared drive mounts before creating or detaching bind aliases.
+    LxtCheckErrno(unshare(CLONE_NEWNS));
+    LxtCheckErrnoZeroSuccess(mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL));
+
+    LxtCheckNullErrno(mkdtemp(Target));
+    LxtCheckErrnoZeroSuccess(mount("/mnt", Target, NULL, MS_BIND | MS_REC, NULL));
+    Mounted = true;
+
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", "/mnt/c/Windows", true));
+    snprintf(Alias, sizeof(Alias), "%s/c/Windows", Target);
+    LxtCheckResult(LxtCheckWslPathTranslation(Alias, "C:\\Windows", false));
+
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", "/mnt/c/Windows", "tmpfs", 0, NULL));
+    OverlayMounted = true;
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", Alias, true));
+
+ErrorExit:
+    if (OverlayMounted && umount2("/mnt/c/Windows", MNT_DETACH) < 0)
+    {
+        LxtLogError("Failed to detach the Windows directory overlay: %s", strerror(errno));
+        Result = LXT_RESULT_FAILURE;
+    }
+
+    if (Mounted)
+    {
+        umount2(Target, MNT_DETACH);
+    }
+
+    if (PointerResult != NULL)
+    {
+        rmdir(Target);
+    }
+
+    return Result;
+}
+
+int WslPathTestDrvFsShadowedMounts(PLXT_ARGS Args)
+{
+    char Target[] = "/data/wslpath-shadow-XXXXXX";
+    char First[sizeof(Target) + sizeof("/first")];
+    char Second[sizeof(Target) + sizeof("/second")];
+    char IndependentPath[sizeof(First) + sizeof("/Windows")];
+    char* PointerResult = NULL;
+    bool Mounted = false;
+    int Result;
+
+    if (LxtWslVersion() == 1)
+    {
+        LxtLogInfo("Test skipped on WSL1.");
+        return 0;
+    }
+
+    // Isolate shared drive mounts before creating or detaching bind aliases.
+    LxtCheckErrno(unshare(CLONE_NEWNS));
+    LxtCheckErrnoZeroSuccess(mount(NULL, "/", NULL, MS_PRIVATE | MS_REC, NULL));
+
+    LxtCheckNullErrno(mkdtemp(Target));
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", Target, "tmpfs", 0, NULL));
+    Mounted = true;
+
+    // Both aliases match C:\Windows, a longer prefix than the drive mount.
+    snprintf(First, sizeof(First), "%s/first", Target);
+    snprintf(Second, sizeof(Second), "%s/second", Target);
+    LxtCheckErrnoZeroSuccess(mkdir(First, 0700));
+    LxtCheckErrnoZeroSuccess(mkdir(Second, 0700));
+    LxtCheckErrnoZeroSuccess(mount("/mnt/c/Windows", First, NULL, MS_BIND, NULL));
+    LxtCheckErrnoZeroSuccess(mount("/mnt/c/Windows", Second, NULL, MS_BIND, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", First, true));
+
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", First, "tmpfs", 0, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", Second, true));
+
+    LxtCheckErrnoZeroSuccess(mount("tmpfs", Second, "tmpfs", 0, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", "/mnt/c/Windows", true));
+
+    // A new DrvFs mount keeps priority over a later alias of the original drive.
+    LxtCheckResult(LxtFsMountDrvFs("C:", First, "uid=2000,gid=2001"));
+    snprintf(IndependentPath, sizeof(IndependentPath), "%s/Windows", First);
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", IndependentPath, true));
+    LxtCheckErrnoZeroSuccess(mount("/mnt/c", Second, NULL, MS_BIND, NULL));
+    LxtCheckResult(LxtCheckWslPathTranslation("C:\\Windows", IndependentPath, true));
+
+ErrorExit:
+    if (Mounted && umount2(Target, MNT_DETACH) < 0)
+    {
+        LxtLogError("umount2 failed for %s: %s", Target, strerror(errno));
+        Result = LXT_RESULT_FAILURE;
+    }
+
+    if (PointerResult != NULL && rmdir(Target) < 0)
+    {
+        LxtLogError("rmdir failed for %s: %s", Target, strerror(errno));
+        Result = LXT_RESULT_FAILURE;
+    }
+
     return Result;
 }
 
