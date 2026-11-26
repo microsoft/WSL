@@ -667,7 +667,8 @@ Return Value:
                 break;
 
             case '\0':
-                TranslatedPath = TranslatedPath.substr(OutputCwdLength);
+                // Use "." for the current directory; an empty result signals translation failure.
+                TranslatedPath = ".";
                 break;
             }
         }

@@ -369,6 +369,9 @@ public:
 
         testWslPath(L"wslpath-test-dir");
         testWslPath(L"wslpath-测试目录-テスト");
+
+        VERIFY_ARE_EQUAL(L".\n", LxsstuLaunchWslAndCaptureOutput(L"--cd / --exec wslpath -u .").first);
+        VERIFY_ARE_EQUAL(L"/\n", LxsstuLaunchWslAndCaptureOutput(L"--cd / --exec wslpath -a -u .").first);
     }
 
     void DrvFsMountUnicodePath(DrvFsMode Mode)
