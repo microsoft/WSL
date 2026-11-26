@@ -123,6 +123,8 @@ private:
 
 int UtilAcceptVsock(int SocketFd, sockaddr_vm Address, int Timeout = -1, int SocketFlags = SOCK_CLOEXEC);
 
+wil::unique_fd UtilAcceptVsockFromHost(int SocketFd, int Timeout);
+
 int UtilBindVsockAnyPort(struct sockaddr_vm* SocketAddress, int Type);
 
 size_t UtilCanonicalisePathSeparator(char* Path, char Separator);
