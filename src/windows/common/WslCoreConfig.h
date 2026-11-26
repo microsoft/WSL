@@ -365,6 +365,7 @@ struct Config
     // require Linux nameserver to be an IP that is not in the range 127.0.0.0/8. This config is intended for those scenarios.
     std::optional<uint32_t> DnsTunnelingIpAddress;
     bool EnableHardwarePerformanceCounters = !shared::Arm64;
+    ConfigKeyPresence HardwarePerformanceCountersConfigPresence = ConfigKeyPresence::Absent;
     bool EnableAutoProxy = true;
     int InitialAutoProxyTimeout = 1000;
     MemoryReclaimMode MemoryReclaim = MemoryReclaimMode::DropCache;
