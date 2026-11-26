@@ -23,8 +23,6 @@ Abstract:
 #include <Dbghelp.h>
 #include <winsafer.h>
 #include <winhttp.h>
-#include <winrt/Windows.Networking.h>
-#include <winrt/Windows.Networking.Sockets.h>
 
 using namespace WEX::Logging;
 using namespace WEX::Common;
@@ -2701,6 +2699,7 @@ $ErrorActionPreference = 'Stop'
 $server = New-Object System.Net.HttpListener
 $server.Prefixes.Add('{}')
 $server.Start()
+[Console]::WriteLine('HTTP Server ready')
 while ($true)
 {{
     $context = $server.GetContext()
@@ -2713,8 +2712,7 @@ while ($true)
         StatusCode,
         Content);
 
-    m_process = LxsstuStartProcess(cmd.data());
-    WaitForListenOrTerminateServer(Endpoint);
+    StartAndWaitForReady(cmd.data());
 }
 
 UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& File)
@@ -2725,10 +2723,10 @@ $ErrorActionPreference = 'Stop'
 $server = New-Object System.Net.HttpListener
 $server.Prefixes.Add('{}')
 $server.Start()
+[Console]::WriteLine('HTTP Server ready')
 while ($true)
 {{
     $context = $server.GetContext()
-    $context.Response.StatusCode
     $content = [System.IO.File]::ReadAllBytes('{}')
     $context.Response.ContentLength64 = $content.length
     $context.Response.ContentType = 'application/octet-stream'
@@ -2738,8 +2736,7 @@ while ($true)
         Endpoint,
         File.wstring());
 
-    m_process = LxsstuStartProcess(cmd.data());
-    WaitForListenOrTerminateServer(Endpoint);
+    StartAndWaitForReady(cmd.data());
 }
 
 UniqueWebServer::~UniqueWebServer()
@@ -2750,14 +2747,16 @@ UniqueWebServer::~UniqueWebServer()
     }
 }
 
-void UniqueWebServer::WaitForListenOrTerminateServer(LPCWSTR endpoint)
+void UniqueWebServer::StartAndWaitForReady(LPWSTR commandLine)
 {
+    auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    m_process = LxsstuStartProcess(commandLine, nullptr, stdoutWrite.get());
     auto stopOnFailure = wil::scope_exit([this] { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(m_process.get(), 0)); });
-    const winrt::Windows::Foundation::Uri uri{endpoint};
-    const winrt::Windows::Networking::HostName host{uri.Host()};
-    const auto port = winrt::to_hstring(uri.Port());
-    wsl::shared::retry::RetryWithTimeout<void>(
-        [&] { winrt::Windows::Networking::Sockets::StreamSocket{}.ConnectAsync(host, port).get(); }, 500ms, 30s);
+    stdoutWrite.reset();
+
+    PartialHandleRead output{stdoutRead.get()};
+    output.Expect("HTTP Server ready\r\n");
     stopOnFailure.release();
 }
 
