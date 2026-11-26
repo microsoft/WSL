@@ -6,6 +6,7 @@ nav:
     - 'Getting started':
        - 'Building and testing WSL': 'dev-loop.md'
        - 'Debugging WSL': 'debugging.md'
+       - 'Release backports': 'release-backports.md'
     - 'WSL architecture':
        - 'Overview': technical-documentation/index.md
        - 'wsl.exe': technical-documentation/wsl.exe.md
