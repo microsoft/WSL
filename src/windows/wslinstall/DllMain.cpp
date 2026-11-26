@@ -860,6 +860,7 @@ extern "C" UINT __stdcall WslCheckForRunningInstances(MSIHANDLE install)
 
         if (IsWslRunning(install))
         {
+            WSL_INSTALL_LOG("WslRunningInstancesDetected");
             if (!IsExplicitInstall(install))
             {
                 WSL_INSTALL_LOG("WslInstallBlockedByRunningInstances");

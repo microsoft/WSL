@@ -25,10 +25,9 @@ public:
 private:
     static inline wil::srwlock s_lock;
     _Guarded_by_(s_lock) static inline size_t s_count {};
-    _Guarded_by_(s_lock) static inline wil::unique_mutex s_busyMutex;
 
-    // The mutex needs to be acquired and released from the same thread
-    _Guarded_by_(s_lock) static inline std::jthread s_mutexThread;
+    // When this event is signaled, it means that the service is busy.
+    _Guarded_by_(s_lock) static inline wil::unique_event s_busyEvent;
 };
 
 } // namespace wsl::windows::service

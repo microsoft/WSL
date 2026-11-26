@@ -844,14 +844,14 @@ class InstallerTests
         const auto clientPid = std::to_wstring(GetProcessId(handle.get()));
         VERIFY_IS_TRUE(IsExplicitInstallClient(clientPid));
         VERIFY_IS_FALSE(IsExplicitInstallClient(std::to_wstring(GetCurrentProcessId())));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(L""));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(L"0"));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(L"-1"));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(L"4294967296"));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(clientPid + L"abc"));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(L"+" + clientPid));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(L" " + clientPid));
-        VERIFY_IS_FALSE(IsExplicitInstallClient(clientPid + L'\0'));
+        const std::wstring invalidPids[] = {
+            L"", L"0", L"-1", L"4294967296", clientPid + L"abc", L"+" + clientPid, L" " + clientPid, clientPid + L'\0'};
+        for (const auto& invalidPid : invalidPids)
+        {
+            VERIFY_THROWS_SPECIFIC(IsExplicitInstallClient(invalidPid), wil::ResultException, [](const wil::ResultException& e) {
+                return e.GetErrorCode() == E_INVALIDARG;
+            });
+        }
 
 #ifndef WSL_OFFICIAL_BUILD
         // The currently running WSL process should not authorize an installation from this test host.
@@ -929,6 +929,23 @@ class InstallerTests
 #endif
     }
 
+    TEST_METHOD(MsiRunningInstanceGuardCanBeSkipped)
+    {
+#ifdef WSL_OFFICIAL_BUILD
+        LogSkipped("This test case requires the test-only WSL_TEST_INSTALL_BUSY property");
+        return;
+#else
+        const auto previousProductCode = GetMsiProductCode();
+        VERIFY_ARE_EQUAL(ERROR_INSTALL_FAILURE, RunDirectMsiInstall(L"WSL_TEST_INSTALL_BUSY=1 SKIPBUSYCHECK=0"));
+
+        const auto exitCode = RunDirectMsiInstall(L"WSL_TEST_INSTALL_BUSY=1 SKIPBUSYCHECK=1");
+        VERIFY_IS_TRUE(exitCode == ERROR_SUCCESS || exitCode == ERROR_SUCCESS_REBOOT_REQUIRED);
+        VERIFY_IS_TRUE(IsMsiPackageInstalled());
+        VERIFY_ARE_EQUAL(previousProductCode, GetMsiProductCode());
+        ValidatePackageInstalledProperly();
+#endif
+    }
+
     TEST_METHOD(MsiRunningInstanceGuardAllowsIdleAndUnknown)
     {
 #ifdef WSL_OFFICIAL_BUILD
@@ -1001,6 +1018,7 @@ class InstallerTests
     }
 
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(MsiRunningInstanceGuardWithLiveWslcSession)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
     TEST_METHOD_PROPERTY(L"TestCategory", L"WSLC")
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
     TEST_METHOD(MsiRunningInstanceGuardWithLiveWslcSession)

@@ -6,31 +6,20 @@
 
 bool wsl::windows::common::install::IsServiceBusy()
 {
-    // Open the mutex that signals whether the service is busy.
-    wil::unique_mutex mutex;
-    if (!mutex.try_open(c_serviceBusyMutexName, SYNCHRONIZE | READ_CONTROL))
+    wil::unique_event event;
+    if (!event.try_open(c_serviceBusyEventName, SYNCHRONIZE | READ_CONTROL))
     {
         THROW_LAST_ERROR_IF(GetLastError() != ERROR_FILE_NOT_FOUND);
         return false;
     }
 
-    // The service's mutex is owned by System. Do not trust anything else.
-    THROW_HR_IF(E_ACCESSDENIED, !IsOwnedBySystem(mutex.get()));
+    THROW_HR_IF(E_ACCESSDENIED, !IsOwnedByService(event.get()));
 
-    // When the service is busy, it holds the mutex, so a wait on it will time out.
-    // Note that this may be inaccurate if the service failed to acquire the mutex
-    // or an unrelated process is holding it.
-    const auto result = WaitForSingleObject(mutex.get(), 0);
+    // The event is signaled while the service is busy.
+    const auto result = WaitForSingleObject(event.get(), 0);
     THROW_LAST_ERROR_IF(result == WAIT_FAILED);
-    if (result == WAIT_TIMEOUT)
-    {
-        return true;
-    }
-
-    THROW_HR_IF(E_UNEXPECTED, result != WAIT_OBJECT_0 && result != WAIT_ABANDONED);
-
-    LOG_IF_WIN32_BOOL_FALSE(ReleaseMutex(mutex.get()));
-    return false;
+    THROW_HR_IF(E_UNEXPECTED, result != WAIT_OBJECT_0 && result != WAIT_TIMEOUT);
+    return result == WAIT_OBJECT_0;
 }
 
 bool wsl::windows::common::install::IsExplicitInstallClient(std::wstring_view clientProcessId)
@@ -39,10 +28,7 @@ bool wsl::windows::common::install::IsExplicitInstallClient(std::wstring_view cl
     const auto pidString = wsl::windows::common::string::WideToMultiByte(clientProcessId);
     DWORD pid{};
     const auto result = std::from_chars(pidString.data(), pidString.data() + pidString.size(), pid);
-    if (result.ec != std::errc{} || result.ptr != pidString.data() + pidString.size() || pid == 0)
-    {
-        return false;
-    }
+    THROW_HR_IF(E_INVALIDARG, result.ec != std::errc{} || result.ptr != pidString.data() + pidString.size() || pid == 0);
 
     const wil::unique_process_handle process{OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid)};
     if (!process)
@@ -59,10 +45,12 @@ bool wsl::windows::common::install::IsExplicitInstallClient(std::wstring_view cl
     return _wcsicmp(name.c_str(), L"msiexec.exe") == 0 || _wcsicmp(name.c_str(), L"wsl.exe") == 0;
 }
 
-bool wsl::windows::common::install::IsOwnedBySystem(HANDLE handle)
+bool wsl::windows::common::install::IsOwnedByService(HANDLE handle)
 {
+    auto [serviceSid, serviceSidBuffer] = wsl::windows::common::security::GetAccountSid(L"NT SERVICE\\WslService");
     wil::unique_hlocal_security_descriptor descriptor;
     PSID owner{};
-    THROW_IF_WIN32_ERROR(GetSecurityInfo(handle, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &descriptor));
-    return owner && IsWellKnownSid(owner, WinLocalSystemSid);
+    THROW_IF_WIN32_ERROR(GetSecurityInfo(
+        handle, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &descriptor));
+    return owner && EqualSid(owner, serviceSid);
 }

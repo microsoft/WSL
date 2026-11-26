@@ -296,7 +296,11 @@
 
                 <!-- Session 0 service -->
                 <File Id="wslservice.exe" Source="${PACKAGE_INPUT_DIR}/wslservice.exe" KeyPath="yes" />
-                <ServiceInstall Name="WSLService" DisplayName="WSL Service" Description="WSL Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no" />
+                <ServiceInstall Name="WSLService" DisplayName="WSL Service" Description="WSL Service" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no">
+                    <!-- Add a SID specific to this service -->
+                    <ServiceConfig ServiceSid="unrestricted" OnInstall="yes" OnReinstall="yes" />
+                </ServiceInstall>
+
                 <!-- The service is stopped on uninstall and upgrade.
                      N.B. It shouldn't be started on install because it will fail to start if the OC is missing, 
                      which would fail the install. -->
@@ -821,7 +825,8 @@
         <!-- See https://learn.microsoft.com/en-us/windows/win32/msi/examples-of-conditional-statement-syntax -->
         <InstallExecuteSequence>
             <!-- Run before files-in-use handling and the old product's uninstall. -->
-            <Custom Action="CheckForRunningInstances" Before="InstallValidate" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED) and (not UPGRADINGPRODUCTCODE)' />
+            <Custom Action="CheckForRunningInstances" Before="InstallValidate" Condition='((not REMOVE~="ALL") or WIX_UPGRADE_DETECTED) and (not UPGRADINGPRODUCTCODE) and (not SKIPBUSYCHECK = 1)' />
+
             <Custom Action="ValidateInstall" After="InstallInitialize" Condition="(not INSTALLED) and (not SKIPVALIDATION = 1)" />
 
             <!-- Must run before InstallServices or else we'll fail if wslservice already exists.

@@ -6,8 +6,8 @@
 
 namespace wsl::windows::common::install {
 
-// Installer/service contract: the service holds this mutex while any workload is active.
-inline constexpr auto c_serviceBusyMutexName = L"Global\\WslServiceBusyMutex";
+// Installer/service contract: the service keeps this event signaled while any workload is active.
+inline constexpr auto c_serviceBusyEventName = L"Global\\WslServiceBusyEvent";
 
 // Best-effort snapshot; it does not prevent workloads from starting after the check.
 // Throws if the status cannot be determined.
@@ -18,7 +18,7 @@ bool IsServiceBusy();
 // The client is the process that called MsiInstallProduct().
 bool IsExplicitInstallClient(std::wstring_view clientProcessId);
 
-// Checks if an object (represented by its handle) is owned by LocalSystem.
-bool IsOwnedBySystem(HANDLE handle);
+// Checks whether an object is owned by WslService's SID.
+bool IsOwnedByService(HANDLE handle);
 
 } // namespace wsl::windows::common::install

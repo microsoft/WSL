@@ -34,6 +34,9 @@ class LxssInstance;
 class LxssInstance : public LxssRunningInstance
 {
 public:
+    NON_COPYABLE(LxssInstance);
+    NON_MOVABLE(LxssInstance);
+
     /// <summary>
     /// Sets up a new LxssInstance.
     /// </summary>

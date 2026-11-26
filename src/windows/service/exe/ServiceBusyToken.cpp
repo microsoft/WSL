@@ -14,30 +14,46 @@ try
 {
     auto lock = s_lock.lock_exclusive();
 
-    // Prevent unprivileged callers from acquiring the mutex
-    constexpr PCWSTR c_MutexSDDL =
-        // Owner: System
-        L"O:SY"
-        // Group: System
-        L"G:SY"
-        // DACL is Protected
+    if (s_busyEvent)
+    {
+        return;
+    }
+
+    auto [serviceSid, serviceSidBuffer] = wsl::windows::common::security::GetAccountSid(L"NT SERVICE\\WslService");
+    wil::unique_hlocal_string serviceSidString;
+    THROW_IF_WIN32_BOOL_FALSE(ConvertSidToStringSidW(serviceSid, &serviceSidString));
+
+    const auto sddl = std::format(
+        // Owner: WslService
+        L"O:{0}"
+        // DACL is protected
         L"D:P"
-        // Allow full access (GA) to System
-        L"(A;;GA;;;SY)"
-        // Allow Builtin Administrators synchronize (0x00100000) and read-control (0x00020000)
-        L"(A;;0x120000;;;BA)";
+        // 0x100000 = Synchronize, 0x020000 = Read control, 0x000002 = Modify state
+        // Allow WslService synchronize, read-control, and modify-state
+        L"(A;;0x120002;;;{0})"
+        // Allow Builtin Administrators synchronize and read-control
+        L"(A;;0x120000;;;BA)",
+        serviceSidString.get());
     wil::unique_hlocal_security_descriptor descriptor;
-    THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(c_MutexSDDL, SDDL_REVISION_1, &descriptor, nullptr));
+    THROW_IF_WIN32_BOOL_FALSE(
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr));
 
     SECURITY_ATTRIBUTES attributes{sizeof(attributes), descriptor.get(), FALSE};
-    wil::unique_mutex mutex;
-    mutex.create(wsl::windows::common::install::c_serviceBusyMutexName, 0, MUTEX_ALL_ACCESS, &attributes);
+    wil::unique_event event;
+    event.reset(CreateEventExW(
+        &attributes,
+        wsl::windows::common::install::c_serviceBusyEventName,
+        CREATE_EVENT_MANUAL_RESET,
+        SYNCHRONIZE | READ_CONTROL | EVENT_MODIFY_STATE));
+    THROW_LAST_ERROR_IF(!event);
 
-    // Avoid using an existing mutex created by an unprivileged process.
-    // This is best-effort only, it does not guarantee that it was created by the service.
-    THROW_HR_IF(E_ACCESSDENIED, !wsl::windows::common::install::IsOwnedBySystem(mutex.get()));
+    // Reject an event not owned by the service.
+    THROW_HR_IF(E_ACCESSDENIED, !wsl::windows::common::install::IsOwnedByService(event.get()));
 
-    s_busyMutex = std::move(mutex);
+    // An existing, abandoned event may need to be reset
+    event.ResetEvent();
+
+    s_busyEvent = std::move(event);
 }
 CATCH_LOG()
 
@@ -47,31 +63,10 @@ ServiceBusyToken::ServiceBusyToken() noexcept
     {
         auto lock = s_lock.lock_exclusive();
 
-        // Acquire the mutex on the first workload
-        if (s_busyMutex && ++s_count == 1)
+        // Signal the event on the first workload
+        if (s_busyEvent && ++s_count == 1)
         {
-            wil::unique_event startupCompleted{wil::EventOptions::None};
-
-            s_mutexThread = std::jthread([mutexHandle = s_busyMutex.get(), startupEvent = startupCompleted.get()](std::stop_token stop) {
-                auto notifyStartup = wil::scope_exit([=]() { LOG_IF_WIN32_BOOL_FALSE(SetEvent(startupEvent)); });
-                try
-                {
-                    wil::unique_event stopRequested{wil::EventOptions::None};
-                    std::stop_callback stopCallback{stop, [&]() { stopRequested.SetEvent(); }};
-
-                    const auto result = WaitForSingleObject(mutexHandle, INFINITE);
-                    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
-                    THROW_HR_IF(E_UNEXPECTED, result != WAIT_OBJECT_0 && result != WAIT_ABANDONED);
-                    auto releaseMutex = wil::scope_exit([=]() { LOG_IF_WIN32_BOOL_FALSE(ReleaseMutex(mutexHandle)); });
-
-                    notifyStartup.reset();
-                    stopRequested.wait();
-                }
-                CATCH_LOG()
-            });
-
-            // Do not allow the first workload to start before the owner thread is ready.
-            startupCompleted.wait();
+            s_busyEvent.SetEvent();
         }
     }
     CATCH_LOG()
@@ -81,11 +76,10 @@ ServiceBusyToken::~ServiceBusyToken()
 {
     auto lock = s_lock.lock_exclusive();
 
-    // Release the mutex if there are no more workloads
-    if (s_busyMutex && --s_count == 0)
+    // Reset the event if there are no more workloads
+    if (s_busyEvent && --s_count == 0)
     {
-        // Request stop and join under the count lock before a new busy period can begin.
-        s_mutexThread = {};
+        s_busyEvent.ResetEvent();
     }
 }
 

@@ -25,7 +25,7 @@ wil::unique_handle OpenWslServiceProcess(DWORD access)
     return process;
 }
 
-wil::unique_handle GetSystemImpersonationToken()
+wil::unique_handle GetServiceImpersonationToken()
 {
     const auto privilege = wsl::windows::common::security::AcquirePrivileges({SE_DEBUG_NAME});
     const auto process = OpenWslServiceProcess(PROCESS_QUERY_LIMITED_INFORMATION);
@@ -36,21 +36,12 @@ wil::unique_handle GetSystemImpersonationToken()
     VERIFY_WIN32_BOOL_SUCCEEDED(DuplicateTokenEx(
         token.get(), TOKEN_QUERY | TOKEN_IMPERSONATE, nullptr, SecurityImpersonation, TokenImpersonation, impersonationToken.put()));
     VERIFY_IS_TRUE(wsl::windows::common::security::IsTokenLocalSystem(impersonationToken.get()));
-    return impersonationToken;
-}
 
-DWORD TryAcquireMutexOnAnotherThread(HANDLE mutex)
-{
-    DWORD result{};
-    std::thread thread([&]() {
-        result = WaitForSingleObject(mutex, 0);
-        if (result == WAIT_OBJECT_0 || result == WAIT_ABANDONED)
-        {
-            auto release = wil::scope_exit([&]() { LOG_IF_WIN32_BOOL_FALSE(ReleaseMutex(mutex)); });
-        }
-    });
-    thread.join();
-    return result;
+    auto [serviceSid, serviceSidBuffer] = wsl::windows::common::security::GetAccountSid(L"NT SERVICE\\WslService");
+    BOOL isService{};
+    VERIFY_WIN32_BOOL_SUCCEEDED(CheckTokenMembership(impersonationToken.get(), serviceSid, &isService));
+    VERIFY_IS_TRUE(isService);
+    return impersonationToken;
 }
 
 } // namespace
@@ -193,48 +184,72 @@ class MachineWideWorkloadStatusTests
         VERIFY_IS_FALSE(wsl::windows::common::helpers::IsServiceRunning(L"WslService"));
     }
 
-    TEST_METHOD(UnprivilegedCallersCannotAcquireBusyMutex)
+    TEST_METHOD(UnprivilegedCallersCannotOpenBusyEvent)
     {
         const auto token = GetNonElevatedToken(TokenImpersonation);
         const auto impersonate = wil::impersonate_token(token.get());
 
-        const wil::unique_handle mutex{OpenMutexW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyMutexName)};
+        const wil::unique_handle event{OpenEventW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyEventName)};
         const auto error = GetLastError();
-        VERIFY_IS_NULL(mutex.get());
+        VERIFY_IS_NULL(event.get());
         VERIFY_ARE_EQUAL(static_cast<DWORD>(ERROR_ACCESS_DENIED), error);
     }
 
-    TEST_METHOD(IdleQueryReleasesMutex)
+    TEST_METHOD(IdleQueryDoesNotChangeEvent)
     {
-        const wil::unique_handle mutex{OpenMutexW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyMutexName)};
-        VERIFY_IS_NOT_NULL(mutex.get());
+        const wil::unique_handle event{OpenEventW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyEventName)};
+        VERIFY_IS_NOT_NULL(event.get());
 
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(event.get(), 0));
         VERIFY_IS_FALSE(wsl::windows::common::install::IsServiceBusy());
         VERIFY_IS_FALSE(wsl::windows::common::install::IsServiceBusy());
-        // A same-thread wait would recursively acquire the mutex and hide a missing ReleaseMutex.
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), TryAcquireMutexOnAnotherThread(mutex.get()));
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(event.get(), 0));
     }
 
-    TEST_METHOD(AbandonedMutexDoesNotKeepServiceBusy)
+    TEST_METHOD(AdministratorCannotModifyBusyEvent)
     {
-        const wil::unique_handle mutex{OpenMutexW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyMutexName)};
-        VERIFY_IS_NOT_NULL(mutex.get());
-
-        // Reproduce owner death without crashing the service or leaving a VM behind.
-        DWORD result{};
-        std::thread owner([&]() { result = WaitForSingleObject(mutex.get(), 0); });
-        owner.join();
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), result);
-
-        // WAIT_ABANDONED also grants ownership; the query must release it.
-        VERIFY_IS_FALSE(wsl::windows::common::install::IsServiceBusy());
-        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), TryAcquireMutexOnAnotherThread(mutex.get()));
+        const wil::unique_handle event{OpenEventW(EVENT_MODIFY_STATE, FALSE, wsl::windows::common::install::c_serviceBusyEventName)};
+        const auto error = GetLastError();
+        VERIFY_IS_NULL(event.get());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(ERROR_ACCESS_DENIED), error);
     }
 
-    TEST_METHOD(RetainedMutexTracksWorkloadsAfterRestart)
+    TEST_METHOD(RejectsEventOwnedByAnotherAccount)
     {
-        const wil::unique_handle mutex{OpenMutexW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyMutexName)};
-        VERIFY_IS_NOT_NULL(mutex.get());
+        auto restart = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, []() { RestartWslService(); });
+        StopWslService();
+
+        wil::unique_event event;
+        bool alreadyExists{};
+        event.create(wil::EventOptions::ManualReset, wsl::windows::common::install::c_serviceBusyEventName, nullptr, &alreadyExists);
+        VERIFY_IS_FALSE(alreadyExists);
+        VERIFY_THROWS_SPECIFIC(wsl::windows::common::install::IsServiceBusy(), wil::ResultException, [](const wil::ResultException& e) {
+            return e.GetErrorCode() == E_ACCESSDENIED;
+        });
+    }
+
+    TEST_METHOD(RetainedSignaledEventIsResetAfterRestart)
+    {
+        wil::unique_event event;
+        {
+            const auto token = GetServiceImpersonationToken();
+            const auto impersonate = wil::impersonate_token(token.get());
+            event.open(wsl::windows::common::install::c_serviceBusyEventName, SYNCHRONIZE | EVENT_MODIFY_STATE);
+        }
+
+        auto reset = event.ResetEvent_scope_exit();
+        event.SetEvent();
+        VERIFY_IS_TRUE(wsl::windows::common::install::IsServiceBusy());
+
+        RestartWslService();
+        VERIFY_IS_FALSE(wsl::windows::common::install::IsServiceBusy());
+        VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(event.get(), 0));
+    }
+
+    TEST_METHOD(RetainedEventTracksWorkloadsAfterRestart)
+    {
+        const wil::unique_handle event{OpenEventW(SYNCHRONIZE, FALSE, wsl::windows::common::install::c_serviceBusyEventName)};
+        VERIFY_IS_NOT_NULL(event.get());
 
         RestartWslService();
         for (int attempt = 0; attempt < 2; ++attempt)
@@ -242,16 +257,18 @@ class MachineWideWorkloadStatusTests
             {
                 WslKeepAlive workload;
                 VERIFY_IS_TRUE(wsl::windows::common::install::IsServiceBusy());
-                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), TryAcquireMutexOnAnotherThread(mutex.get()));
+                VERIFY_IS_TRUE(wsl::windows::common::install::IsServiceBusy());
+                VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), WaitForSingleObject(event.get(), 0));
             }
 
             WslShutdown();
             VerifyServiceBecomesIdle();
-            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_OBJECT_0), TryAcquireMutexOnAnotherThread(mutex.get()));
+            VERIFY_ARE_EQUAL(static_cast<DWORD>(WAIT_TIMEOUT), WaitForSingleObject(event.get(), 0));
         }
     }
 
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(TerminatedWslcSessionDoesNotKeepServiceBusy)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
     TEST_METHOD_PROPERTY(L"TestCategory", L"WSLC")
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
     TEST_METHOD(TerminatedWslcSessionDoesNotKeepServiceBusy)
@@ -281,6 +298,7 @@ class MachineWideWorkloadStatusTests
     }
 
     TAEF_BEGIN_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE(DetectsWslcSessionHostExit)
+    TEST_METHOD_PROPERTY(L"Ignore[not(@Version=2)]", L"true")
     TEST_METHOD_PROPERTY(L"TestCategory", L"WSLC")
     TAEF_END_TEST_METHOD_PROPERTIES_IN_CLASS_SCOPE()
     TEST_METHOD(DetectsWslcSessionHostExit)
@@ -343,7 +361,7 @@ class MachineWideWorkloadStatusTests
         VERIFY_IS_FALSE(wsl::windows::common::security::IsTokenLocalSystem(userImpersonationToken.get()));
         WslKeepAlive workload;
 
-        const auto impersonationToken = GetSystemImpersonationToken();
+        const auto impersonationToken = GetServiceImpersonationToken();
         const auto impersonate = wil::impersonate_token(impersonationToken.get());
         VERIFY_IS_TRUE(wsl::windows::common::install::IsServiceBusy());
     }

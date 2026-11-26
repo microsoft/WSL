@@ -49,8 +49,8 @@ namespace wrl = Microsoft::WRL;
 /// </summary>
 class WslCoreVm
 {
-    WslCoreVm(const WslCoreVm&) = delete;
-    void operator=(const WslCoreVm&) = delete;
+    NON_COPYABLE(WslCoreVm);
+    NON_MOVABLE(WslCoreVm);
 
 public:
     using InitializeDrvFsCallback = std::function<LX_INIT_DRVFS_MOUNT(HANDLE)>;
