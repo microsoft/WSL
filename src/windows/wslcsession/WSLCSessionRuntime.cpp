@@ -477,7 +477,7 @@ void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& st
 
     // (Re)bind the session-scoped event tracker to this VM's docker client and relay. Existing
     // container subscriptions are preserved across restarts.
-    m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
+    m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay, m_dockerdProcess->Get());
 
     m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath, m_hooks.OnVolumeEvent);
 }
@@ -525,12 +525,11 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
     // Wait for dockerd to deliver pending events before it is stopped. Teardown only runs on the relay thread when the VM
     // exits unexpectedly (OnVmExited), where dockerd is already gone and the relay thread could not deliver events while
     // waiting for them, so skipping the wait there never drops events on a normal VM stop.
-    if (m_dockerClient && m_dockerdProcess.has_value() && !m_vmExited.load() && !m_terminating->load() && m_ioRelay &&
-        !m_ioRelay->IsRelayThread())
+    if (m_dockerClient && !m_vmExited.load() && !m_terminating->load() && m_ioRelay && !m_ioRelay->IsRelayThread())
     {
         try
         {
-            m_eventTracker->WaitForPendingEvents([&]() { THROW_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGHUP)); }, c_pendingEventsTimeout);
+            m_eventTracker->WaitForPendingEvents(c_pendingEventsTimeout);
         }
         CATCH_LOG();
     }
@@ -560,6 +559,11 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
 
     // The session-scoped event tracker is intentionally not reset. Its stream handle dies with the IO
     // relay above, and InitializeDockerRuntime re-binds it on the next start.
+    if (m_eventTracker)
+    {
+        m_eventTracker->Disconnect();
+    }
+
     m_dockerClient.reset();
 
     if (CaptureTerminationReason)
