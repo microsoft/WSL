@@ -1140,6 +1140,19 @@ class NetworkTests
         VERIFY_ARE_EQUAL(expected, out.c_str());
     }
 
+    WSL2_TEST_METHOD(DnsChangeLinkLocalIpv6UsesGuestInterfaceIndex)
+    {
+        DistroFileChange restoreResolvConf(L"/etc/resolv.conf");
+        const auto eth0Index = LxsstuLaunchWslAndCaptureOutput(L"cat /sys/class/net/eth0/ifindex", 0).first;
+
+        wsl::shared::hns::DNS dns;
+        dns.ServerList = std::format(L"fe80::1%{}", wsl::shared::string::GuidToString<wchar_t>(AdapterId));
+        SendDeviceSettingsRequest(L"lo", dns, ModifyRequestType::Update, GuestEndpointResourceType::DNS);
+
+        const auto resolvConf = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0).first;
+        VERIFY_ARE_EQUAL(std::format(L"nameserver fe80::1%{}\n", wsl::shared::string::Trim(eth0Index)), resolvConf);
+    }
+
     WSL2_TEST_METHOD(DnsChangeMultipleServerAndSearch)
     {
         wsl::shared::hns::DNS dns;
@@ -5263,10 +5276,24 @@ class MirroredTests
         m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
         WaitForMirroredStateInLinux();
 
-        auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
-        const std::wregex pattern(L"(.|\n)*nameserver [0-9\\. ]+(.|\n)*", std::regex::extended);
+        const auto [out, _] = LxsstuLaunchWslAndCaptureOutput(L"cat /etc/resolv.conf", 0);
+        std::wistringstream contents(out);
+        bool hasNameserver = false;
+        for (std::wstring line; std::getline(contents, line);)
+        {
+            std::wistringstream fields(line);
+            std::wstring directive;
+            if (fields >> directive && directive == L"nameserver")
+            {
+                std::wstring server;
+                fields >> server;
+                NET_ADDRESS_INFO address{};
+                VERIFY_WIN32_SUCCEEDED(ParseNetworkString(server.c_str(), NET_STRING_IP_ADDRESS, &address, nullptr, nullptr), line.c_str());
+                hasNameserver = true;
+            }
+        }
 
-        VERIFY_IS_TRUE(std::regex_match(out, pattern));
+        VERIFY_IS_TRUE(hasNameserver, L"Expected at least one nameserver in /etc/resolv.conf");
     }
 
     WSL2_TEST_METHOD(NetworkSettings)

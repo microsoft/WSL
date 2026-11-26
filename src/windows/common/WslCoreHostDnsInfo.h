@@ -1,6 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 #pragma once
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -22,7 +23,8 @@ enum class DnsSettingsFlags
     None = 0x0,
     IncludeVpn = 0x1,
     IncludeIpv6Servers = 0x2,
-    IncludeAllSuffixes = 0x4
+    IncludeAllSuffixes = 0x4,
+    AppendIpv6LinkLocalScopeId = 0x8
 };
 DEFINE_ENUM_FLAG_OPERATORS(DnsSettingsFlags);
 
@@ -52,7 +54,9 @@ DWORD GetBestInterface();
 class HostDnsInfo
 {
 public:
-    static DnsInfo GetDnsSettings(_In_ DnsSettingsFlags Flags);
+    using Ipv6LinkLocalScopeFilter = std::function<bool(NET_IFINDEX)>;
+
+    static DnsInfo GetDnsSettings(_In_ DnsSettingsFlags Flags, const Ipv6LinkLocalScopeFilter& ipv6LinkLocalScopeFilter = {});
 
     static DnsInfo GetDnsTunnelingSettings(const std::wstring& dnsTunnelingNameserver);
 
@@ -60,7 +64,8 @@ private:
     /// <summary>
     /// Internal function to retrieve interface DNS servers.
     /// </summary>
-    static std::vector<std::string> GetInterfaceDnsServers(const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags);
+    static std::vector<std::string> GetInterfaceDnsServers(
+        const std::vector<IpAdapterAddress>& AdapterAddresses, _In_ DnsSettingsFlags Flags, const Ipv6LinkLocalScopeFilter& ipv6LinkLocalScopeFilter);
 
     /// <summary>
     /// Internal function to retrieve all Windows DNS suffixes.
@@ -70,7 +75,12 @@ private:
     /// <summary>
     /// Internal function to convert DNS server addresses into strings.
     /// </summary>
-    static std::vector<std::string> GetDnsServerStrings(_In_ const PIP_ADAPTER_DNS_SERVER_ADDRESS& DnsServer, _In_ USHORT IpFamilyFilter, _In_ USHORT MaxValues);
+    static std::vector<std::string> GetDnsServerStrings(
+        const IpAdapterAddress& adapter,
+        _In_ USHORT IpFamilyFilter,
+        _In_ USHORT MaxValues,
+        bool appendIpv6LinkLocalScopeId,
+        const Ipv6LinkLocalScopeFilter& ipv6LinkLocalScopeFilter = {});
 };
 
 using RegistryChangeCallback = std::function<void()>;
