@@ -26,6 +26,7 @@ Abstract:
 
 #include "util.h"
 #include "CommandLine.h"
+#include "stringshared.h"
 
 using namespace wsl::shared;
 
@@ -294,7 +295,7 @@ Routine Description:
     - The path is made absolute.
     - All separators are changed to backslashes.
     - Duplicate separators and .. components are compacted.
-    - The \\?\ prefix is stripped from long paths.
+    - Extended drive and UNC paths are converted to their ordinary spellings.
 
 Arguments:
 
@@ -369,11 +370,17 @@ Return Value:
     else if (Path[0] == PATH_SEP_NT && Path[1] == PATH_SEP_NT)
     {
         //
-        // This is either a long path or a UNC path. If it's a long path,
-        // strip the prefix.
+        // For extended UNC paths, reuse the last two prefix characters as the leading backslashes.
         //
 
-        if (Path[2] == '?' && Path[3] == PATH_SEP_NT)
+        constexpr std::string_view c_extendedUncPrefix = R"(\\?\UNC\)";
+        if (wsl::shared::string::StartsWith(std::string_view{Path, PathLength}, c_extendedUncPrefix, true))
+        {
+            StartIndex = c_extendedUncPrefix.size() - 2;
+            Path[StartIndex] = PATH_SEP_NT;
+            CollapseStartIndex = 2;
+        }
+        else if (Path[2] == '?' && Path[3] == PATH_SEP_NT)
         {
             StartIndex = 4;
             CollapseStartIndex = 0;
