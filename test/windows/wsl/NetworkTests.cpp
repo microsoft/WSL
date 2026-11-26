@@ -5758,6 +5758,153 @@ class MirroredTests
 
         NetworkTests::VerifyI386PortIsTracked(true);
     }
+
+    static std::string CaptureNetworkChange(const std::function<void()>& change)
+    {
+        auto [readPipe, writePipe] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+        VERIFY_WIN32_BOOL_SUCCEEDED(SetHandleInformation(writePipe.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+
+        auto command = LxssGenerateWslCommandLine(L"ip -o monitor label address route");
+        NetworkTests::unique_kill_process monitor(LxsstuStartProcess(command.data(), nullptr, writePipe.get(), writePipe.get()));
+        writePipe.reset();
+        PartialHandleRead events{readPipe.get()};
+
+        const auto waitForMarker = [&] {
+            GUID markerId{};
+            VERIFY_SUCCEEDED(CoCreateGuid(&markerId));
+            const auto markerTable = 10000 + markerId.Data1 % 1000000000;
+            const auto markerRoute = std::format(L"unreachable 192.0.2.255/32 table {}", markerTable);
+            const auto markerEvent = std::format("table {} ", markerTable);
+            VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+                [&] {
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -4 route add " + markerRoute), 0u);
+                    VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"ip -4 route del " + markerRoute), 0u);
+                    THROW_HR_IF_MSG(
+                        E_PENDING,
+                        events.GetData().find(markerEvent) == std::string::npos,
+                        "The network monitor did not observe the marker route");
+                },
+                std::chrono::milliseconds(100),
+                std::chrono::seconds(10),
+                [] { return wil::ResultFromCaughtException() == E_PENDING; }));
+        };
+
+        waitForMarker();
+        const auto start = events.GetData().size();
+        change();
+        waitForMarker();
+        const auto output = events.GetData().substr(start);
+        LogInfo("Network events:\r\n%ls", NetworkTests::FixLineEndings(wsl::shared::string::MultiByteToWide(output)).c_str());
+        return output;
+    }
+
+    static void SetHostInterfaceMetric(DWORD ifIndex, ADDRESS_FAMILY family, ULONG metric, bool automaticMetric = false)
+    {
+        const auto metricOptions =
+            automaticMetric ? L"-AutomaticMetric Enabled" : std::format(L"-AutomaticMetric Disabled -InterfaceMetric {}", metric);
+        LxsstuLaunchPowershellAndCaptureOutput(
+            std::format(L"Set-NetIPInterface -InterfaceIndex {} -AddressFamily {} {} -PolicyStore ActiveStore -Confirm:$false -ErrorAction Stop", ifIndex, family == AF_INET ? L"IPv4" : L"IPv6", metricOptions));
+    }
+
+    static void VerifyHostInterfaceMetricChange(ADDRESS_FAMILY family)
+    {
+        const bool v4 = family == AF_INET;
+        constexpr int routeMetric = 100;
+        constexpr int initialMetric = 30;
+        constexpr int higherMetric = 35;
+        constexpr int lowerMetric = 25;
+        const DWORD ifIndex = NetworkTests::GetBestInterfaceIndex(family);
+        const ADDRESS_FAMILY otherFamily = v4 ? AF_INET6 : AF_INET;
+        MIB_IPINTERFACE_ROW originalInterface{};
+        originalInterface.Family = family;
+        originalInterface.InterfaceIndex = ifIndex;
+        VERIFY_ARE_EQUAL(GetIpInterfaceEntry(&originalInterface), (ULONG)NO_ERROR);
+
+        MIB_IPINTERFACE_ROW otherInterface{};
+        otherInterface.Family = otherFamily;
+        otherInterface.InterfaceIndex = ifIndex;
+        const auto otherResult = GetIpInterfaceEntry(&otherInterface);
+        if (otherResult != ERROR_NOT_FOUND && otherResult != ERROR_FILE_NOT_FOUND)
+        {
+            VERIFY_WIN32_SUCCEEDED(otherResult);
+        }
+        const bool adjustOtherMetric = otherResult == NO_ERROR && otherInterface.Metric < higherMetric;
+        auto restoreOtherMetric = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            if (adjustOtherMetric)
+            {
+                SetHostInterfaceMetric(ifIndex, otherFamily, otherInterface.Metric, otherInterface.UseAutomaticMetric);
+            }
+        });
+        auto restoreMetric = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&] {
+            SetHostInterfaceMetric(ifIndex, family, originalInterface.Metric, originalInterface.UseAutomaticMetric);
+        });
+
+        if (adjustOtherMetric)
+        {
+            SetHostInterfaceMetric(ifIndex, otherFamily, higherMetric);
+        }
+        SetHostInterfaceMetric(ifIndex, family, initialMetric);
+
+        const std::wstring destination = v4 ? L"192.0.2.0/24" : L"2001:db8:1::/64";
+        const std::wstring gateway = v4 ? L"192.0.2.1" : L"2001:db8:1::1";
+        VERIFY_IS_FALSE(HostRouteExists(destination));
+        auto cleanupRoute = wil::scope_exit([&] { RemoveHostRoute(destination); });
+        AddHostRoute(ifIndex, destination, gateway, routeMetric);
+        const auto device = wsl::shared::retry::RetryWithTimeout<std::wstring>(
+            [&] {
+                const auto route = FindMirroredRoute(family, destination, gateway, routeMetric + initialMetric);
+                THROW_HR_IF_MSG(E_PENDING, !route, "Waiting for the initial interface metric to be mirrored");
+                return route->Device;
+            },
+            std::chrono::milliseconds(100),
+            std::chrono::seconds(10),
+            [] { return wil::ResultFromCaughtException() == E_PENDING; });
+
+        const auto [addresses, warnings] =
+            LxsstuLaunchWslAndCaptureOutput(std::format(L"ip -{} -o address show dev {}", v4 ? 4 : 6, device), 0);
+        VERIFY_IS_FALSE(addresses.empty(), L"The mirrored interface must have an address before changing its metric");
+        const auto guestIndex = std::stoul(addresses);
+
+        const auto events = CaptureNetworkChange([&] {
+            for (const int metric : {higherMetric, lowerMetric})
+            {
+                SetHostInterfaceMetric(ifIndex, family, metric);
+                VERIFY_IS_TRUE(WaitForMirroredRoute(family, destination, gateway, true, routeMetric + metric));
+            }
+        });
+        VERIFY_ARE_EQUAL(
+            std::string::npos,
+            events.find(std::format("[ADDR]Deleted {}:", guestIndex)),
+            L"A metric-only change must not delete addresses");
+    }
+
+    WSL2_TEST_METHOD(InterfaceMetricChangePreservesAddressesV4)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET))
+        {
+            LogSkipped("Host does not have IPv4 internet connectivity. Skipping...");
+            return;
+        }
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        VerifyHostInterfaceMetricChange(AF_INET);
+    }
+
+    WSL2_TEST_METHOD(InterfaceMetricChangePreservesAddressesV6)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        if (!NetworkTests::HostHasInternetConnectivity(AF_INET6))
+        {
+            LogSkipped("Host does not have IPv6 internet connectivity. Skipping...");
+            return;
+        }
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        VerifyHostInterfaceMetricChange(AF_INET6);
+    }
 };
 
 class BridgedTests

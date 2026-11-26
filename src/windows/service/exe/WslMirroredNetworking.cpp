@@ -524,6 +524,8 @@ void wsl::core::networking::WslMirroredNetworkManager::ProcessInterfaceChange()
         const auto metricUpdate = originalMinimumMetric != minimumMetric;
 
         endpoint.Network->PendingIPInterfaceUpdate |= connectedStateUpdated || mtuUpdated || metricUpdate;
+        // A metric-only change affects route preference but does not delete guest IP addresses.
+        endpoint.Network->PendingAddressRefresh |= connectedStateUpdated || mtuUpdated;
 
         if (disableDefaultRoutesUpdated || connectedStateUpdated || mtuUpdated || metricUpdate)
         {
@@ -1022,6 +1024,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
     }
 
     const auto makingIpInterfaceUpdate = endpoint.Network->PendingIPInterfaceUpdate;
+    const auto makingAddressRefreshUpdate = endpoint.Network->PendingAddressRefresh;
     // Linux may delete routes behind us when making interface, address, and route changes
     // will track when to refresh v4 and v6 routes to ensure routes are still present after changes
     // a few customers have seen this when we update temporary v6 addresses, for example
@@ -1054,6 +1057,7 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
         else
         {
             endpoint.Network->PendingIPInterfaceUpdate = false;
+            endpoint.Network->PendingAddressRefresh = false;
         }
 
         endpoint.Network->IsConnected = originalConnectValue;
@@ -1084,9 +1088,8 @@ _Check_return_ bool wsl::core::networking::WslMirroredNetworkManager::SyncIpStat
                     address->SyncStatus = PendingUpdate;
                     address->SyncRetryCount = TrackedIpAddress::MaxSyncRetryCount;
                 }
-                else if (makingIpInterfaceUpdate)
+                else if (makingAddressRefreshUpdate)
                 {
-                    // if we pushed an interface update, ensure our addresses are up to date
                     address->SyncStatus = PendingUpdate;
                     address->SyncRetryCount = TrackedIpAddress::MaxSyncRetryCount;
                 }
@@ -1614,6 +1617,7 @@ try
                 endpoint.Network->IsHidden = false;
                 // setting PendingIPInterfaceUpdate to tell SyncIpStateWithLinux to update the Interface state
                 endpoint.Network->PendingIPInterfaceUpdate = true;
+                endpoint.Network->PendingAddressRefresh = true;
             }
             mirroredConnectedInterfaces.insert(endpoint.InterfaceGuid);
         }
@@ -1632,6 +1636,7 @@ try
             endpoint.Network->IsHidden = true;
             // setting PendingIPInterfaceUpdate to tell SyncIpStateWithLinux to update the Interface state
             endpoint.Network->PendingIPInterfaceUpdate = true;
+            // No address refresh is needed because SyncIpStateWithLinux removes addresses from hidden interfaces.
         }
 
         if (!SyncIpStateWithLinux(endpoint))
