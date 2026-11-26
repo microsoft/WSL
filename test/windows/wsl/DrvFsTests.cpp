@@ -372,6 +372,10 @@ public:
 
         VERIFY_ARE_EQUAL(L".\n", LxsstuLaunchWslAndCaptureOutput(L"--cd / --exec wslpath -u .").first);
         VERIFY_ARE_EQUAL(L"/\n", LxsstuLaunchWslAndCaptureOutput(L"--cd / --exec wslpath -a -u .").first);
+
+        VERIFY_ARE_EQUAL(L"/tmp\\log\n", LxsstuLaunchWslAndCaptureOutput(L"--cd /tmp --exec wslpath -u ..\\tmp\uf05clog").first);
+        VERIFY_ARE_EQUAL(L"/tmp\\log\n", LxsstuLaunchWslAndCaptureOutput(L"--cd /tmp --exec wslpath -au ..\\tmp\uf05clog").first);
+        VERIFY_ARE_EQUAL(L"log\n", LxsstuLaunchWslAndCaptureOutput(L"--cd /tmp --exec wslpath -u .\\log").first);
     }
 
     void DrvFsMountUnicodePath(DrvFsMode Mode)

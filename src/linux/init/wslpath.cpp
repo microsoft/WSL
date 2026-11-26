@@ -651,25 +651,16 @@ Return Value:
         OutputCwdLength = strlen(OutputCwd);
         if (strncmp(TranslatedPath.c_str(), OutputCwd, OutputCwdLength) == 0)
         {
-            switch (TranslatedPath[OutputCwdLength])
+            const char separator = Mode == TRANSLATE_MODE_UNIX ? PATH_SEP : PATH_SEP_NT;
+            const char next = TranslatedPath[OutputCwdLength];
+            if (next == '\0' || (next == separator && OutputCwdLength + 1 == TranslatedPath.length()))
             {
-            case PATH_SEP_NT:
-            case PATH_SEP:
-                if (OutputCwdLength + 1 == TranslatedPath.length())
-                {
-                    // Special case for wslpath -u .
-                    TranslatedPath = ".";
-                }
-                else
-                {
-                    TranslatedPath = TranslatedPath.substr(OutputCwdLength + 1);
-                }
-                break;
-
-            case '\0':
                 // Use "." for the current directory; an empty result signals translation failure.
                 TranslatedPath = ".";
-                break;
+            }
+            else if (next == separator)
+            {
+                TranslatedPath.erase(0, OutputCwdLength + 1);
             }
         }
     }
