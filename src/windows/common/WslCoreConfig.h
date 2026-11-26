@@ -340,7 +340,7 @@ struct Config
     int InstanceIdleTimeout = (15 * 1000);
     std::filesystem::path DebugConsoleLogFile;
     std::wstring VmSwitch;
-    int KernelBootTimeout = (30 * 1000);
+    int KernelBootTimeout = (90 * 1000);
     int DistributionStartTimeout = (60 * 1000);
     int MountDeviceTimeout = (5 * 1000);
     bool EnableHostFileSystemAccess = true;
