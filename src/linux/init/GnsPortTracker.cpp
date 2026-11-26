@@ -26,6 +26,8 @@
 
 constexpr std::chrono::seconds c_bind_timeout_seconds{60};
 constexpr std::chrono::milliseconds c_sock_diag_listing_delay{500};
+constexpr std::chrono::seconds c_udp_reservation_initial_retry_delay{1};
+constexpr std::chrono::seconds c_udp_reservation_max_retry_delay{60};
 
 GnsPortTracker::GnsPortTracker(
     std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
@@ -38,6 +40,10 @@ GnsPortTracker::GnsPortTracker(
     m_networkingMode(networkingMode)
 {
     m_networkNamespace = std::filesystem::read_symlink("/proc/self/ns/net").string();
+
+    // Read once: at this point the range is the one that the host reserved. The guest can change the sysctl later,
+    // but that doesn't change the host reservation.
+    m_hostReservedPortRange = GetEphemeralPortRange();
     GNS_LOG_INFO("GnsPortTracker initialized with networking mode ({})", static_cast<int>(m_networkingMode));
 }
 
@@ -329,25 +335,24 @@ try
     // Sockets that the kernel creates for itself, such as the UDP socket of a VXLAN, GENEVE or WireGuard
     // device, never go through bind(), so the seccomp trap never reserves their port on the host and
     // inbound packets for them are not delivered to the guest in mirrored mode.
-    // Reserve any unconnected UDP socket that is not tracked yet. Ports in the ephemeral range are
-    // skipped, because client sockets that sendto() without bind() are auto-bound there.
-    // Once reserved, ReconcileAllocatedPorts releases the port when the socket goes away.
+    // Reserve any unconnected UDP socket that is not tracked yet. Ports in the range that the host already
+    // reserved for the guest are skipped. The match is on the full allocation, because a tracked entry for the
+    // same port on another address may not have reserved anything on the host (for example 127.0.0.2).
+    // A refused request is retried with an increasing delay, because the failure can be temporary.
+    // Once reserved, ReconcileAllocatedPorts releases the port when no socket uses it anymore.
 
-    std::erase_if(m_unreservableUdpPorts, [&](const auto& port) { return !Ports.UnconnectedUdp.contains(port); });
+    std::erase_if(m_refusedUdpPorts, [&](const auto& entry) { return !Ports.UnconnectedUdp.contains(entry.first); });
 
-    const auto [ephemeralStart, ephemeralEnd] = GetEphemeralPortRange();
+    const auto [reservedStart, reservedEnd] = m_hostReservedPortRange;
     for (auto socket : Ports.UnconnectedUdp)
     {
-        if (socket.Port == 0 || (socket.Port >= ephemeralStart && socket.Port <= ephemeralEnd))
+        if (socket.Port == 0 || (socket.Port >= reservedStart && socket.Port <= reservedEnd) || m_allocatedPorts.contains(socket))
         {
             continue;
         }
 
-        const bool tracked = std::any_of(m_allocatedPorts.begin(), m_allocatedPorts.end(), [&](const auto& entry) {
-            return entry.first.Port == socket.Port && entry.first.Protocol == socket.Protocol;
-        });
-
-        if (tracked || m_unreservableUdpPorts.contains(socket))
+        const auto refused = m_refusedUdpPorts.find(socket);
+        if (refused != m_refusedUdpPorts.end() && Clock::now() < refused->second.NextAttempt)
         {
             continue;
         }
@@ -363,10 +368,15 @@ try
         {
             // The socket is known to exist, so no timeout is needed.
             m_allocatedPorts.insert_or_assign(socket, std::nullopt);
+            m_refusedUdpPorts.erase(socket);
         }
         else
         {
-            m_unreservableUdpPorts.insert(socket);
+            const auto delay = refused == m_refusedUdpPorts.end()
+                                   ? c_udp_reservation_initial_retry_delay
+                                   : std::min(refused->second.Delay * 2, c_udp_reservation_max_retry_delay);
+
+            m_refusedUdpPorts.insert_or_assign(socket, RefusedReservation{Clock::now() + delay, delay});
         }
     }
 }

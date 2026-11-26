@@ -140,6 +140,12 @@ private:
 
     using TrackerEvent = std::variant<seccomp_notif, ListPortsResult>;
 
+    struct RefusedReservation
+    {
+        Clock::time_point NextAttempt;
+        std::chrono::seconds Delay;
+    };
+
     bool IsMirroredMode() const
     {
         return m_networkingMode == LxMiniInitNetworkingModeMirrored;
@@ -176,7 +182,8 @@ private:
     int HandleInterfaceStateChange(const seccomp_notif& Notification);
 
     std::map<PortAllocation, std::optional<Clock::time_point>> m_allocatedPorts;
-    std::set<PortAllocation> m_unreservableUdpPorts; // Untracked UDP sockets the host refused to reserve
+    std::map<PortAllocation, RefusedReservation> m_refusedUdpPorts; // Untracked UDP sockets the host refused to reserve
+    std::pair<std::uint16_t, std::uint16_t> m_hostReservedPortRange;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
 

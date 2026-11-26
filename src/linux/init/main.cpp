@@ -3376,6 +3376,13 @@ try
 
         auto NetworkingConfiguration = &ConfigMessage->NetworkingConfiguration;
         Config.NetworkingMode = NetworkingConfiguration->NetworkingMode;
+
+        // The port tracker reads this range at startup, so it must be set first.
+        if (SetEphemeralPortRange(NetworkingConfiguration->EphemeralPortRangeStart, NetworkingConfiguration->EphemeralPortRangeEnd) < 0)
+        {
+            return -1;
+        }
+
         if (NetworkingConfiguration->PortTrackerType != LxMiniInitPortTrackerTypeNone)
         {
             StartPortTracker(NetworkingConfiguration->PortTrackerType, NetworkingConfiguration->NetworkingMode);
@@ -3389,11 +3396,6 @@ try
         if (NetworkingConfiguration->EnableDhcpClient)
         {
             StartDhcpClient(NetworkingConfiguration->DhcpTimeout);
-        }
-
-        if (SetEphemeralPortRange(NetworkingConfiguration->EphemeralPortRangeStart, NetworkingConfiguration->EphemeralPortRangeEnd) < 0)
-        {
-            return -1;
         }
 
         if (ConfigMessage->EntropySize > 0)

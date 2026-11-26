@@ -4843,6 +4843,36 @@ class MirroredTests
         NetworkTests::VerifyAcceptedConnectionPortTracking();
     }
 
+    // Creates a VXLAN device, whose UDP socket is created by the kernel and not by bind(). The device is deleted on scope exit.
+    static auto CreateGuestVxlan(uint16_t Port, std::wstring_view LocalAddress = L"127.0.0.1")
+    {
+        auto deleteDevice = wil::scope_exit([]() { LxsstuLaunchWsl(L"ip link del wsltestvxlan"); });
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(
+                L"ip link add wsltestvxlan type vxlan id 42 dstport {} local {} && ip link set wsltestvxlan up", Port, LocalAddress)),
+            (DWORD)0);
+
+        return deleteDevice;
+    }
+
+    // Retries until binding the UDP port on the host fails (reserved for the guest) or succeeds (not reserved).
+    static void WaitForHostUdpPort(uint16_t Port, bool ExpectReserved, std::chrono::seconds Timeout)
+    {
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(Port);
+                const bool reserved = bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR;
+                THROW_HR_IF(E_FAIL, reserved != ExpectReserved);
+            },
+            std::chrono::seconds(1),
+            Timeout));
+    }
+
     WSL2_TEST_METHOD(MirroredKernelUdpSocketIsReserved)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
@@ -4855,25 +4885,9 @@ class MirroredTests
         // A VXLAN device's UDP socket is created by the kernel, not by bind(), so the seccomp trap never sees it.
         // Verify that the port tracker still reserves its port on the host, so inbound packets reach the guest.
         constexpr uint16_t port = 4790;
-        VERIFY_ARE_EQUAL(
-            LxsstuLaunchWsl(std::format(L"ip link add wsltestvxlan type vxlan id 42 dstport {} local 127.0.0.1 && ip link set wsltestvxlan up", port)),
-            (DWORD)0);
+        auto deleteDevice = CreateGuestVxlan(port);
 
-        auto deleteDevice = wil::scope_exit([&]() { LxsstuLaunchWsl(L"ip link del wsltestvxlan"); });
-
-        // Retry until the port tracker reserves the port, blocking the host bind.
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                wil::unique_socket sock(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-                THROW_LAST_ERROR_IF(!sock);
-
-                SOCKADDR_IN addr{};
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(port);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
-            },
-            std::chrono::seconds(1),
-            std::chrono::seconds(30)));
+        WaitForHostUdpPort(port, true, std::chrono::seconds(30));
 
         // Wait > 60 seconds so that the port tracker's deallocation logic would have run. The port must stay
         // reserved while the device exists. See c_bind_timeout_seconds in GnsPortTracker.cpp
@@ -4882,18 +4896,65 @@ class MirroredTests
 
         // Delete the device. Verify the port is eventually released.
         deleteDevice.reset();
-        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                wil::unique_socket sock(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-                THROW_LAST_ERROR_IF(!sock);
+        WaitForHostUdpPort(port, false, std::chrono::minutes(2));
+    }
 
-                SOCKADDR_IN addr{};
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(port);
-                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
-            },
-            std::chrono::seconds(1),
-            std::chrono::minutes(2)));
+    WSL2_TEST_METHOD(MirroredKernelUdpSocketIsReservedAfterEphemeralRangeChange)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        WslKeepAlive keepAlive;
+
+        // Widening the guest's ephemeral range doesn't widen the host reservation, so a port that is only in the
+        // new range must still be reserved. Shut down afterwards to restore the range.
+        constexpr uint16_t port = 4791;
+        auto restoreRange = wil::scope_exit([]() { WslShutdown(); });
+        VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"echo 1024 65000 > /proc/sys/net/ipv4/ip_local_port_range"), (DWORD)0);
+
+        auto deleteDevice = CreateGuestVxlan(port);
+        WaitForHostUdpPort(port, true, std::chrono::seconds(30));
+    }
+
+    WSL2_TEST_METHOD(MirroredKernelUdpSocketIsReservedWithLoopbackBindOnSamePort)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        WslKeepAlive keepAlive;
+
+        // A bind to 127.0.0.2 is tracked in the guest, but the host reserves nothing for it.
+        constexpr uint16_t port = 4792;
+        auto loopbackBind = NetworkTests::BindGuestPort(L"UDP4-LISTEN:4792,bind=127.0.0.2", true);
+        NetworkTests::BindHostPort(port, SOCK_DGRAM, IPPROTO_UDP, true);
+
+        // An IPv6 VXLAN socket can use the same port as the IPv4 socket above. It must still be reserved.
+        auto deleteDevice = CreateGuestVxlan(port, L"::1");
+        WaitForHostUdpPort(port, true, std::chrono::seconds(30));
+    }
+
+    WSL2_TEST_METHOD(MirroredKernelUdpSocketReservationIsRetried)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        WslKeepAlive keepAlive;
+
+        // Hold the port on the host so that the first reservation requests are refused.
+        constexpr uint16_t port = 4793;
+        auto hostSocket = NetworkTests::BindHostPort(port, SOCK_DGRAM, IPPROTO_UDP, true);
+        auto deleteDevice = CreateGuestVxlan(port);
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+
+        // Once the port is free, a later attempt must reserve it.
+        hostSocket.reset();
+        WaitForHostUdpPort(port, true, std::chrono::minutes(2));
     }
 
     WSL2_TEST_METHOD(MirroredReusePortOnGuest)
