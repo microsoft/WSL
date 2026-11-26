@@ -804,6 +804,34 @@ bool wsl::windows::common::filesystem::FileExists(_In_ LPCWSTR Path)
     return (Attributes != INVALID_FILE_ATTRIBUTES);
 }
 
+std::optional<int> wsl::windows::common::filesystem::GetSparseFileState(_In_ HANDLE File)
+{
+    try
+    {
+        FILE_BASIC_INFO basicInfo{};
+        THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandleEx(File, FileBasicInfo, &basicInfo, sizeof(basicInfo)));
+        return WI_IsFlagSet(basicInfo.FileAttributes, FILE_ATTRIBUTE_SPARSE_FILE) ? 1 : 0;
+    }
+    CATCH_LOG()
+
+    return std::nullopt;
+}
+
+std::optional<int> wsl::windows::common::filesystem::GetSparseFileState(_In_ PCWSTR Path)
+{
+    try
+    {
+        const wil::unique_hfile file{CreateFileW(
+            Path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+        THROW_LAST_ERROR_IF(!file);
+
+        return GetSparseFileState(file.get());
+    }
+    CATCH_LOG()
+
+    return std::nullopt;
+}
+
 std::filesystem::path wsl::windows::common::filesystem::GetCanonicalPath(const std::filesystem::path& Path)
 {
     std::error_code error;
