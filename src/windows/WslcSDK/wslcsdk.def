@@ -61,6 +61,7 @@ WslcSetContainerSettingsCapabilityDrops
 WslcCreateContainerProcess
 WslcStartContainer
 WslcSetContainerInitProcessIOCallbacks
+WslcActivateContainerIOCallbacks
 WslcInspectContainer
 WslcGetContainerState
 WslcStopContainer

@@ -20,7 +20,10 @@ STDAPI WslcSetContainerInitProcessIOCallbacks(
 Return value: `HRESULT`.
 
 Call this function before [`WslcStartContainer`](wslcstartcontainer.md), and start the container with
-`WSLC_CONTAINER_START_FLAG_ATTACH`. It has no effect after the container is already running.
+`WSLC_CONTAINER_START_FLAG_ATTACH`. It has no effect after the container is already running. Callbacks
+are delivered as soon as the container starts, unless it is started with
+`WSLC_CONTAINER_START_FLAG_DEFER_IO_CALLBACKS`; in that case they are delivered after
+[`WslcActivateContainerIOCallbacks`](wslcactivatecontaineriocallbacks.md) is called.
 
 Registering any callback through this function consumes both process I/O handles, so neither can
 subsequently be acquired with `WslcGetProcessIOHandle`. If registered, `onExit` runs after buffered
