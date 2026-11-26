@@ -23,6 +23,7 @@ Abstract:
 #include "PluginManager.h"
 #include "Lifetime.h"
 #include "DistributionRegistration.h"
+#include "UsbTypes.h"
 
 #define WSL_NEW_DISTRO_LXFS L"NewDistributionLxFs"
 #define WSL_DISTRO_CONFIG_DEFAULT_UID L"DefaultUid"
@@ -40,6 +41,10 @@ class ConsoleManager;
 class LxssRunningInstance;
 class WslCoreVm;
 class LxssUserSessionImpl;
+
+namespace wsl::windows::common::usb {
+class Manager;
+}
 
 typedef struct _LXSS_RUN_ELF_CONTEXT
 {
@@ -266,6 +271,21 @@ public:
     /// </summary>
     IFACEMETHOD(UnregisterDistribution)(_In_ LPCGUID DistroGuid, _Out_ LXSS_ERROR_INFO* Error) override;
 
+    /// <summary>
+    /// Enumerates physical USB devices and their availability to the caller.
+    /// </summary>
+    IFACEMETHOD(EnumerateUsbDevices)(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Attaches a USB device to the caller's utility VM.
+    /// </summary>
+    IFACEMETHOD(AttachUsbDevice)(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error) override;
+
+    /// <summary>
+    /// Detaches the caller's USB device and returns it to Windows.
+    /// </summary>
+    IFACEMETHOD(DetachUsbDevice)(_In_ LPCWSTR Port, _Out_ LXSS_ERROR_INFO* Error) override;
+
     // IWslSupport methods.
 
     /// <summary>
@@ -316,7 +336,11 @@ private:
 class LxssUserSessionImpl : public std::enable_shared_from_this<LxssUserSessionImpl>
 {
 public:
-    LxssUserSessionImpl(_In_ PSID userSid, _In_ DWORD sessionId, _Inout_ wsl::windows::service::PluginManager& pluginManager);
+    LxssUserSessionImpl(
+        _In_ PSID userSid,
+        _In_ DWORD sessionId,
+        _Inout_ wsl::windows::service::PluginManager& pluginManager,
+        _Inout_ wsl::windows::common::usb::Manager& usbManager);
     virtual ~LxssUserSessionImpl();
     LxssUserSessionImpl(const LxssUserSessionImpl&) = delete;
     LxssUserSessionImpl& operator=(const LxssUserSessionImpl&) = delete;
@@ -542,6 +566,23 @@ public:
     /// Queries a distribution's default UID, default environment, and flags.
     /// </summary>
     static CreateLxProcessContext s_GetCreateProcessContext(_In_ const GUID& DistroGuid, _In_ bool SystemDistro);
+
+    /// <summary>
+    /// Enumerates physical USB devices and their availability to this user.
+    /// </summary>
+    HRESULT EnumerateUsbDevices(_Out_ ULONG* DeviceCount, _Out_ WSL_USB_DEVICE** Devices);
+
+    /// <summary>
+    /// Attaches a USB device for this user while serializing with session shutdown.
+    /// </summary>
+    HRESULT AttachUsbDevice(_In_ LPCWSTR Port);
+
+    /// <summary>
+    /// Detaches this user's USB device and returns it to Windows.
+    /// </summary>
+    HRESULT DetachUsbDevice(_In_ LPCWSTR Port);
+
+    void OnUsbDeviceRemoved(const GUID& ReservationId);
 
 private:
     struct PidTermination
@@ -828,6 +869,15 @@ private:
 
     static LRESULT CALLBACK s_TimezoneWindowProc(HWND windowHandle, UINT messageCode, WPARAM wParameter, LPARAM lParameter);
 
+    _Requires_lock_held_(m_instanceLock)
+    void _ReleaseUsbAttachment(const GUID& ReservationId, bool WaitForReappearance = false);
+
+    _Requires_lock_held_(m_instanceLock)
+    void _ReleaseUsbAttachments() noexcept;
+
+    _Requires_lock_held_(m_instanceLock)
+    void _ReplayUsbAttachments() noexcept;
+
     /// <summary>
     /// Lock for protecting various lists.
     /// </summary>
@@ -921,6 +971,8 @@ private:
 
     wsl::windows::service::PluginManager& m_pluginManager;
 
+    wsl::windows::common::usb::Manager& m_usbManager;
+
     /// <summary>
     /// Listens to host http proxy setting changes, tracks ongoing proxy queries, and stores current settings.
     /// Information used to configure Linux proxy environment variables.
@@ -929,6 +981,15 @@ private:
 
     wil::unique_event m_timezoneStopEvent{wil::EventOptions::ManualReset};
     std::thread m_timezoneThread;
+
+    struct UsbAttachment
+    {
+        wsl::windows::common::usb::DeviceReservation Reservation;
+        bool Requested = false;
+        bool Attached = false;
+    };
+
+    _Guarded_by_(m_instanceLock) std::map<GUID, UsbAttachment, wsl::windows::common::helpers::GuidLess> m_usbAttachments;
 };
 
 #define LXSS_CLIENT_ID_WILDCARD ((ULONG)0)

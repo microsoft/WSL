@@ -33,6 +33,7 @@ inline constexpr auto c_allowDiskMount = L"AllowDiskMount";
 inline constexpr auto c_allowCustomNetworkingModeUserSetting = L"AllowNetworkingModeUserSetting";
 inline constexpr auto c_allowCustomFirewallUserSetting = L"AllowFirewallUserSetting";
 inline constexpr auto c_defaultNetworkingMode = L"DefaultNetworkingMode";
+inline constexpr auto c_allowUsb = L"AllowUsb";
 inline constexpr auto c_allowWSLContainer = L"AllowWSLContainer";
 inline constexpr auto c_allowWSLContainerPrivileged = L"AllowWSLContainerPrivileged";
 inline constexpr auto c_wslContainerRegistryAllowlist = L"WSLContainerRegistryAllowlist";

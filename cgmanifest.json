@@ -110,6 +110,30 @@
                     "hash": "sha1:48c2c76de06fde8cf36faf039509b38b3ae90b5b"
                 }
             }
+        },
+        {
+            "developmentDependency": true,
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "usbip-win2-x64",
+                    "version": "0.9.8.1",
+                    "downloadUrl": "https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.8.1/USBip-0.9.8.1-x64.exe",
+                    "hash": "sha1:65e954dc6941ed73e56230556765523df995dd00"
+                }
+            }
+        },
+        {
+            "developmentDependency": true,
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "usbip-win2-arm64",
+                    "version": "0.9.8.1",
+                    "downloadUrl": "https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.8.1/USBip-0.9.8.1-arm64.exe",
+                    "hash": "sha1:ddc8624267b1ec26b54e40afcc19a9d8bdaf7f16"
+                }
+            }
         }
     ]
 }

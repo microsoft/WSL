@@ -18,6 +18,7 @@ Abstract:
 #include <memory>
 #include "helpers.hpp"
 #include "SocketChannel.h"
+#include "UsbTypes.h"
 
 namespace wsl::windows::common {
 
@@ -112,6 +113,12 @@ public:
     void UnregisterDistribution(_In_ LPCGUID DistroGuid) const;
 
     void MoveDistribution(_In_ const GUID& DistroGuid, _In_ LPCWSTR Location) const;
+
+    std::vector<usb::ListedDevice> EnumerateUsbDevices() const;
+
+    void AttachUsbDevice(PCWSTR Port) const;
+
+    void DetachUsbDevice(PCWSTR Port) const;
 
 private:
     wil::com_ptr<ILxssUserSession> m_userSession;
