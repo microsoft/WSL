@@ -59,7 +59,7 @@ DockerEventTracker::DockerEventTracker(ULONG SessionId) : m_sessionId(SessionId)
 {
 }
 
-void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
+void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay, IWSLCProcess& dockerd)
 {
     auto onChunk = [this](const gsl::span<char>& buffer) {
         if (!buffer.empty()) // docker inserts empty lines between events, skip those.
@@ -83,17 +83,29 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
     auto socket = dockerClient.MonitorEvents();
 
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
+
+    m_dockerd = &dockerd;
 }
 
-void DockerEventTracker::WaitForPendingEvents(const std::function<void()>& RequestDaemonReload, std::chrono::milliseconds Timeout)
+void DockerEventTracker::Disconnect() noexcept
 {
+    m_dockerd.Reset();
+}
+
+void DockerEventTracker::WaitForPendingEvents(std::chrono::milliseconds Timeout)
+{
+    if (!m_dockerd)
+    {
+        return;
+    }
+
     std::uint64_t reloadCount{};
     {
         std::lock_guard lock{m_reloadLock};
         reloadCount = m_reloadCount;
     }
 
-    RequestDaemonReload();
+    THROW_IF_FAILED(m_dockerd->Signal(WSLCSignalSIGHUP));
 
     std::unique_lock lock{m_reloadLock};
     if (!m_reloadDelivered.wait_for(lock, Timeout, [&]() { return m_reloadCount != reloadCount; }))

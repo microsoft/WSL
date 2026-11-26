@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "wslc.h"
 #include "DockerHTTPClient.h"
 #include "IORelay.h"
 
@@ -79,14 +80,17 @@ public:
     explicit DockerEventTracker(ULONG SessionId);
 
     // Rebinds the tracker on VM start without replacing callback registrations.
-    void Connect(DockerHTTPClient& dockerClient, IORelay& relay);
+    void Connect(DockerHTTPClient& dockerClient, IORelay& relay, IWSLCProcess& dockerd);
 
-    // Blocks until the event stream has delivered every event dockerd emitted before RequestDaemonReload, or Timeout
-    // elapses. RequestDaemonReload must make dockerd reload its configuration (SIGHUP), which publishes a daemon reload
-    // event after every event already published, so its delivery marks the stream as drained. Operations complete once
-    // dockerd responds, while their events arrive later on the stream, so this lets teardown wait for them before stopping
-    // dockerd discards them. Must not be called from the relay thread.
-    void WaitForPendingEvents(const std::function<void()>& RequestDaemonReload, std::chrono::milliseconds Timeout);
+    // Releases the dockerd process bound by Connect. Called when the VM is torn down.
+    void Disconnect() noexcept;
+
+    // Blocks until the event stream has delivered every event dockerd emitted before this call, or Timeout elapses.
+    // Signals dockerd to reload its configuration (SIGHUP), which publishes a daemon reload event after every event
+    // already published, so its delivery marks the stream as drained. Operations complete once dockerd responds, while
+    // their events arrive later on the stream, so this lets teardown wait for them before stopping dockerd discards them.
+    // Returns immediately if the tracker isn't connected. Must not be called from the relay thread.
+    void WaitForPendingEvents(std::chrono::milliseconds Timeout);
 
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
@@ -231,6 +235,7 @@ private:
 
     ULONG m_sessionId{};
     std::shared_ptr<RegistryState> m_state = std::make_shared<RegistryState>();
+    Microsoft::WRL::ComPtr<IWSLCProcess> m_dockerd;
 
     std::mutex m_reloadLock;
     std::condition_variable m_reloadDelivered;
