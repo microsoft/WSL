@@ -33,6 +33,8 @@ constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
 // How often an ExistingOnly lease retries the runtime lock while another thread holds it exclusively.
 constexpr DWORD c_existingOnlyLockRetryMs = 10;
 
+constexpr auto c_pendingEventsTimeout = std::chrono::seconds(5);
+
 } // namespace
 
 namespace wsl::windows::service::wslc {
@@ -518,6 +520,19 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
     if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         m_vmExited.store(true);
+    }
+
+    // Wait for dockerd to deliver pending events before it is stopped. Teardown only runs on the relay thread when the VM
+    // exits unexpectedly (OnVmExited), where dockerd is already gone and the relay thread could not deliver events while
+    // waiting for them, so skipping the wait there never drops events on a normal VM stop.
+    if (m_dockerClient && m_dockerdProcess.has_value() && !m_vmExited.load() && !m_terminating->load() && m_ioRelay &&
+        !m_ioRelay->IsRelayThread())
+    {
+        try
+        {
+            m_eventTracker->WaitForPendingEvents([&]() { THROW_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGHUP)); }, c_pendingEventsTimeout);
+        }
+        CATCH_LOG();
     }
 
     if (m_hooks.TearDownSessionState)

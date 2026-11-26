@@ -9777,14 +9777,14 @@ sys.exit(1 if queries else 0)
 
         CreateNamedNetwork(networkName);
 
-        // Teardown stops the relay that delivers events, so the create must land before the restart.
-        const auto createEvents = ReadEvents(stream.get(), 1);
-        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
-
+        // Tear down without reading the create first, so teardown must wait for its delivery.
         BOOL wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        const auto createEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
 
         // Listing restarts the VM and recovers the network from dockerd.
         VERIFY_IS_TRUE(NetworkIsListed(networkName));
@@ -9986,14 +9986,14 @@ sys.exit(1 if queries else 0)
 
         CreateNamedVolume(volumeName, "vhd", {}, {{"SizeBytes", "1073741824"}});
 
-        // Teardown stops the relay that delivers events, so the create must land before the restart.
-        const auto createEvents = ReadEvents(stream.get(), 1);
-        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
-
+        // Tear down without reading the create first, so teardown must wait for its delivery.
         BOOL wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
         VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        const auto createEvents = ReadEvents(stream.get(), 1);
+        VERIFY_ARE_EQUAL("create", createEvents[0].Action);
 
         // Listing restarts the VM and recovers the volume.
         VERIFY_IS_TRUE(ListVolumes().contains(volumeName));
@@ -10270,12 +10270,7 @@ sys.exit(1 if queries else 0)
         WSLCTagImageOptions tagOptions{.Image = "debian:latest", .Repo = repository.c_str(), .Tag = "v1"};
         VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
 
-        // Teardown stops the relay that delivers events, so the tag must land before the restart.
-        const auto tagEvents = ReadImageEventsThroughMarker(stream.get());
-        VERIFY_ARE_EQUAL(static_cast<size_t>(1), tagEvents.size());
-        VERIFY_ARE_EQUAL("tag", tagEvents[0].Action);
-        VERIFY_ARE_EQUAL(image, tagEvents[0].Actor.Attributes.at("name"));
-
+        // Tear down without reading the tag first, so teardown must wait for its delivery.
         BOOL wasAlreadyIdle = TRUE;
         VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
         VERIFY_IS_FALSE(wasAlreadyIdle);
@@ -10284,6 +10279,11 @@ sys.exit(1 if queries else 0)
         // Listing restarts the VM.
         ExpectImagePresent(*m_defaultSession, image.c_str());
         VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        const auto tagEvents = ReadImageEventsThroughMarker(stream.get());
+        VERIFY_ARE_EQUAL(static_cast<size_t>(1), tagEvents.size());
+        VERIFY_ARE_EQUAL("tag", tagEvents[0].Action);
+        VERIFY_ARE_EQUAL(image, tagEvents[0].Actor.Attributes.at("name"));
 
         DeleteImage(image, WSLCDeleteImageFlagsNoPrune);
         cleanup.release();
@@ -10298,6 +10298,68 @@ sys.exit(1 if queries else 0)
         VERIFY_SUCCEEDED(m_defaultSession->GetEvents(
             tagEvents[0].timeNano / 1'000'000'000, untagEvents[0].timeNano / 1'000'000'000 + 1, &filter, 1, &replayStream));
         VERIFY_ARE_EQUAL((std::vector<std::string>{"tag", "untag"}), EventActions(DrainEventStream(replayStream.get())));
+    }
+
+    WSLC_TEST_METHOD(PendingImageEventsSurviveVmRestart)
+    {
+        // Image events carry the image's labels, so large labels make each event slow to deliver. Force-deleting an image
+        // with many tags emits all of its untag events in one operation, leaving a backlog when teardown starts.
+        constexpr size_t c_labelCount = 64;
+        constexpr size_t c_labelSize = 16 * 1024;
+        constexpr size_t c_tagCount = 24;
+
+        const auto repository = GenerateNetworkEventTestName("wslc-test-image-pending");
+        const auto contextDir = std::filesystem::current_path() / repository;
+
+        std::filesystem::create_directories(contextDir);
+        auto contextCleanup = wil::scope_exit([&]() {
+            std::error_code ec;
+            std::filesystem::remove_all(contextDir, ec);
+        });
+
+        {
+            const std::string value(c_labelSize, 'x');
+            std::ofstream dockerfile(contextDir / "Dockerfile");
+            dockerfile << "FROM hello-world:latest\n";
+            for (size_t index = 0; index < c_labelCount; ++index)
+            {
+                dockerfile << std::format("LABEL {}-{}={}\n", repository, index, value);
+            }
+        }
+
+        const auto image = repository + ":v0";
+        VERIFY_SUCCEEDED(BuildImageFromContext(contextDir, image.c_str()));
+
+        wil::unique_cotaskmem_ansistring inspectOutput;
+        VERIFY_SUCCEEDED(m_defaultSession->InspectImage(image.c_str(), &inspectOutput));
+        const auto imageId = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectImage>(inspectOutput.get()).Id;
+        auto imageCleanup = wil::scope_exit([&]() { LOG_IF_FAILED(DeleteImageNoThrow(imageId, WSLCDeleteImageFlagsForce).first); });
+
+        for (size_t index = 1; index <= c_tagCount; ++index)
+        {
+            const auto tag = std::format("v{}", index);
+            WSLCTagImageOptions tagOptions{.Image = image.c_str(), .Repo = repository.c_str(), .Tag = tag.c_str()};
+            VERIFY_SUCCEEDED(m_defaultSession->TagImage(&tagOptions));
+        }
+
+        auto stream = OpenEventStream({{"type", "network"}, {"type", "image"}});
+        ReadImageEventsThroughMarker(stream.get());
+
+        DeleteImage(imageId, WSLCDeleteImageFlagsForce);
+        imageCleanup.release();
+
+        BOOL wasAlreadyIdle = TRUE;
+        VERIFY_SUCCEEDED(m_defaultSession->TriggerIdleTermination(&wasAlreadyIdle));
+        VERIFY_IS_FALSE(wasAlreadyIdle);
+        VERIFY_IS_FALSE(IsVmRunning(c_testSessionName));
+
+        // Listing restarts the VM.
+        ExpectImagePresent(*m_defaultSession, image.c_str(), false);
+        VERIFY_IS_TRUE(IsVmRunning(c_testSessionName));
+
+        std::vector<std::string> expectedActions(c_tagCount + 1, "untag");
+        expectedActions.emplace_back("delete");
+        VERIFY_ARE_EQUAL(expectedActions, EventActions(ReadImageEventsThroughMarker(stream.get())));
     }
 
     WSLC_TEST_METHOD(EventStreamReportsLostEvents)

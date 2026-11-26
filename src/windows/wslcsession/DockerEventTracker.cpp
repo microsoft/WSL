@@ -85,6 +85,33 @@ void DockerEventTracker::Connect(DockerHTTPClient& dockerClient, IORelay& relay)
     relay.AddHandle(std::make_unique<common::io::HTTPChunkBasedReadHandle>(std::move(socket), std::move(onChunk)));
 }
 
+void DockerEventTracker::WaitForPendingEvents(const std::function<void()>& RequestDaemonReload, std::chrono::milliseconds Timeout)
+{
+    std::uint64_t reloadCount{};
+    {
+        std::lock_guard lock{m_reloadLock};
+        reloadCount = m_reloadCount;
+    }
+
+    RequestDaemonReload();
+
+    std::unique_lock lock{m_reloadLock};
+    if (!m_reloadDelivered.wait_for(lock, Timeout, [&]() { return m_reloadCount != reloadCount; }))
+    {
+        WSL_LOG("DockerEventsPendingTimeout", TraceLoggingValue(m_sessionId, "SessionId"));
+    }
+}
+
+void DockerEventTracker::OnDaemonReload() noexcept
+{
+    {
+        std::lock_guard lock{m_reloadLock};
+        m_reloadCount++;
+    }
+
+    m_reloadDelivered.notify_all();
+}
+
 DockerEventTracker::RegistryState::~RegistryState()
 {
     // Tracking references may outlive the tracker, but must unregister before releasing the registry.
@@ -144,6 +171,10 @@ void DockerEventTracker::OnEvent(const std::string_view& event)
     else if (typeStr == "image")
     {
         OnImageEvent(parsed, actionStr, eventTimeNano);
+    }
+    else if (typeStr == "daemon" && actionStr == "reload")
+    {
+        OnDaemonReload();
     }
 }
 

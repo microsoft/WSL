@@ -81,6 +81,13 @@ public:
     // Rebinds the tracker on VM start without replacing callback registrations.
     void Connect(DockerHTTPClient& dockerClient, IORelay& relay);
 
+    // Blocks until the event stream has delivered every event dockerd emitted before RequestDaemonReload, or Timeout
+    // elapses. RequestDaemonReload must make dockerd reload its configuration (SIGHUP), which publishes a daemon reload
+    // event after every event already published, so its delivery marks the stream as drained. Operations complete once
+    // dockerd responds, while their events arrive later on the stream, so this lets teardown wait for them before stopping
+    // dockerd discards them. Must not be called from the relay thread.
+    void WaitForPendingEvents(const std::function<void()>& RequestDaemonReload, std::chrono::milliseconds Timeout);
+
     EventTrackingReference RegisterContainerStateUpdates(const std::string& ContainerId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterExecStateUpdates(const std::string& ContainerId, const std::string& ExecId, ContainerStateChangeCallback&& Callback) noexcept;
     EventTrackingReference RegisterVolumeUpdates(VolumeEventCallback&& Callback) noexcept;
@@ -98,6 +105,7 @@ public:
 
 private:
     void OnEvent(const std::string_view& event);
+    void OnDaemonReload() noexcept;
     void OnContainerEvent(const nlohmann::json& parsed, const std::string& action, std::int64_t eventTimeNano);
     void OnContainerAction(const std::string& containerId, const std::string& action, const std::map<std::string, std::string>& attributes, std::int64_t eventTimeNano);
     void OnContainerCreated(const nlohmann::json& parsed, std::int64_t eventTimeNano);
@@ -223,5 +231,9 @@ private:
 
     ULONG m_sessionId{};
     std::shared_ptr<RegistryState> m_state = std::make_shared<RegistryState>();
+
+    std::mutex m_reloadLock;
+    std::condition_variable m_reloadDelivered;
+    _Guarded_by_(m_reloadLock) std::uint64_t m_reloadCount {};
 };
 } // namespace wsl::windows::service::wslc
