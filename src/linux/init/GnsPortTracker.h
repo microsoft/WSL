@@ -129,6 +129,7 @@ private:
     {
         std::set<PortAllocation> FullAllocations;
         ActivePortSet PortProtocolPairs; // Always populated, but only used in mirrored mode
+        std::set<PortAllocation> UnconnectedUdp; // UDP sockets with no remote peer. Only used in mirrored mode
     };
 
     struct ListPortsResult
@@ -139,12 +140,22 @@ private:
 
     using TrackerEvent = std::variant<seccomp_notif, ListPortsResult>;
 
+    struct RefusedReservation
+    {
+        Clock::time_point NextAttempt;
+        std::chrono::seconds Delay;
+    };
+
     bool IsMirroredMode() const
     {
         return m_networkingMode == LxMiniInitNetworkingModeMirrored;
     }
 
     void ReconcileAllocatedPorts(const ActivePorts& Ports, Clock::time_point Timestamp);
+
+    void ReserveUntrackedUdpPorts(const ActivePorts& Ports);
+
+    static std::pair<std::uint16_t, std::uint16_t> GetEphemeralPortRange();
 
     void RunPortListing();
 
@@ -171,6 +182,8 @@ private:
     int HandleInterfaceStateChange(const seccomp_notif& Notification);
 
     std::map<PortAllocation, std::optional<Clock::time_point>> m_allocatedPorts;
+    std::map<PortAllocation, RefusedReservation> m_refusedUdpPorts; // Untracked UDP sockets the host refused to reserve
+    std::pair<std::uint16_t, std::uint16_t> m_hostReservedPortRange;
     std::shared_ptr<wsl::shared::SocketChannel> m_hvSocketChannel;
     NetlinkChannel m_channel;
 

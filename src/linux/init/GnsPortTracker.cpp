@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+#include <algorithm>
 #include <filesystem>
 #include <optional>
 #include <iostream>
@@ -15,6 +16,7 @@
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
 #include "seccomp_defs.h"
+#include "util.h"
 
 // TODO: Include <sys/pidfd.h> and remove this once musl provides it.
 // <linux/pidfd.h> cannot be used because it conflicts with musl's <fcntl.h>.
@@ -24,6 +26,8 @@
 
 constexpr std::chrono::seconds c_bind_timeout_seconds{60};
 constexpr std::chrono::milliseconds c_sock_diag_listing_delay{500};
+constexpr std::chrono::seconds c_udp_reservation_initial_retry_delay{1};
+constexpr std::chrono::seconds c_udp_reservation_max_retry_delay{60};
 
 GnsPortTracker::GnsPortTracker(
     std::shared_ptr<wsl::shared::SocketChannel> hvSocketChannel,
@@ -36,6 +40,10 @@ GnsPortTracker::GnsPortTracker(
     m_networkingMode(networkingMode)
 {
     m_networkNamespace = std::filesystem::read_symlink("/proc/self/ns/net").string();
+
+    // Read once: at this point the range is the one that the host reserved. The guest can change the sysctl later,
+    // but that doesn't change the host reservation.
+    m_hostReservedPortRange = GetEphemeralPortRange();
     GNS_LOG_INFO("GnsPortTracker initialized with networking mode ({})", static_cast<int>(m_networkingMode));
 }
 
@@ -94,7 +102,7 @@ void GnsPortTracker::Run()
             auto resumeListing = wil::scope_exit([&]() {
                 try
                 {
-                    if (portListingAwaitingAcknowledgement && !m_allocatedPorts.empty())
+                    if (portListingAwaitingAcknowledgement && (IsMirroredMode() || !m_allocatedPorts.empty()))
                     {
                         m_portListingResume.post(true);
                         portListingAwaitingAcknowledgement = false;
@@ -186,6 +194,11 @@ void GnsPortTracker::Run()
                 portListingAwaitingAcknowledgement = true;
 
                 ReconcileAllocatedPorts(listPortsResult.Ports, listPortsResult.Timestamp);
+
+                if (IsMirroredMode())
+                {
+                    ReserveUntrackedUdpPorts(listPortsResult.Ports);
+                }
             }
         }
         CATCH_LOG()
@@ -221,6 +234,12 @@ GnsPortTracker::ActivePorts GnsPortTracker::ListBoundPorts()
 
             ports.FullAllocations.emplace(
                 ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+
+            if (message.sdiag_protocol == IPPROTO_UDP && payload->id.idiag_dport == 0)
+            {
+                ports.UnconnectedUdp.emplace(
+                    ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+            }
         }
     };
 
@@ -308,6 +327,77 @@ void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, Clock::ti
 
         ++it;
     }
+}
+
+void GnsPortTracker::ReserveUntrackedUdpPorts(const ActivePorts& Ports)
+try
+{
+    // Sockets that the kernel creates for itself, such as the UDP socket of a VXLAN, GENEVE or WireGuard
+    // device, never go through bind(), so the seccomp trap never reserves their port on the host and
+    // inbound packets for them are not delivered to the guest in mirrored mode.
+    // Reserve any unconnected UDP socket that is not tracked yet. Ports in the range that the host already
+    // reserved for the guest are skipped. The match is on the full allocation, because a tracked entry for the
+    // same port on another address may not have reserved anything on the host (for example 127.0.0.2).
+    // A refused request is retried with an increasing delay, because the failure can be temporary.
+    // Once reserved, ReconcileAllocatedPorts releases the port when no socket uses it anymore.
+
+    std::erase_if(m_refusedUdpPorts, [&](const auto& entry) { return !Ports.UnconnectedUdp.contains(entry.first); });
+
+    const auto [reservedStart, reservedEnd] = m_hostReservedPortRange;
+    for (auto socket : Ports.UnconnectedUdp)
+    {
+        if (socket.Port == 0 || (socket.Port >= reservedStart && socket.Port <= reservedEnd) || m_allocatedPorts.contains(socket))
+        {
+            continue;
+        }
+
+        const auto refused = m_refusedUdpPorts.find(socket);
+        if (refused != m_refusedUdpPorts.end() && Clock::now() < refused->second.NextAttempt)
+        {
+            continue;
+        }
+
+        const auto result = RequestPort(socket, true);
+        GNS_LOG_INFO(
+            "Requested the host for port allocation on untracked UDP socket: family ({}) port ({}) - returned {}",
+            socket.Family,
+            socket.Port,
+            result);
+
+        if (result == 0)
+        {
+            // The socket is known to exist, so no timeout is needed.
+            m_allocatedPorts.insert_or_assign(socket, std::nullopt);
+            m_refusedUdpPorts.erase(socket);
+        }
+        else
+        {
+            const auto delay = refused == m_refusedUdpPorts.end()
+                                   ? c_udp_reservation_initial_retry_delay
+                                   : std::min(refused->second.Delay * 2, c_udp_reservation_max_retry_delay);
+
+            m_refusedUdpPorts.insert_or_assign(socket, RefusedReservation{Clock::now() + delay, delay});
+        }
+    }
+}
+catch (const std::exception& e)
+{
+    GNS_LOG_ERROR("Failed to reserve untracked UDP ports, {}", e.what());
+}
+
+std::pair<std::uint16_t, std::uint16_t> GnsPortTracker::GetEphemeralPortRange()
+{
+    // N.B. IPv6 uses the IPv4 range as well.
+    const auto content = UtilReadFileContent("/proc/sys/net/ipv4/ip_local_port_range");
+    unsigned int start = 0;
+    unsigned int end = 0;
+    if (sscanf(content.c_str(), "%u %u", &start, &end) != 2 || start > end || end > UINT16_MAX)
+    {
+        // Linux's default range.
+        return {32768, 60999};
+    }
+
+    return {static_cast<std::uint16_t>(start), static_cast<std::uint16_t>(end)};
 }
 
 int GnsPortTracker::RequestPort(const PortAllocation& Port, bool allocate)
