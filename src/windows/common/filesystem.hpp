@@ -118,7 +118,7 @@ void DeviceIoControl(_In_ HANDLE handle, _In_ ULONG code, _In_ gsl::span<const g
 NTSTATUS
 DeviceIoControlNoThrow(_In_ HANDLE handle, _In_ ULONG code, _In_ gsl::span<const gsl::byte> input = {});
 
-std::pair<ULONG, ULONG> EnumerateFixedDrives(HANDLE Token = nullptr);
+std::pair<ULONG, ULONG> EnumerateFixedDrives(HANDLE Token = nullptr, bool IncludeUsbDrives = true);
 
 /// <summary>
 /// Creates a directory with the given path if it does not exist. Throws if creating the directory
@@ -181,6 +181,12 @@ std::string GetWindowsHosts(const std::filesystem::path& Path);
 /// and not a reserved device name. An empty name is accepted.
 /// </summary>
 bool IsRepresentableFileName(std::wstring_view Name);
+
+/// <summary>
+/// True when Drive is backed by a USB storage bus (BusTypeUsb), such as an external USB SSD
+/// that Windows reports as DRIVE_FIXED. Returns false if the bus type cannot be queried.
+/// </summary>
+bool IsUsbDrive(wchar_t Drive);
 
 /// <summary>
 /// Creates a uniquely named staging directory under Parent and returns its path. The name is

@@ -94,6 +94,7 @@ void wsl::core::Config::ParseConfigFile(_In_opt_ LPCWSTR ConfigFilePath, _In_opt
         ConfigKey(ConfigSetting::DistributionStartTimeout, DistributionStartTimeout),
         ConfigKey(ConfigSetting::Virtio, EnableVirtio),
         ConfigKey(ConfigSetting::HostFileSystemAccess, EnableHostFileSystemAccess),
+        ConfigKey(ConfigSetting::AutoMountUsbDrives, EnableAutoMountUsbDrives),
         ConfigKey(ConfigSetting::MountDeviceTimeout, MountDeviceTimeout),
         ConfigKey(ConfigSetting::HardwarePerformanceCounters, EnableHardwarePerformanceCounters),
         ConfigKey(ConfigSetting::VmSwitch, VmSwitch),
@@ -425,6 +426,7 @@ void wsl::core::Config::Initialize(_In_opt_ HANDLE UserToken)
     {
         EMIT_USER_WARNING(wsl::shared::Localization::MessageSafeModeEnabled());
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableHostFileSystemAccess, false);
+        VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableAutoMountUsbDrives, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableNestedVirtualization, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableHardwarePerformanceCounters, false);
         VALIDATE_CONFIG_OPTION(EnableSafeMode, EnableGpuSupport, false);

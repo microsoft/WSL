@@ -21,15 +21,15 @@ Abstract:
 #define T_VALUE(c, n) TraceLoggingValue((c).n, #n)
 
 #define CONFIG_TELEMETRY(c) \
-    T_VALUE(c, BestEffortDnsParsing), T_VALUE(c, DhcpTimeout), T_VALUE(c, EnableAutoProxy), T_VALUE(c, EnableDebugConsole), \
-        T_VALUE(c, EnableDebugShell), T_VALUE(c, EnableDhcp), T_VALUE(c, EnableDnsProxy), T_VALUE(c, EnableDnsTunneling), \
-        T_VALUE(c, EnableGpuSupport), T_VALUE(c, EnableGuiApps), T_VALUE(c, EnableHardwarePerformanceCounters), \
-        T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), T_VALUE(c, EnableIpv6), \
-        T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), T_VALUE(c, EnableSafeMode), \
-        T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), T_VALUE(c, EnableVirtioFs), \
-        T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), T_VALUE(c, IsolateDistroCgroup), \
-        T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), T_STRING(c, KernelModulesList), \
-        T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
+    T_VALUE(c, BestEffortDnsParsing), T_VALUE(c, DhcpTimeout), T_VALUE(c, EnableAutoMountUsbDrives), \
+        T_VALUE(c, EnableAutoProxy), T_VALUE(c, EnableDebugConsole), T_VALUE(c, EnableDebugShell), T_VALUE(c, EnableDhcp), \
+        T_VALUE(c, EnableDnsProxy), T_VALUE(c, EnableDnsTunneling), T_VALUE(c, EnableGpuSupport), T_VALUE(c, EnableGuiApps), \
+        T_VALUE(c, EnableHardwarePerformanceCounters), T_VALUE(c, EnableHostAddressLoopback), T_VALUE(c, EnableHostFileSystemAccess), \
+        T_VALUE(c, EnableIpv6), T_VALUE(c, EnableLocalhostRelay), T_VALUE(c, EnableNestedVirtualization), \
+        T_VALUE(c, EnableSafeMode), T_VALUE(c, EnableSparseVhd), T_VALUE(c, EnableVirtio), T_VALUE(c, EnableVirtio9p), \
+        T_VALUE(c, EnableVirtioFs), T_VALUE(c, EnableVirtioFsAggregateShares), T_ENUM(c, FirewallConfigPresence), \
+        T_VALUE(c, IsolateDistroCgroup), T_VALUE(c, KernelBootTimeout), T_SET(c, KernelCommandLine), T_VALUE(c, KernelDebugPort), \
+        T_STRING(c, KernelModulesList), T_SET(c, KernelModulesPath), T_SET(c, KernelPath), T_VALUE(c, LoadDefaultKernelModules), \
         T_PRESENT(c, LoadKernelModulesPresence), T_VALUE(c, MaximumMemorySizeBytes), T_VALUE(c, MaximumProcessorCount), \
         T_ENUM(c, MemoryReclaim), T_VALUE(c, MemorySizeBytes), T_VALUE(c, MountDeviceTimeout), T_ENUM(c, NetworkingMode), \
         T_VALUE(c, ProcessorCount), T_SET(c, SwapFilePath), T_VALUE(c, SwapSizeBytes), T_VALUE(c, SwiotlbSizeBytes), \
@@ -258,6 +258,7 @@ namespace ConfigSetting {
     static constexpr auto DistributionStartTimeout = "wsl2.distributionStartTimeout";
     static constexpr auto Virtio = "wsl2.virtio";
     static constexpr auto HostFileSystemAccess = "wsl2.hostFileSystemAccess";
+    static constexpr auto AutoMountUsbDrives = "wsl2.autoMountUsbDrives";
     static constexpr auto MountDeviceTimeout = "wsl2.mountDeviceTimeout";
     static constexpr auto HardwarePerformanceCounters = "wsl2.hardwarePerformanceCounters";
     static constexpr auto NetworkingMode = "wsl2.networkingMode";
@@ -344,6 +345,7 @@ struct Config
     int DistributionStartTimeout = (60 * 1000);
     int MountDeviceTimeout = (5 * 1000);
     bool EnableHostFileSystemAccess = true;
+    bool EnableAutoMountUsbDrives = true;
     bool EnableDhcp = true;
     bool EnableIpv6 = false;
     int DhcpTimeout = (5 * 1000);

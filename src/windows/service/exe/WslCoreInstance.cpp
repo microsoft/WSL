@@ -29,7 +29,8 @@ WslCoreInstance::WslCoreInstance(
     _In_ DWORD SocketTimeout,
     _In_ int IdleTimeout,
     _Out_opt_ ULONG* ConnectPort,
-    _In_opt_ HANDLE JobObject) :
+    _In_opt_ HANDLE JobObject,
+    _In_ bool AutoMountUsbDrives) :
     LxssRunningInstance(IdleTimeout),
     m_featureFlags(FeatureFlags),
     m_instanceId(InstanceId),
@@ -40,7 +41,8 @@ WslCoreInstance::WslCoreInstance(
     m_ntClientLifetimeId(ClientLifetimeId),
     m_redirectorConnectionTargets{m_configuration.Name},
     m_socketTimeout(SocketTimeout),
-    m_jobObject(JobObject)
+    m_jobObject(JobObject),
+    m_autoMountUsbDrives(AutoMountUsbDrives)
 {
     // Establish a communication channel with the init daemon.
     m_initChannel = std::make_shared<WslCorePort>(InitSocket.release(), m_runtimeId, m_socketTimeout);
@@ -136,7 +138,8 @@ WslCoreInstance::WslCoreInstance(
                 m_socketTimeout,
                 IdleTimeout,
                 nullptr,
-                JobObject);
+                JobObject,
+                m_autoMountUsbDrives);
         }
         CATCH_LOG()
     }
@@ -424,7 +427,7 @@ void WslCoreInstance::Initialize()
     ULONG fixedDrives = 0;
     if (WI_IsFlagSet(m_configuration.Flags, LXSS_DISTRO_FLAGS_ENABLE_DRIVE_MOUNTING))
     {
-        fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives().first;
+        fixedDrives = wsl::windows::common::filesystem::EnumerateFixedDrives(nullptr, m_autoMountUsbDrives).first;
     }
 
     const auto timezone = wsl::windows::common::helpers::GetLinuxTimezone();
@@ -494,7 +497,7 @@ void WslCoreInstance::Initialize()
 
 void WslCoreInstance::MountDrvfs(bool Admin) const
 {
-    auto [drives, nonReadableDrives] = wsl::windows::common::filesystem::EnumerateFixedDrives();
+    auto [drives, nonReadableDrives] = wsl::windows::common::filesystem::EnumerateFixedDrives(nullptr, m_autoMountUsbDrives);
     LX_INIT_MOUNT_DRVFS Message{{LxInitMessageRemountDrvfs, sizeof(Message)}, Admin, drives, nonReadableDrives, static_cast<int>(m_defaultUid)};
 
     const auto& Result = m_initChannel->GetChannel().Transaction(Message, nullptr, m_socketTimeout);

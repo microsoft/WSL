@@ -2561,6 +2561,12 @@ Usage:
         // Verify that the vhdSize setting is parsed correctly.
         validateWarnings(L"[wsl2]\ndefaultVhdSize=64GB\n", L"");
 
+        // Verify that autoMountUsbDrives is parsed correctly.
+        validateWarnings(L"[wsl2]\nautoMountUsbDrives=false\n", L"");
+        validateWarnings(
+            L"[wsl2]\nautoMountUsbDrives=NotABoolean\n",
+            std::format(L"wsl: Invalid boolean value 'NotABoolean' for key 'wsl2.autoMountUsbDrives' in {}:23\r\n", wslConfigPath));
+
         auto maxProcessorCount = wsl::windows::common::wslutil::GetLogicalProcessorCount();
         validateWarnings(
             std::format(L"processors={}", maxProcessorCount + 1).c_str(),

@@ -69,7 +69,8 @@ public:
         _In_ DWORD SocketTimeout,
         _In_ int IdleTimeout,
         _Out_opt_ ULONG* ConnectPort = nullptr,
-        _In_opt_ HANDLE JobObject = nullptr);
+        _In_opt_ HANDLE JobObject = nullptr,
+        _In_ bool AutoMountUsbDrives = true);
 
     virtual ~WslCoreInstance();
 
@@ -142,6 +143,7 @@ private:
     WSLDistributionInformation m_distributionInfo{};
     DWORD m_socketTimeout{};
     HANDLE m_jobObject{};
+    bool m_autoMountUsbDrives = true;
     std::thread m_oobeThread;
     wil::unique_event m_destroyingEvent{wil::EventOptions::ManualReset};
     _Guarded_by_(m_lock) wil::shared_event m_oobeCompleteEvent;
