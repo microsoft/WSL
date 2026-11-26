@@ -101,6 +101,11 @@ public sealed partial class OOBEWindow : WindowEx, IDisposable
 
     private void Window_Closed(object sender, WindowEventArgs args)
     {
+        if (Content is Views.OOBE.ShellPage shellPage)
+        {
+            shellPage.ViewModel.UnregisterNavigationEvents();
+        }
+
         App.OOBEWindow = null;
         App.MainWindow?.CloseHiddenWindow();
         Dispose();

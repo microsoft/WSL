@@ -40,6 +40,12 @@ public partial class ShellViewModel : ObservableRecipient
         NavigationViewService = navigationViewService;
     }
 
+    internal void UnregisterNavigationEvents()
+    {
+        NavigationService.Navigated -= OnNavigated;
+        NavigationViewService.UnregisterEvents();
+    }
+
     private void OnNavigated(object sender, NavigationEventArgs e)
     {
         IsBackEnabled = NavigationService.CanGoBack;
