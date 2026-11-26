@@ -2,19 +2,15 @@
 #include "NetlinkResponse.h"
 #include "NetlinkError.h"
 #include "Utils.h"
+#include <errno.h>
 
 NetlinkResponse::NetlinkResponse(std::vector<char>&& content) : m_data(std::move(content))
 {
 }
 
-void NetlinkResponse::ThrowIfErrorFound() const
+void NetlinkResponse::ThrowIfErrorFound(bool dump) const
 {
     auto results = Messages<nlmsgerr>(NLMSG_ERROR);
-
-    if (results.empty())
-    {
-        return;
-    }
 
     for (const auto& e : results)
     {
@@ -23,6 +19,27 @@ void NetlinkResponse::ThrowIfErrorFound() const
         if (result != 0)
         {
             throw NetlinkError(result);
+        }
+    }
+
+    if (dump)
+    {
+        size_t size = m_data.size();
+        for (const auto* header = reinterpret_cast<const nlmsghdr*>(m_data.data()); NLMSG_OK(header, size); header = NLMSG_NEXT(header, size))
+        {
+            if (header->nlmsg_flags & NLM_F_DUMP_INTR)
+            {
+                throw NetlinkError(-EINTR);
+            }
+        }
+
+        for (const auto& message : Messages<int>(NLMSG_DONE))
+        {
+            const int result = *message.Payload();
+            if (result != 0)
+            {
+                throw NetlinkError(result);
+            }
         }
     }
 }

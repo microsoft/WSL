@@ -11,7 +11,7 @@ public:
 
     NetlinkResponse(std::vector<char>&& content);
 
-    void ThrowIfErrorFound() const;
+    void ThrowIfErrorFound(bool dump = false) const;
 
     std::vector<char>::const_iterator Begin() const;
     std::vector<char>::const_iterator End() const;
