@@ -121,7 +121,7 @@ public:
     NON_COPYABLE(ReadHandle);
     NON_MOVABLE(ReadHandle);
 
-    ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead);
+    ReadHandle(HandleWrapper&& MovedHandle, std::function<void(const gsl::span<char>& Buffer)>&& OnRead, size_t BufferSize = LX_RELAY_BUFFER_SIZE);
     virtual ~ReadHandle();
 
     void Schedule() override;
@@ -490,6 +490,7 @@ private:
     WriteHandle* ActiveHandle = nullptr;
     size_t RemainingBytes = 0;
 };
+
 class MultiHandleWait
 {
 public:
