@@ -398,6 +398,8 @@ public:
     UniqueWebServer& operator=(UniqueWebServer&&) = delete;
 
 private:
+    void StartAndWaitForReady(LPWSTR commandLine);
+
     wil::unique_handle m_process;
 };
 

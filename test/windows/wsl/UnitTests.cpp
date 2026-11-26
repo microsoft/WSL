@@ -8963,21 +8963,6 @@ Distribution successfully installed. It can be launched via 'wsl.exe -d ubuntu-d
         const auto url = endpoint + fileName;
         const auto noProgress = [](uint64_t, uint64_t) {};
 
-        wsl::shared::retry::RetryWithTimeout<void>(
-            [&]() {
-                wil::unique_socket probe{socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
-                THROW_LAST_ERROR_IF(!probe);
-
-                sockaddr_in address{};
-                address.sin_family = AF_INET;
-                address.sin_port = htons(port);
-                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-                THROW_LAST_ERROR_IF(connect(probe.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR);
-            },
-            std::chrono::milliseconds(500),
-            std::chrono::seconds(5));
-
         const auto firstPath = wsl::windows::common::wslutil::DownloadFileImpl(url, L"", noProgress);
 
         auto readFile = [](const std::filesystem::path& Path) {

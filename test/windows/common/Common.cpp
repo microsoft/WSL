@@ -2699,6 +2699,7 @@ $ErrorActionPreference = 'Stop'
 $server = New-Object System.Net.HttpListener
 $server.Prefixes.Add('{}')
 $server.Start()
+[Console]::WriteLine('HTTP Server ready')
 while ($true)
 {{
     $context = $server.GetContext()
@@ -2711,7 +2712,7 @@ while ($true)
         StatusCode,
         Content);
 
-    m_process = LxsstuStartProcess(cmd.data());
+    StartAndWaitForReady(cmd.data());
 }
 
 UniqueWebServer::UniqueWebServer(LPCWSTR Endpoint, const std::filesystem::path& File)
@@ -2722,10 +2723,10 @@ $ErrorActionPreference = 'Stop'
 $server = New-Object System.Net.HttpListener
 $server.Prefixes.Add('{}')
 $server.Start()
+[Console]::WriteLine('HTTP Server ready')
 while ($true)
 {{
     $context = $server.GetContext()
-    $context.Response.StatusCode
     $content = [System.IO.File]::ReadAllBytes('{}')
     $context.Response.ContentLength64 = $content.length
     $context.Response.ContentType = 'application/octet-stream'
@@ -2735,7 +2736,7 @@ while ($true)
         Endpoint,
         File.wstring());
 
-    m_process = LxsstuStartProcess(cmd.data());
+    StartAndWaitForReady(cmd.data());
 }
 
 UniqueWebServer::~UniqueWebServer()
@@ -2744,6 +2745,19 @@ UniqueWebServer::~UniqueWebServer()
     {
         LogError("TerminateProcess failed, %lu", GetLastError());
     }
+}
+
+void UniqueWebServer::StartAndWaitForReady(LPWSTR commandLine)
+{
+    auto [stdoutRead, stdoutWrite] = wsl::windows::common::wslutil::OpenAnonymousPipe(0, true, false);
+    THROW_IF_WIN32_BOOL_FALSE(SetHandleInformation(stdoutWrite.get(), HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT));
+    m_process = LxsstuStartProcess(commandLine, nullptr, stdoutWrite.get());
+    auto stopOnFailure = wil::scope_exit([this] { LOG_IF_WIN32_BOOL_FALSE(TerminateProcess(m_process.get(), 0)); });
+    stdoutWrite.reset();
+
+    PartialHandleRead output{stdoutRead.get()};
+    output.Expect("HTTP Server ready\r\n");
+    stopOnFailure.release();
 }
 
 DistroFileChange::DistroFileChange(LPCWSTR Path, bool exists, LPCWSTR DistributionName) :
