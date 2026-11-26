@@ -50,7 +50,6 @@ bool wsl::windows::common::install::IsOwnedByService(HANDLE handle)
     auto [serviceSid, serviceSidBuffer] = wsl::windows::common::security::GetAccountSid(L"NT SERVICE\\WslService");
     wil::unique_hlocal_security_descriptor descriptor;
     PSID owner{};
-    THROW_IF_WIN32_ERROR(GetSecurityInfo(
-        handle, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &descriptor));
+    THROW_IF_WIN32_ERROR(GetSecurityInfo(handle, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION, &owner, nullptr, nullptr, nullptr, &descriptor));
     return owner && EqualSid(owner, serviceSid);
 }

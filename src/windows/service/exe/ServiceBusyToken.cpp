@@ -35,16 +35,12 @@ try
         L"(A;;0x120000;;;BA)",
         serviceSidString.get());
     wil::unique_hlocal_security_descriptor descriptor;
-    THROW_IF_WIN32_BOOL_FALSE(
-        ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr));
+    THROW_IF_WIN32_BOOL_FALSE(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr));
 
     SECURITY_ATTRIBUTES attributes{sizeof(attributes), descriptor.get(), FALSE};
     wil::unique_event event;
     event.reset(CreateEventExW(
-        &attributes,
-        wsl::windows::common::install::c_serviceBusyEventName,
-        CREATE_EVENT_MANUAL_RESET,
-        SYNCHRONIZE | READ_CONTROL | EVENT_MODIFY_STATE));
+        &attributes, wsl::windows::common::install::c_serviceBusyEventName, CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE | READ_CONTROL | EVENT_MODIFY_STATE));
     THROW_LAST_ERROR_IF(!event);
 
     // Reject an event not owned by the service.

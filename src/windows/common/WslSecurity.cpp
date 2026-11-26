@@ -134,8 +134,7 @@ std::pair<PSID, std::vector<char>> wsl::windows::common::security::GetAccountSid
 
     std::vector<char> buffer(sidSize);
     std::wstring domainName(domainNameSize, L'\0');
-    THROW_IF_WIN32_BOOL_FALSE(
-        LookupAccountNameW(nullptr, accountName, buffer.data(), &sidSize, domainName.data(), &domainNameSize, &sidType));
+    THROW_IF_WIN32_BOOL_FALSE(LookupAccountNameW(nullptr, accountName, buffer.data(), &sidSize, domainName.data(), &domainNameSize, &sidType));
 
     PSID sid = buffer.data();
     return std::make_pair(sid, std::move(buffer));
