@@ -112,7 +112,10 @@ struct CreateProcessVmModeContext
 
 std::wstring BuildEnvironment(gsl::span<gsl::byte> EnvironmentData)
 {
-    std::map<std::wstring, std::wstring> Environment;
+    auto caseInsensitiveEnvNameOrder = [](const std::wstring& left, const std::wstring& right) {
+        return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_LESS_THAN;
+    };
+    std::map<std::wstring, std::wstring, decltype(caseInsensitiveEnvNameOrder)> Environment(caseInsensitiveEnvNameOrder);
 
     // Construct a map of the current environment strings.
     const wsl::windows::common::helpers::unique_environment_strings EnvironmentStrings(GetEnvironmentStrings());
