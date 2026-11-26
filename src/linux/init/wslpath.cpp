@@ -467,7 +467,12 @@ Return Value:
         return 1;
     }
 
-    if (OriginalPath == nullptr || Mode == TRANSLATE_MODE_HELP)
+    if (Mode == TRANSLATE_MODE_HELP)
+    {
+        return puts(Usage().c_str()) == EOF ? 1 : 0;
+    }
+
+    if (OriginalPath == nullptr)
     {
         INVALID_USAGE();
     }
