@@ -1519,6 +1519,12 @@ class UnitTests
         THROW_LAST_ERROR_IF(!SetEnvironmentVariable(L"WSLENV", L"Empty/u"));
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"[ -z ${Empty+x} ]"), (DWORD)1);
         VERIFY_ARE_EQUAL(LxsstuLaunchWsl(L"[ -z ${SanityCheck+x} ]"), (DWORD)0);
+
+        const ScopedEnvVariable inherited(L"WSLENV_CASE_TEST", L"inherited");
+        VerifyOutput(L"-e env WSLENV=wslenv_case_test/w wslenv_case_test= cmd.exe /d /c set WSLENV_CASE_TEST", L"", 1);
+        VerifyOutput(
+            L"-e env WSLENV=wslenv_case_test/w wslenv_case_test=updated cmd.exe /d /c set WSLENV_CASE_TEST",
+            L"WSLENV_CASE_TEST=updated\r\n");
     }
 
     static void ValidateErrorMessage(
