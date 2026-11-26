@@ -242,7 +242,6 @@ set_target_properties(
   VS_GLOBAL_GenerateAssemblyInfo false
 )
 
-set(WSL_SETTINGS_RUNTIME_VERSION "8.0.34")
 configure_file(
   "${CMAKE_CURRENT_LIST_DIR}/directory.build.targets.in"
   "${CMAKE_CURRENT_LIST_DIR}/directory.build.targets"
