@@ -1604,9 +1604,10 @@ struct CREATE_PROCESS_MESSAGE
     uint64_t PluginId;
     unsigned int PathIndex;
     unsigned int CommandLineIndex;
+    unsigned int PluginRelativeCgroupPathIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(PluginId), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
+    PRETTY_PRINT(FIELD(Header), FIELD(PluginId), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex), STRING_FIELD(PluginRelativeCgroupPathIndex));
 };
 
 struct EJECT_VHD_MESSAGE
