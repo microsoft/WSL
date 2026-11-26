@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+#include <algorithm>
 #include <filesystem>
 #include <optional>
 #include <iostream>
@@ -15,6 +16,7 @@
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
 #include "seccomp_defs.h"
+#include "util.h"
 
 // TODO: Include <sys/pidfd.h> and remove this once musl provides it.
 // <linux/pidfd.h> cannot be used because it conflicts with musl's <fcntl.h>.
@@ -94,7 +96,7 @@ void GnsPortTracker::Run()
             auto resumeListing = wil::scope_exit([&]() {
                 try
                 {
-                    if (portListingAwaitingAcknowledgement && !m_allocatedPorts.empty())
+                    if (portListingAwaitingAcknowledgement && (IsMirroredMode() || !m_allocatedPorts.empty()))
                     {
                         m_portListingResume.post(true);
                         portListingAwaitingAcknowledgement = false;
@@ -186,6 +188,11 @@ void GnsPortTracker::Run()
                 portListingAwaitingAcknowledgement = true;
 
                 ReconcileAllocatedPorts(listPortsResult.Ports, listPortsResult.Timestamp);
+
+                if (IsMirroredMode())
+                {
+                    ReserveUntrackedUdpPorts(listPortsResult.Ports);
+                }
             }
         }
         CATCH_LOG()
@@ -221,6 +228,12 @@ GnsPortTracker::ActivePorts GnsPortTracker::ListBoundPorts()
 
             ports.FullAllocations.emplace(
                 ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+
+            if (message.sdiag_protocol == IPPROTO_UDP && payload->id.idiag_dport == 0)
+            {
+                ports.UnconnectedUdp.emplace(
+                    ntohs(payload->id.idiag_sport), static_cast<int>(payload->idiag_family), static_cast<int>(message.sdiag_protocol), address);
+            }
         }
     };
 
@@ -308,6 +321,73 @@ void GnsPortTracker::ReconcileAllocatedPorts(const ActivePorts& Ports, Clock::ti
 
         ++it;
     }
+}
+
+void GnsPortTracker::ReserveUntrackedUdpPorts(const ActivePorts& Ports)
+try
+{
+    // Sockets that the kernel creates for itself, such as the UDP socket of a VXLAN, GENEVE or WireGuard
+    // device, never go through bind(), so the seccomp trap never reserves their port on the host and
+    // inbound packets for them are not delivered to the guest in mirrored mode.
+    // Reserve any unconnected UDP socket that is not tracked yet. Ports in the ephemeral range are
+    // skipped, because client sockets that sendto() without bind() are auto-bound there.
+    // Once reserved, ReconcileAllocatedPorts releases the port when the socket goes away.
+
+    std::erase_if(m_unreservableUdpPorts, [&](const auto& port) { return !Ports.UnconnectedUdp.contains(port); });
+
+    const auto [ephemeralStart, ephemeralEnd] = GetEphemeralPortRange();
+    for (auto socket : Ports.UnconnectedUdp)
+    {
+        if (socket.Port == 0 || (socket.Port >= ephemeralStart && socket.Port <= ephemeralEnd))
+        {
+            continue;
+        }
+
+        const bool tracked = std::any_of(m_allocatedPorts.begin(), m_allocatedPorts.end(), [&](const auto& entry) {
+            return entry.first.Port == socket.Port && entry.first.Protocol == socket.Protocol;
+        });
+
+        if (tracked || m_unreservableUdpPorts.contains(socket))
+        {
+            continue;
+        }
+
+        const auto result = RequestPort(socket, true);
+        GNS_LOG_INFO(
+            "Requested the host for port allocation on untracked UDP socket: family ({}) port ({}) - returned {}",
+            socket.Family,
+            socket.Port,
+            result);
+
+        if (result == 0)
+        {
+            // The socket is known to exist, so no timeout is needed.
+            m_allocatedPorts.insert_or_assign(socket, std::nullopt);
+        }
+        else
+        {
+            m_unreservableUdpPorts.insert(socket);
+        }
+    }
+}
+catch (const std::exception& e)
+{
+    GNS_LOG_ERROR("Failed to reserve untracked UDP ports, {}", e.what());
+}
+
+std::pair<std::uint16_t, std::uint16_t> GnsPortTracker::GetEphemeralPortRange()
+{
+    // N.B. IPv6 uses the IPv4 range as well.
+    const auto content = UtilReadFileContent("/proc/sys/net/ipv4/ip_local_port_range");
+    unsigned int start = 0;
+    unsigned int end = 0;
+    if (sscanf(content.c_str(), "%u %u", &start, &end) != 2 || start > end || end > UINT16_MAX)
+    {
+        // Linux's default range.
+        return {32768, 60999};
+    }
+
+    return {static_cast<std::uint16_t>(start), static_cast<std::uint16_t>(end)};
 }
 
 int GnsPortTracker::RequestPort(const PortAllocation& Port, bool allocate)

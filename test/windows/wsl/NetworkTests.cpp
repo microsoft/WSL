@@ -4843,6 +4843,59 @@ class MirroredTests
         NetworkTests::VerifyAcceptedConnectionPortTracking();
     }
 
+    WSL2_TEST_METHOD(MirroredKernelUdpSocketIsReserved)
+    {
+        MIRRORED_NETWORKING_TEST_ONLY();
+
+        m_config->Update(LxssGenerateTestConfig({.networkingMode = wsl::core::NetworkingMode::Mirrored}));
+        WaitForMirroredStateInLinux();
+
+        WslKeepAlive keepAlive;
+
+        // A VXLAN device's UDP socket is created by the kernel, not by bind(), so the seccomp trap never sees it.
+        // Verify that the port tracker still reserves its port on the host, so inbound packets reach the guest.
+        constexpr uint16_t port = 4790;
+        VERIFY_ARE_EQUAL(
+            LxsstuLaunchWsl(std::format(L"ip link add wsltestvxlan type vxlan id 42 dstport {} local 127.0.0.1 && ip link set wsltestvxlan up", port)),
+            (DWORD)0);
+
+        auto deleteDevice = wil::scope_exit([&]() { LxsstuLaunchWsl(L"ip link del wsltestvxlan"); });
+
+        // Retry until the port tracker reserves the port, blocking the host bind.
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(port);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) != SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::seconds(30)));
+
+        // Wait > 60 seconds so that the port tracker's deallocation logic would have run. The port must stay
+        // reserved while the device exists. See c_bind_timeout_seconds in GnsPortTracker.cpp
+        std::this_thread::sleep_for(std::chrono::seconds(90));
+        NetworkTests::BindHostPort(port, SOCK_DGRAM, IPPROTO_UDP, false);
+
+        // Delete the device. Verify the port is eventually released.
+        deleteDevice.reset();
+        VERIFY_NO_THROW(wsl::shared::retry::RetryWithTimeout<void>(
+            [&]() {
+                wil::unique_socket sock(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+                THROW_LAST_ERROR_IF(!sock);
+
+                SOCKADDR_IN addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(port);
+                THROW_HR_IF(E_FAIL, bind(sock.get(), reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR);
+            },
+            std::chrono::seconds(1),
+            std::chrono::minutes(2)));
+    }
+
     WSL2_TEST_METHOD(MirroredReusePortOnGuest)
     {
         MIRRORED_NETWORKING_TEST_ONLY();
