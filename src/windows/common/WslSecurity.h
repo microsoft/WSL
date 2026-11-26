@@ -82,6 +82,8 @@ std::pair<PSID, std::vector<char>> CreateSid(SID_IDENTIFIER_AUTHORITY Authority,
     return std::make_pair(sid, std::move(buffer));
 }
 
+std::pair<PSID, std::vector<char>> GetAccountSid(_In_ PCWSTR accountName);
+
 /// <summary>
 /// Creates a restricted token from the provided token.
 /// </summary>

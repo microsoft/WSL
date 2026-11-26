@@ -21,6 +21,7 @@ Abstract:
 #include "INetworkingEngine.h"
 #include "RuntimeClass.h"
 #include "WslCoreConfig.h"
+#include "ServiceBusyToken.h"
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -56,6 +57,7 @@ public:
 private:
     bool FeatureEnabled(WSLCFeatureFlags Value) const;
 
+    ServiceBusyToken m_busyToken;
     std::recursive_mutex m_lock;
 
     std::unique_ptr<IVirtualMachineBackend> m_backend;

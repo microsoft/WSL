@@ -35,9 +35,12 @@ Abstract:
 #include "WSLCCompat.h"
 #include "COMImplClass.h"
 #include "RuntimeClass.h"
+#include "ServiceBusyToken.h"
 #include "wslutil.h"
 #include <atomic>
 #include <algorithm>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -79,6 +82,14 @@ private:
 // Security info is stored here (not queried from the per-user process) to prevent spoofing.
 struct SessionEntry
 {
+    NON_COPYABLE(SessionEntry);
+    NON_MOVABLE(SessionEntry);
+
+    SessionEntry(IWSLCSessionReference* Reference, wil::unique_handle Job, wil::unique_handle Process, wil::unique_handle TerminationEvent);
+
+    wil::srwlock BusyLock;
+    _Guarded_by_(BusyLock) std::optional<ServiceBusyToken> BusyToken { std::in_place };
+
     MarshaledSessionReference Ref;
     ULONG SessionId = 0;
     DWORD CreatorPid = 0;
@@ -95,6 +106,14 @@ struct SessionEntry
 
     wil::unique_handle JobObject;
     wil::unique_handle HostProcess;
+
+    // Termination events are used to track session lifetime.
+    // We listen for the session's termination, but also for the host process in case it exits abnormally.
+    // The event callbacks hold pointers to this object, so its address must remain stable.
+    // This makes the object non-movable.
+    wil::unique_handle TerminatedEvent;
+    wil::unique_threadpool_wait TerminationWait;
+    wil::unique_threadpool_wait HostProcessWait;
 };
 
 class WSLCSessionManagerImpl
@@ -144,7 +163,8 @@ private:
         using TResult = std::conditional_t<std::is_same_v<T, void>, nullptr_t, std::optional<T>>;
         TResult result{};
 
-        auto each = [&](SessionEntry& entry) {
+        auto each = [&](const std::unique_ptr<SessionEntry>& entryPtr) {
+            auto& entry = *entryPtr;
             // Try to open the session via the service ref.
             // Fails with ERROR_OBJECT_NO_LONGER_EXISTS if released,
             // ERROR_INVALID_STATE if terminated, or RPC error if the reference is disconnected or the host exited.
@@ -215,7 +235,7 @@ private:
 
     // All sessions tracked via SessionEntry (which holds weak refs and service-side security info).
     // Expired sessions are hidden immediately; entries are erased when a cleanup pass observes host exit.
-    std::vector<SessionEntry> m_sessions;
+    std::vector<std::unique_ptr<SessionEntry>> m_sessions;
 
     // Strong references to persistent sessions to keep them alive.
     // Session ID is stored alongside so cleanup doesn't require cross-process COM calls.

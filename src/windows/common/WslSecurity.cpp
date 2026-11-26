@@ -123,6 +123,23 @@ LUID wsl::windows::common::security::EnableTokenPrivilege(_Inout_ HANDLE token, 
     return luid;
 }
 
+std::pair<PSID, std::vector<char>> wsl::windows::common::security::GetAccountSid(_In_ PCWSTR accountName)
+{
+    DWORD sidSize{};
+    DWORD domainNameSize{};
+    SID_NAME_USE sidType{};
+    THROW_LAST_ERROR_IF(
+        !LookupAccountNameW(nullptr, accountName, nullptr, &sidSize, nullptr, &domainNameSize, &sidType) &&
+        GetLastError() != ERROR_INSUFFICIENT_BUFFER);
+
+    std::vector<char> buffer(sidSize);
+    std::wstring domainName(domainNameSize, L'\0');
+    THROW_IF_WIN32_BOOL_FALSE(LookupAccountNameW(nullptr, accountName, buffer.data(), &sidSize, domainName.data(), &domainNameSize, &sidType));
+
+    PSID sid = buffer.data();
+    return std::make_pair(sid, std::move(buffer));
+}
+
 DWORD wsl::windows::common::security::GetUserBasicIntegrityLevel(_In_ HANDLE token)
 {
     // Get the integrity level.

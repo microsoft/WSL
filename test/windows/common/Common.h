@@ -647,6 +647,8 @@ bool IsMirroredNetworkingSupported();
 
 bool WslShutdown();
 
+void VerifyServiceBecomesIdle();
+
 void TerminateDistribution(LPCWSTR DistributionName = LXSS_DISTRO_NAME_TEST_L);
 
 void VerifyNoVmAccessToVhd(LPCWSTR VhdPath);

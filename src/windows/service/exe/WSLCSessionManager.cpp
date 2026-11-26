@@ -46,6 +46,7 @@ extern wsl::windows::service::PluginManager g_pluginManager;
 using wsl::windows::common::COMServiceExecutionContext;
 using wsl::windows::service::wslc::CallingProcessTokenInfo;
 using wsl::windows::service::wslc::MarshaledSessionReference;
+using wsl::windows::service::wslc::SessionEntry;
 using wsl::windows::service::wslc::WSLCPluginNotifier;
 using wsl::windows::service::wslc::WSLCSessionManagerImpl;
 using wsl::windows::service::wslc::WSLCVirtualMachineFactory;
@@ -140,6 +141,22 @@ private:
     }
 };
 
+wil::unique_threadpool_wait CreateTerminationWait(SessionEntry* entryPtr, HANDLE handle)
+{
+    wil::unique_threadpool_wait terminationWait{CreateThreadpoolWait(
+        [](PTP_CALLBACK_INSTANCE, PVOID context, PTP_WAIT, TP_WAIT_RESULT) noexcept {
+            // After termination, the session entry no longer holds the service as busy
+            auto* entry = static_cast<SessionEntry*>(context);
+            auto lock = entry->BusyLock.lock_exclusive();
+            entry->BusyToken.reset();
+        },
+        entryPtr,
+        nullptr)};
+    THROW_LAST_ERROR_IF(!terminationWait);
+    SetThreadpoolWait(terminationWait.get(), handle, nullptr);
+    return std::move(terminationWait);
+}
+
 } // namespace
 
 MarshaledSessionReference::MarshaledSessionReference(IWSLCSessionReference* Reference) :
@@ -200,6 +217,16 @@ void MarshaledSessionReference::Reset() noexcept
     }
 }
 
+SessionEntry::SessionEntry(IWSLCSessionReference* Reference, wil::unique_handle Job, wil::unique_handle Process, wil::unique_handle TerminationEvent) :
+    Ref(Reference),
+    JobObject(std::move(Job)),
+    HostProcess(std::move(Process)),
+    TerminatedEvent(std::move(TerminationEvent)),
+    TerminationWait(CreateTerminationWait(this, TerminatedEvent.get())),
+    HostProcessWait(CreateTerminationWait(this, HostProcess.get()))
+{
+}
+
 WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
 {
     // Terminate all sessions on shutdown.
@@ -209,8 +236,8 @@ WSLCSessionManagerImpl::~WSLCSessionManagerImpl()
     std::lock_guard lock(m_wslcSessionsLock);
     for (auto& entry : m_sessions)
     {
-        NotifySessionStoppingLockHeld(entry);
-        LOG_IF_FAILED(entry.Ref.Terminate());
+        NotifySessionStoppingLockHeld(*entry);
+        LOG_IF_FAILED(entry->Ref.Terminate());
     }
 }
 
@@ -293,6 +320,7 @@ void WSLCSessionManagerImpl::CreateSession(
         return; // Existing session was opened.
     }
 
+    ServiceBusyToken startupBusyToken;
     wslutil::StopWatch stopWatch;
 
     // Initialize settings for the default session.
@@ -362,19 +390,20 @@ void WSLCSessionManagerImpl::CreateSession(
             THROW_HR(factoryHr);
         }
 
+        wil::unique_handle terminatedEvent;
+        THROW_IF_FAILED(session->GetTerminationEvent(terminatedEvent.put()));
+
         // Track the session via its service ref, along with metadata and security info.
-        m_sessions.push_back(SessionEntry{
-            MarshaledSessionReference{serviceRef.get()},
-            sessionId,
-            creatorPid,
-            resolvedDisplayName,
-            std::move(tokenInfo),
-            notifier,
-            false,
-            sharedToken,
-            std::move(storedSid),
-            std::move(sessionJob),
-            std::move(hostProcess)});
+        auto sessionEntry =
+            std::make_unique<SessionEntry>(serviceRef.get(), std::move(sessionJob), std::move(hostProcess), std::move(terminatedEvent));
+        sessionEntry->SessionId = sessionId;
+        sessionEntry->CreatorPid = creatorPid;
+        sessionEntry->DisplayName = resolvedDisplayName;
+        sessionEntry->Owner = std::move(tokenInfo);
+        sessionEntry->PluginNotifier = notifier;
+        sessionEntry->UserToken = sharedToken;
+        sessionEntry->UserSid = std::move(storedSid);
+        m_sessions.push_back(std::move(sessionEntry));
 
         // For persistent sessions, also hold a strong reference to keep them alive.
         const bool persistent = WI_IsFlagSet(Flags, WSLCSessionFlagsPersistent);
@@ -386,7 +415,7 @@ void WSLCSessionManagerImpl::CreateSession(
         // Notify plugins that the session was created. A failure here aborts session creation.
         try
         {
-            auto& entry = m_sessions.back();
+            auto& entry = *m_sessions.back();
             WSLCSessionInformation info{};
             info.SessionId = static_cast<WSLCSessionId>(entry.SessionId);
             info.DisplayName = entry.DisplayName.c_str();
@@ -400,8 +429,8 @@ void WSLCSessionManagerImpl::CreateSession(
             const auto error = wil::ResultFromCaughtException();
 
             // Plugin rejected the session: tear it down before propagating.
-            m_sessions.back().StoppingNotified = true; // Don't fire stopping for a session that never started successfully.
-            LOG_IF_FAILED(m_sessions.back().Ref.Terminate());
+            m_sessions.back()->StoppingNotified = true; // Don't fire stopping for a session that never started successfully.
+            LOG_IF_FAILED(m_sessions.back()->Ref.Terminate());
             m_sessions.pop_back();
 
             auto remove = std::ranges::remove_if(m_persistentSessions, [&](const auto& e) { return e.first == sessionId; });

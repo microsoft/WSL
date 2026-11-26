@@ -14,6 +14,7 @@ Abstract:
 
 #include "precomp.h"
 #include "install.h"
+#include "InstallGuard.h"
 #include <msiquery.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -820,6 +821,60 @@ extern "C" UINT __stdcall WslFinalizeInstallation(MSIHANDLE install)
         WSL_INSTALL_LOG("WslFinalizeInstallation");
     }
     CATCH_LOG();
+
+    return NOERROR;
+}
+
+bool IsWslRunning(MSIHANDLE install)
+{
+#ifndef WSL_OFFICIAL_BUILD
+    const auto testBusy = GetMsiProperty(install, L"WSL_TEST_INSTALL_BUSY");
+    THROW_HR_IF(E_FAIL, testBusy == L"error");
+    if (testBusy == L"0" || testBusy == L"1")
+    {
+        return testBusy == L"1";
+    }
+#endif
+
+    return IsServiceBusy();
+}
+
+bool IsExplicitInstall(MSIHANDLE install) noexcept
+try
+{
+    return IsExplicitInstallClient(GetMsiProperty(install, L"CLIENTPROCESSID"));
+}
+catch (...)
+{
+    LOG_CAUGHT_EXCEPTION();
+    return false;
+}
+
+// Checks for running WSL instances and determines if the installation should proceed.
+// Returns NOERROR if installation can proceed, or ERROR_INSTALL_FAILURE if it should be blocked.
+extern "C" UINT __stdcall WslCheckForRunningInstances(MSIHANDLE install)
+{
+    try
+    {
+        WSL_INSTALL_LOG("WslCheckForRunningInstances");
+
+        if (IsWslRunning(install))
+        {
+            WSL_INSTALL_LOG("WslRunningInstancesDetected");
+            if (!IsExplicitInstall(install))
+            {
+                WSL_INSTALL_LOG("WslInstallBlockedByRunningInstances");
+                return ERROR_INSTALL_FAILURE;
+            }
+        }
+    }
+    catch (...)
+    {
+        const auto error = wil::ResultFromCaughtException();
+        LOG_CAUGHT_EXCEPTION();
+        WSL_INSTALL_LOG("WslInstallDetectionFailed", TraceLoggingHResult(error));
+        WriteInstallLog(std::format("WSL busy detection failed (0x{:08x}); allowing installation.", static_cast<ULONG>(error)));
+    }
 
     return NOERROR;
 }
