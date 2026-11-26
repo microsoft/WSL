@@ -170,7 +170,9 @@ typedef enum _WSLCSessionStorageFlags
     WSLCSessionStorageFlagsNone = 0,
     WSLCSessionStorageFlagsNoCreate = 1, // Open an existing storage path, but don't create a new one.
     WSLCSessionStorageFlagsWarnCustomLocation = 2, // Warn when creating a new VHD at a session.storagePath-configured location.
-    WSLCSessionStorageFlagsValid = WSLCSessionStorageFlagsNoCreate | WSLCSessionStorageFlagsWarnCustomLocation
+    WSLCSessionStorageFlagsSparse = 4, // Create new session storage as a sparse VHD. Currently experimental.
+    WSLCSessionStorageFlagsValid =
+        WSLCSessionStorageFlagsNoCreate | WSLCSessionStorageFlagsWarnCustomLocation | WSLCSessionStorageFlagsSparse
 } WSLCSessionStorageFlags;
 
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(WSLCSessionStorageFlags);")
