@@ -166,7 +166,7 @@ std::vector<std::string> wsl::core::networking::HostDnsInfo::GetInterfaceDnsServ
         if (WI_IsFlagSet(Flags, DnsSettingsFlags::IncludeIpv6Servers))
         {
             std::vector<std::string> ipv6Servers = GetDnsServerStrings(
-                NextAddress->FirstDnsServerAddress, AF_INET6, static_cast<USHORT>(MaxResolvConfDnsServers - DnsServers.size()));
+                NextAddress->FirstDnsServerAddress, AF_INET6, static_cast<USHORT>(MaxDnsServers - ipv4Servers.size()));
 
             DnsServers.insert(DnsServers.end(), ipv6Servers.begin(), ipv6Servers.end());
         }
