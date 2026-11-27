@@ -376,6 +376,10 @@ public:
         VERIFY_ARE_EQUAL(L"/tmp\\log\n", LxsstuLaunchWslAndCaptureOutput(L"--cd /tmp --exec wslpath -u ..\\tmp\uf05clog").first);
         VERIFY_ARE_EQUAL(L"/tmp\\log\n", LxsstuLaunchWslAndCaptureOutput(L"--cd /tmp --exec wslpath -au ..\\tmp\uf05clog").first);
         VERIFY_ARE_EQUAL(L"log\n", LxsstuLaunchWslAndCaptureOutput(L"--cd /tmp --exec wslpath -u .\\log").first);
+
+        const auto [out, err] = LxsstuLaunchWslAndCaptureOutput(L"--exec wslpath --help", 0);
+        VERIFY_IS_FALSE(out.empty());
+        VERIFY_IS_TRUE(err.empty());
     }
 
     void DrvFsMountUnicodePath(DrvFsMode Mode)
