@@ -26,6 +26,7 @@ Abstract:
 
 #include "util.h"
 #include "CommandLine.h"
+#include "stringshared.h"
 
 using namespace wsl::shared;
 
@@ -294,7 +295,7 @@ Routine Description:
     - The path is made absolute.
     - All separators are changed to backslashes.
     - Duplicate separators and .. components are compacted.
-    - The \\?\ prefix is stripped from long paths.
+    - Extended drive and UNC paths are converted to their ordinary spellings.
 
 Arguments:
 
@@ -369,11 +370,17 @@ Return Value:
     else if (Path[0] == PATH_SEP_NT && Path[1] == PATH_SEP_NT)
     {
         //
-        // This is either a long path or a UNC path. If it's a long path,
-        // strip the prefix.
+        // For extended UNC paths, reuse the last two prefix characters as the leading backslashes.
         //
 
-        if (Path[2] == '?' && Path[3] == PATH_SEP_NT)
+        constexpr std::string_view c_extendedUncPrefix = R"(\\?\UNC\)";
+        if (wsl::shared::string::StartsWith(std::string_view{Path, PathLength}, c_extendedUncPrefix, true))
+        {
+            StartIndex = c_extendedUncPrefix.size() - 2;
+            Path[StartIndex] = PATH_SEP_NT;
+            CollapseStartIndex = 2;
+        }
+        else if (Path[2] == '?' && Path[3] == PATH_SEP_NT)
         {
             StartIndex = 4;
             CollapseStartIndex = 0;
@@ -460,7 +467,12 @@ Return Value:
         return 1;
     }
 
-    if (OriginalPath == nullptr || Mode == TRANSLATE_MODE_HELP)
+    if (Mode == TRANSLATE_MODE_HELP)
+    {
+        return puts(Usage().c_str()) == EOF ? 1 : 0;
+    }
+
+    if (OriginalPath == nullptr)
     {
         INVALID_USAGE();
     }
@@ -644,24 +656,16 @@ Return Value:
         OutputCwdLength = strlen(OutputCwd);
         if (strncmp(TranslatedPath.c_str(), OutputCwd, OutputCwdLength) == 0)
         {
-            switch (TranslatedPath[OutputCwdLength])
+            const char separator = Mode == TRANSLATE_MODE_UNIX ? PATH_SEP : PATH_SEP_NT;
+            const char next = TranslatedPath[OutputCwdLength];
+            if (next == '\0' || (next == separator && OutputCwdLength + 1 == TranslatedPath.length()))
             {
-            case PATH_SEP_NT:
-            case PATH_SEP:
-                if (OutputCwdLength + 1 == TranslatedPath.length())
-                {
-                    // Special case for wslpath -u .
-                    TranslatedPath = ".";
-                }
-                else
-                {
-                    TranslatedPath = TranslatedPath.substr(OutputCwdLength + 1);
-                }
-                break;
-
-            case '\0':
-                TranslatedPath = TranslatedPath.substr(OutputCwdLength);
-                break;
+                // Use "." for the current directory; an empty result signals translation failure.
+                TranslatedPath = ".";
+            }
+            else if (next == separator)
+            {
+                TranslatedPath.erase(0, OutputCwdLength + 1);
             }
         }
     }

@@ -34,6 +34,7 @@ Abstract:
 #define WSLPATH_SYMLINK_TEST_LINK_WIN WSLPATH_SYMLINK_TEST_DIR_WIN "\\link"
 #define WSLPATH_DISTRO_PREFIX "\\\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST
 #define WSLPATH_DISTRO_COMPAT_PREFIX "\\\\wsl$\\" LXSS_DISTRO_NAME_TEST
+#define WSLPATH_DISTRO_EXTENDED_PREFIX "\\\\?\\UNC\\wsl.localhost\\" LXSS_DISTRO_NAME_TEST
 #define WSLPATH_ESCAPE_LX_DIR "/data/" WSLPATH_ESCAPE_NAME
 #define WSLPATH_ESCAPE_LX_DIR_WIN WSLPATH_DISTRO_PREFIX "\\data\\" WSLPATH_ESCAPE_NAME_ESCAPED
 #define WSLPATH_MOUNT_POINT "/data/wslpath_mount"
@@ -386,6 +387,7 @@ Return Value:
     LxtCheckResult(LxtCheckWslPathTranslation("\\\\?\\C:\\Users", "/mnt/c/Users", true));
     LxtCheckResult(LxtCheckWslPathTranslation("\\\\?\\C:\\Users\\", "/mnt/c/Users/", true));
     LxtCheckResult(LxtCheckWslPathTranslation(".", ".", true));
+    LxtCheckResult(LxtCheckWslPathTranslation(WSLPATH_DISTRO_EXTENDED_PREFIX "\\proc\\stat", "/proc/stat", true));
 
     //
     // Validate that distro names that only share the current distro name as a prefix are correctly treated as an error.
