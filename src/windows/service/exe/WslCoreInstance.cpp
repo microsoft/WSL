@@ -70,7 +70,7 @@ WslCoreInstance::WslCoreInstance(
         if (((result.Result == EINVAL || result.Result == 74 || result.Result == 117) && result.FailureStep == LxInitCreateInstanceStepMountDisk) ||
             (result.Result == 5 && result.FailureStep == LxInitCreateInstanceStepLaunchInit))
         {
-            THROW_HR(WSL_E_DISK_CORRUPTED);
+            THROW_HR(WSL_E_MOUNT_FAILED);
         }
         else
         {
