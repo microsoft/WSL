@@ -14,6 +14,7 @@
 #include "NetlinkTransactionError.h"
 #include "GnsPortTracker.h"
 #include "lxinitshared.h"
+#include "retryshared.h"
 #include "seccomp_defs.h"
 
 // TODO: Include <sys/pidfd.h> and remove this once musl provides it.
@@ -679,56 +680,63 @@ std::optional<GnsPortTracker::PortAllocation> GnsPortTracker::ResolvePortZeroBin
 
     // The bind() syscall has been completed (CompleteRequest() already unblocked the
     // caller). Poll getsockname() briefly until the kernel assigns a port.
-    constexpr int maxRetries = 25;
-    constexpr auto retryDelay = std::chrono::milliseconds(10);
-
     in_port_t port = 0;
     in6_addr address = {};
     int resolvedFamily = 0;
 
-    for (int attempt = 0; attempt < maxRetries; ++attempt)
+    try
     {
-        if (attempt > 0)
-        {
-            std::this_thread::sleep_for(retryDelay);
-        }
+        const auto resolved = wsl::shared::retry::RetryWithTimeout<bool>(
+            [&]() {
+                sockaddr_storage storage{};
+                socklen_t addrLen = sizeof(storage);
+                if (getsockname(lookup.DuplicatedSocketFd.get(), reinterpret_cast<sockaddr*>(&storage), &addrLen) != 0)
+                {
+                    GNS_LOG_ERROR("Port-0 bind: getsockname failed for pid {} (errno {})", lookup.Pid, errno);
+                    return false;
+                }
 
-        sockaddr_storage storage{};
-        socklen_t addrLen = sizeof(storage);
-        if (getsockname(lookup.DuplicatedSocketFd.get(), reinterpret_cast<sockaddr*>(&storage), &addrLen) != 0)
+                resolvedFamily = static_cast<int>(storage.ss_family);
+
+                if (storage.ss_family == AF_INET)
+                {
+                    const auto* sin = reinterpret_cast<const sockaddr_in*>(&storage);
+                    port = ntohs(sin->sin_port);
+                    address.s6_addr32[0] = sin->sin_addr.s_addr;
+                }
+                else if (storage.ss_family == AF_INET6)
+                {
+                    const auto* sin6 = reinterpret_cast<const sockaddr_in6*>(&storage);
+                    port = ntohs(sin6->sin6_port);
+                    memcpy(address.s6_addr32, sin6->sin6_addr.s6_addr32, sizeof(address.s6_addr32));
+                }
+                else
+                {
+                    GNS_LOG_ERROR("Port-0 bind: unexpected address family ({}) for pid {}", resolvedFamily, lookup.Pid);
+                    return false;
+                }
+
+                THROW_ERRNO_IF(EAGAIN, port == 0);
+
+                return true;
+            },
+            std::chrono::milliseconds(10),
+            std::chrono::milliseconds(240),
+            []() { return wil::ResultFromCaughtException() == EAGAIN; },
+            std::chrono::milliseconds(1));
+
+        if (!resolved)
         {
-            GNS_LOG_ERROR("Port-0 bind: getsockname failed for pid {} (errno {})", lookup.Pid, errno);
             return {};
-        }
-
-        resolvedFamily = static_cast<int>(storage.ss_family);
-
-        if (storage.ss_family == AF_INET)
-        {
-            const auto* sin = reinterpret_cast<const sockaddr_in*>(&storage);
-            port = ntohs(sin->sin_port);
-            address.s6_addr32[0] = sin->sin_addr.s_addr;
-        }
-        else if (storage.ss_family == AF_INET6)
-        {
-            const auto* sin6 = reinterpret_cast<const sockaddr_in6*>(&storage);
-            port = ntohs(sin6->sin6_port);
-            memcpy(address.s6_addr32, sin6->sin6_addr.s6_addr32, sizeof(address.s6_addr32));
-        }
-        else
-        {
-            GNS_LOG_ERROR("Port-0 bind: unexpected address family ({}) for pid {}", resolvedFamily, lookup.Pid);
-            return {};
-        }
-
-        if (port != 0)
-        {
-            break;
         }
     }
-
-    if (port == 0)
+    catch (const wil::ResultException& e)
     {
+        if (e.GetErrorCode() != EAGAIN)
+        {
+            throw;
+        }
+
         GNS_LOG_ERROR("Port-0 bind: kernel did not assign a port for pid {} after retries", lookup.Pid);
         return {};
     }

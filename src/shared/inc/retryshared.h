@@ -14,14 +14,22 @@ Abstract:
 
 #pragma once
 
+#include <algorithm>
+
 namespace wsl::shared::retry {
 
 constexpr auto AlwaysRetry = []() { return true; };
 
 template <typename T, typename TPeriod, typename TTimeout>
-T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTimeout timeout, const std::function<bool()>& retryPred = AlwaysRetry)
+T RetryWithTimeout(
+    const std::function<T()>& routine,
+    TPeriod retryPeriod,
+    TTimeout timeout,
+    const std::function<bool()>& retryPred = AlwaysRetry,
+    TPeriod initialRetryPeriod = TPeriod::zero())
 {
     auto stop = std::chrono::steady_clock::now() + timeout;
+    auto currentRetryPeriod = initialRetryPeriod == TPeriod::zero() ? retryPeriod : std::min(initialRetryPeriod, retryPeriod);
     for (;;)
     {
         try
@@ -35,7 +43,11 @@ T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTime
                 throw;
             }
 
-            std::this_thread::sleep_for(retryPeriod);
+            std::this_thread::sleep_for(currentRetryPeriod);
+            if (currentRetryPeriod < retryPeriod)
+            {
+                currentRetryPeriod += std::min(currentRetryPeriod, retryPeriod - currentRetryPeriod);
+            }
         }
     }
 }
@@ -43,14 +55,14 @@ T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTime
 #ifdef WIN32
 
 template <typename T, typename TPeriod, typename TTimeout>
-T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTimeout timeout, std::vector<HRESULT>&& retryErrors)
+T RetryWithTimeout(const std::function<T()>& routine, TPeriod retryPeriod, TTimeout timeout, std::vector<HRESULT>&& retryErrors, TPeriod initialRetryPeriod = TPeriod::zero())
 {
     auto pred = [retryErrors = std::move(retryErrors)]() {
         auto hr = HRESULT_FROM_WIN32(GetLastError());
         return std::find(retryErrors.begin(), retryErrors.end(), hr) != retryErrors.end();
     };
 
-    return RetryWithTimeout(routine, retryPeriod, timeout, pred);
+    return RetryWithTimeout(routine, retryPeriod, timeout, pred, initialRetryPeriod);
 }
 
 #endif
