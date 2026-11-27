@@ -24,10 +24,10 @@ Abstract:
 #include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/param.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -185,6 +185,8 @@ inline ConnCheckResult CheckConnection(const char* hostname, const char* ipv6hos
             break;
         }
 
+#if defined(_MSC_VER)
+
         fd_set writeSocketSet{};
         if (result.Ipv4Status == ConnCheckStatus::InProgress)
         {
@@ -204,6 +206,20 @@ inline ConnCheckResult CheckConnection(const char* hostname, const char* ipv6hos
             timeout.tv_sec = static_cast<long>(maxMillisecondsElapsed - elapsedTimeMs.count()) / 1000;
             wprintf(L"CheckConnection: arming select for %d seconds\n", timeout.tv_sec);
             const auto status = select(maxsocket + 1, nullptr, &writeSocketSet, nullptr, &timeout);
+
+#else
+
+        pollfd pollDescriptors[] = {
+            {(result.Ipv4Status == ConnCheckStatus::InProgress) ? v4sock.get() : -1, POLLOUT, 0},
+            {(result.Ipv6Status == ConnCheckStatus::InProgress) ? v6sock.get() : -1, POLLOUT, 0}};
+        if (pollDescriptors[0].fd != -1 || pollDescriptors[1].fd != -1)
+        {
+            const auto timeout = static_cast<int>(maxMillisecondsElapsed - elapsedTimeMs.count());
+            wprintf(L"CheckConnection: arming poll for %d milliseconds\n", timeout);
+            const auto status = poll(pollDescriptors, 2, timeout);
+
+#endif
+
             if (status == 0)
             {
                 if (result.Ipv4Status == ConnCheckStatus::InProgress)
@@ -220,6 +236,15 @@ inline ConnCheckResult CheckConnection(const char* hostname, const char* ipv6hos
             else if (status < 0)
             {
                 const auto error = errno;
+
+#if !defined(_MSC_VER)
+
+                if (error == EINTR)
+                {
+                    continue;
+                }
+
+#endif
                 if (result.Ipv4Status == ConnCheckStatus::InProgress)
                 {
                     wprintf(L"CheckConnection: result.Ipv4Status = ConnCheckStatus::FailureSocketConnect (%d)\n", error);
@@ -233,6 +258,9 @@ inline ConnCheckResult CheckConnection(const char* hostname, const char* ipv6hos
             }
             else
             {
+
+#if defined(_MSC_VER)
+
                 // Success.
                 if (v4sock)
                 {
@@ -251,6 +279,35 @@ inline ConnCheckResult CheckConnection(const char* hostname, const char* ipv6hos
                         result.Ipv6Status = ConnCheckStatus::Success;
                     }
                 }
+
+#else
+
+                ConnCheckStatus* results[] = {&result.Ipv4Status, &result.Ipv6Status};
+                for (int index = 0; index < 2; ++index)
+                {
+                    const auto& descriptor = pollDescriptors[index];
+                    if (descriptor.revents == 0)
+                    {
+                        continue;
+                    }
+
+                    int error = 0;
+                    socklen_t errorSize = sizeof(error);
+                    if (descriptor.revents & POLLNVAL)
+                    {
+                        error = EBADF;
+                    }
+                    else if (getsockopt(descriptor.fd, SOL_SOCKET, SO_ERROR, &error, &errorSize) < 0)
+                    {
+                        error = errno;
+                    }
+
+                    *results[index] = (error == 0 && (descriptor.revents & POLLOUT)) ? ConnCheckStatus::Success
+                                                                                     : ConnCheckStatus::FailureSocketConnect;
+                    wprintf(L"CheckConnection: v%d result (%d), error (%d)\n", index == 0 ? 4 : 6, *results[index], error);
+                }
+
+#endif
             }
         }
     }

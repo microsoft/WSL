@@ -597,11 +597,24 @@ InterfaceConfiguration Interface::ListAddressesImpl(int af)
             }
 
             auto getAddresses = [&](int type, std::vector<Address>& dest) {
-                for (const auto attribute : message.Attributes<const void*>(type))
+                auto appendAddresses = [&](const auto& attributes) {
+                    for (const auto* attribute : attributes)
+                    {
+                        dest.emplace_back(Address::FromBinary(ifaddr->ifa_family, ifaddr->ifa_prefixlen, attribute));
+                    }
+                };
+
+                if (ifaddr->ifa_family == AF_INET)
                 {
-                    auto messageAf = message.Payload()->ifa_family;
-                    int prefixLength = message.Payload()->ifa_prefixlen;
-                    dest.emplace_back(Address::FromBinary(messageAf, prefixLength, attribute));
+                    appendAddresses(message.Attributes<in_addr>(type));
+                }
+                else if (ifaddr->ifa_family == AF_INET6)
+                {
+                    appendAddresses(message.Attributes<in6_addr>(type));
+                }
+                else
+                {
+                    throw RuntimeErrorWithSourceLocation(std::format("Unexpected address family: {}", ifaddr->ifa_family));
                 }
             };
 

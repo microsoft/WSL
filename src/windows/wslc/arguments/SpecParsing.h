@@ -87,7 +87,7 @@ ParsedNetworkArgument ParseNetworkArgument(std::wstring_view value, const std::w
 WSLCSignal GetWSLCSignalFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses a timestamp given as Unix epoch seconds or an RFC3339 string into epoch seconds.
-ULONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName = {});
+LONGLONG GetTimestampFromString(const std::wstring& value, const std::wstring& argName = {});
 
 // Parses an output format ("json"/"table") into a FormatType.
 models::FormatType GetFormatTypeFromString(const std::wstring& input, const std::wstring& argName = {});
@@ -97,6 +97,10 @@ int GetInspectJsonIndentFromString(const std::wstring& input, const std::wstring
 
 // Parses an image pull policy ("always"/"missing"/"never").
 models::PullPolicy GetPullPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
+
+// Parses a container restart policy ("no"/"always"/"on-failure[:max-retries]"/"unless-stopped"). Policies
+// that parse correctly but are not supported are rejected.
+WSLCContainerRestartPolicy GetRestartPolicyFromString(const std::wstring& input, const std::wstring& argName = {});
 
 // Parses a build progress type ("auto"/"tty"/"plain"/"quiet") into a ProgressMode.
 models::ProgressMode GetProgressModeFromString(const std::wstring& input, const std::wstring& argName = {});

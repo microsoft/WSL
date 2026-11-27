@@ -68,6 +68,8 @@ LX_INT XAttr::Clunk()
     // Make sure in-flight write operations are finished.
     std::shared_lock<std::shared_mutex> lock{m_Lock};
 
+    util::FsUserContext userContext{m_Root->Uid, m_Root->Gid, m_Root->Groups};
+
     // Remove the xattr if its size is 0; otherwise, set the value.
     // N.B. Plan 9 does not support xattrs with zero-length values.
     if (m_Value.size() == 0)

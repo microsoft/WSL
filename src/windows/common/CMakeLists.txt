@@ -3,12 +3,14 @@ set(SOURCES
     ConsoleProgressBar.cpp
     ConsoleProgressIndicator.cpp
     ConsoleState.cpp
+    wslc/models/ContainerModel.cpp
     DeviceHostProxy.cpp
     disk.cpp
     Distribution.cpp
     Dmesg.cpp
     DnsResolver.cpp
     DnsTunnelingChannel.cpp
+    EventStore.cpp
     ExecutionContext.cpp
     filesystem.cpp
     GnsChannel.cpp
@@ -18,11 +20,20 @@ set(SOURCES
     hcs.cpp
     helpers.cpp
     hvsocket.cpp
+    wslc/services/ICredentialStorage.cpp
+    wslc/services/FileCredStorage.cpp
+    wslc/services/WinCredStorage.cpp
+    wslc/cli/InputChannel.cpp
+    wslc/cli/OutputChannel.cpp
+    wslc/cli/Terminal.cpp
+    wslc/cli/TableData.cpp
+    wslc/cli/TableRenderer.cpp
     interop.cpp
     HandleIO.cpp
     Localization.cpp
     lxssbusclient.cpp
     lxssclient.cpp
+    LxssHttpProxy.cpp
     LxssMessagePort.cpp
     LxssSecurity.cpp
     LxssServerPort.cpp
@@ -37,11 +48,13 @@ set(SOURCES
     string.cpp
     SubProcess.cpp
     svccomm.cpp
+    timestamp.cpp
     VTSupport.cpp
     WindowsUpdateIntegration.cpp
     WSLCContainerLauncher.cpp
     ConsommeNetworking.cpp
     WSLCProcessLauncher.cpp
+    WSLCRestartScheduler.cpp
     WslClient.cpp
     WslCoreConfig.cpp
     WslCoreFilesystem.cpp
@@ -51,11 +64,14 @@ set(SOURCES
     WslCoreNetworkingSupport.cpp
     WslInstall.cpp
     WslSecurity.cpp
+    VirtualMachineBackend.cpp
+    HcsVirtualMachineBackend.cpp
     SlowOperationWatcher.cpp
     WslTelemetry.cpp
     wslutil.cpp
     install.cpp
-    WSLCUserSettings.cpp
+    wslc/WSLCProxy.cpp
+    wslc/settings/WSLCUserSettings.cpp
     notifications.cpp)
 
 set(HEADERS
@@ -66,6 +82,7 @@ set(HEADERS
     ../inc/lxssbusclient.h
     ../inc/lxssclient.h
     ../inc/LxssDynamicFunction.h
+    ../inc/RegistryWatcher.h
     ../inc/traceloggingconfig.h
     ../inc/wdk.h
     ../inc/wsl.h
@@ -89,12 +106,16 @@ set(HEADERS
     ConsoleProgressBar.h
     ConsoleProgressIndicator.h
     ConsoleState.h
+    COMImplClass.h
+    RuntimeClass.h
+    wslc/models/ContainerModel.h
     DeviceHostProxy.h
     disk.hpp
     Distribution.h
     Dmesg.h
     DnsResolver.h
     DnsTunnelingChannel.h
+    EventStore.h
     ExecutionContext.h
     filesystem.hpp
     GnsChannel.h
@@ -105,9 +126,18 @@ set(HEADERS
     hcs_schema.h
     helpers.hpp
     hvsocket.hpp
+    wslc/services/ICredentialStorage.h
+    wslc/services/FileCredStorage.h
+    wslc/services/WinCredStorage.h
+    wslc/cli/InputChannel.h
+    wslc/cli/OutputChannel.h
+    wslc/cli/Terminal.h
+    wslc/cli/TableData.h
+    wslc/cli/TableRenderer.h
     INetworkingEngine.h
     interop.hpp
     HandleIO.h
+    LxssHttpProxy.h
     LxssMessagePort.h
     LxssPort.h
     LxssSecurity.h
@@ -125,11 +155,14 @@ set(HEADERS
     Stringify.h
     SubProcess.h
     svccomm.hpp
+    timestamp.hpp
     VTSupport.h
     WindowsUpdateIntegration.h
     WSLCContainerLauncher.h
+    WSLCContainerEntry.h
     ConsommeNetworking.h
     WSLCProcessLauncher.h
+    WSLCRestartScheduler.h
     WslClient.h
     WslCoreConfig.h
     WslCoreFilesystem.h
@@ -140,12 +173,15 @@ set(HEADERS
     WslCoreNetworkingSupport.h
     WslInstall.h
     WslSecurity.h
+    IVirtualMachineBackend.h
+    HcsVirtualMachineBackend.h
     SlowOperationWatcher.h
     WslTelemetry.h
     wslutil.h
-    EnumVariantMap.h
-    WSLCUserSettings.h
-    WSLCSessionDefaults.h
+    wslc/EnumVariantMap.h
+    wslc/WSLCProxy.h
+    wslc/settings/WSLCUserSettings.h
+    wslc/WSLCSessionDefaults.h
     )
 
 add_library(common STATIC ${SOURCES} ${HEADERS})
@@ -155,7 +191,17 @@ target_precompile_headers(common PRIVATE precomp.h)
 set_target_properties(common PROPERTIES FOLDER windows)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/../service/mc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 
+# common calls into HCS, HNS, the IP helper API, the VHD APIs, MSI, WinTrust and
+# the config file parser, so anything linking common needs those libraries too.
+# PUBLIC propagates them instead of making each consumer restate them.
+# yaml-cpp backs WSLCUserSettings, advapi32 the credential manager APIs used by
+# WinCredStorage, and Crypt32 the data protection APIs used by FileCredStorage.
+target_link_libraries(common PUBLIC ${HCS_LINK_LIBRARIES} ${MSI_LINK_LIBRARIES} VirtDisk.lib configfile yaml-cpp advapi32 Crypt32.lib Winhttp.lib)
+
 # WSLCUserSettings.cpp uses yaml-cpp headers.
-set_source_files_properties(WSLCUserSettings.cpp PROPERTIES
+# The per-source include path and definition below only apply when the file is
+# compiled on its own, so keep it out of the unity sources.
+set_source_files_properties(wslc/settings/WSLCUserSettings.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${yaml-cpp_SOURCE_DIR}/include"
-    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE")
+    COMPILE_DEFINITIONS "YAML_CPP_STATIC_DEFINE"
+    SKIP_UNITY_BUILD_INCLUSION ON)

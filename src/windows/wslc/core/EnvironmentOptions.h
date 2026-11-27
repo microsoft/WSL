@@ -15,6 +15,7 @@ Abstract:
 #include "Argument.h"
 #include "ArgMap.h"
 
+#include <span>
 #include <vector>
 
 namespace wsl::windows::wslc {
@@ -33,8 +34,9 @@ constexpr EnvBinding c_envBindings[] = {
     {L"NO_COLOR", ArgType::NoColor},
 };
 
-// Populates target for any ArgType in definedArgs not already set.
+// Populates target from declared arguments that have environment bindings.
 // Never throws on user input or environment state.
-void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& definedArgs) noexcept;
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& arguments) noexcept;
+void ApplyEnvironmentOptions(argument::ArgMap& target, const std::vector<Argument>& arguments, std::span<const EnvBinding> bindings) noexcept;
 
 } // namespace wsl::windows::wslc

@@ -8,6 +8,8 @@
 
 namespace wsl::windows::wslc::services {
 
+using namespace wsl::windows::wslc::cli;
+
 // Adapts the service IWarningCallback COM sink onto the CLI Terminal so the CLI, not the
 // service, decides how warnings are presented (mirrors ImageProgressCallback).
 class DECLSPEC_UUID("A7E3F8B2-4D19-4C6A-9E5B-8F2A1D3C7E90") WarningCallback

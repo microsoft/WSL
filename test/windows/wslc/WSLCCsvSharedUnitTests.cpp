@@ -16,7 +16,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
-#include "windows/Common.h"
+#include "Common.h"
 #include "WSLCCLITestHelpers.h"
 #include <optional>
 #include <string>

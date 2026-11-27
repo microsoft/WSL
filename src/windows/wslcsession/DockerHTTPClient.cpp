@@ -27,6 +27,7 @@ Abstract:
 
 #include <winrt/Windows.Foundation.h>
 #include "DockerHTTPClient.h"
+#include "timestamp.hpp"
 
 namespace http = boost::beast::http;
 using boost::beast::http::verb;
@@ -37,6 +38,15 @@ using wsl::windows::service::wslc::DockerHTTPClient;
 using namespace wsl::windows::common;
 
 namespace {
+
+bool MatchPruneLabels(const std::vector<std::string>& filters, const std::map<std::string, std::string>& labels)
+{
+    return std::ranges::all_of(filters, [&](const auto& filter) {
+        const auto separator = filter.find('=');
+        const auto label = labels.find(filter.substr(0, separator));
+        return label != labels.end() && (separator == std::string::npos || label->second == filter.substr(separator + 1));
+    });
+}
 
 bool IsResponseChunked(const http::response_parser<http::buffer_body>::value_type& response)
 {
@@ -124,8 +134,8 @@ std::string DockerHTTPClient::URL::Escape(const std::string& Value)
     return wsl::shared::string::WideToMultiByte(escaped.c_str());
 }
 
-DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, HANDLE exitingEvent, GUID VmId, ULONG ConnectTimeoutMs) :
-    m_exitingEvent(exitingEvent), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
+DockerHTTPClient::DockerHTTPClient(wsl::shared::SocketChannel&& Channel, std::vector<HANDLE>&& CancelEvents, GUID VmId, ULONG ConnectTimeoutMs) :
+    m_cancelEvents(std::move(CancelEvents)), m_channel(std::move(Channel)), m_vmId(VmId), m_connectTimeoutMs(ConnectTimeoutMs)
 {
 }
 
@@ -265,11 +275,12 @@ docker_schema::PruneImageResult DockerHTTPClient::PruneImages(const std::map<std
 }
 
 std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListContainers(
-    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters)
+    bool all, int limit, const std::map<std::string, std::vector<std::string>>& filters, bool size)
 {
     auto url = URL::Create("/containers/json");
     url.SetParameter("all", all);
     url.SetParameter("limit", std::to_string(limit));
+    url.SetParameter("size", size);
 
     if (!filters.empty())
     {
@@ -355,9 +366,12 @@ void DockerHTTPClient::DeleteContainer(const std::string& Id, bool Force, bool D
     Transaction(verb::delete_, url);
 }
 
-docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id)
+docker_schema::InspectContainer DockerHTTPClient::InspectContainer(const std::string& Id, bool Size)
 {
-    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, URL::Create("/containers/{}/json", Id));
+    auto url = URL::Create("/containers/{}/json", Id);
+    url.SetParameter("size", Size);
+
+    return Transaction<EmptyRequest, docker_schema::InspectContainer>(verb::get, url);
 }
 
 docker_schema::ContainerStats DockerHTTPClient::ContainerStats(const std::string& Id)
@@ -431,6 +445,35 @@ std::tuple<uint32_t, wil::unique_socket, bool> DockerHTTPClient::GetArchive(cons
     auto [response, socket] = SendRequest(verb::get, url, {}, {});
 
     return {response.result_int(), std::move(socket), response.chunked()};
+}
+
+std::optional<docker_schema::ContainerPathStat> DockerHTTPClient::StatArchivePath(const std::string& ContainerID, const std::string& Path)
+{
+    auto url = URL::Create("/containers/{}/archive", ContainerID);
+    url.SetParameter("path", Path);
+
+    // The engine reports the stat in a response header, so a HEAD request is enough.
+    auto [response, socket] = SendRequest(verb::head, url, {}, {});
+    socket.reset();
+
+    if (response.result_int() == 404)
+    {
+        return std::nullopt;
+    }
+
+    if (response.result_int() != 200)
+    {
+        throw DockerHTTPException(std::move(response), verb::head, url.Get(), "", "");
+    }
+
+    const auto header = response["X-Docker-Container-Path-Stat"];
+    if (header.empty())
+    {
+        return std::nullopt;
+    }
+
+    const auto decoded = wslutil::Base64Decode(std::string(header));
+    return wsl::shared::FromJson<docker_schema::ContainerPathStat>(decoded.c_str());
 }
 
 docker_schema::Volume DockerHTTPClient::CreateVolume(const docker_schema::CreateVolume& Request)
@@ -522,13 +565,14 @@ docker_schema::PruneNetworkResult DockerHTTPClient::PruneNetworks(const std::map
     return Transaction<docker_schema::EmptyRequest, docker_schema::PruneNetworkResult>(verb::post, url);
 }
 
-wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, ULONGLONG Since, ULONGLONG Until, ULONGLONG Tail)
+wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLogsFlags Flags, LONGLONG Since, LONGLONG Until, ULONGLONG Tail)
 {
     auto url = URL::Create("/containers/{}/logs", Id);
     url.SetParameter("follow", WI_IsFlagSet(Flags, WSLCLogsFlagsFollow));
     url.SetParameter("stdout", true);
     url.SetParameter("stderr", true);
     url.SetParameter("timestamps", WI_IsFlagSet(Flags, WSLCLogsFlagsTimestamps));
+    url.SetParameter("details", WI_IsFlagSet(Flags, WSLCLogsFlagsDetails));
 
     if (Tail != 0)
     {
@@ -554,17 +598,81 @@ wil::unique_socket DockerHTTPClient::ContainerLogs(const std::string& Id, WSLCLo
     return std::move(socket);
 }
 
-docker_schema::PruneContainerResult DockerHTTPClient::PruneContainers(const std::map<std::string, std::vector<std::string>>& filters)
+std::vector<docker_schema::ContainerInfo> DockerHTTPClient::ListPruneCandidates(const std::map<std::string, std::vector<std::string>>& Filters)
 {
-    auto url = URL::Create("/containers/prune");
-
-    if (!filters.empty())
+    for (const auto& [key, _] : Filters)
     {
-        nlohmann::json filtersJson = filters;
-        url.SetParameter("filters", filtersJson.dump());
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG,
+            wsl::windows::service::wslc::FormatDockerEngineError(std::format("invalid filter '{}'", key)),
+            key != "label" && key != "label!" && key != "until");
     }
 
-    return Transaction<docker_schema::EmptyRequest, docker_schema::PruneContainerResult>(verb::post, url);
+    std::optional<std::pair<std::int64_t, std::int64_t>> until;
+    if (const auto filter = Filters.find("until"); filter != Filters.end())
+    {
+        const std::set<std::string> values{filter->second.begin(), filter->second.end()};
+        THROW_HR_WITH_USER_ERROR_IF(
+            E_INVALIDARG, wsl::windows::service::wslc::FormatDockerEngineError("more than one until filter specified"), values.size() != 1);
+        try
+        {
+            until = timestamp::ParseTimestamp(*values.begin());
+            if (*values.begin() != "0" && timestamp::TryParseDuration(*values.begin()).has_value())
+            {
+                until->second = 0;
+            }
+        }
+        catch (const wil::ResultException& e)
+        {
+            THROW_HR_IF(e.GetErrorCode(), e.GetErrorCode() != E_INVALIDARG);
+            THROW_HR_WITH_USER_ERROR(
+                E_INVALIDARG,
+                wsl::windows::service::wslc::FormatDockerEngineError(
+                    std::format("failed to parse value as time or duration: \"{}\"", *values.begin())));
+        }
+    }
+
+    std::map<std::string, std::vector<std::string>> listFilters{{"status", {"created", "exited", "dead"}}};
+    if (const auto filter = Filters.find("label"); filter != Filters.end())
+    {
+        listFilters.emplace(*filter);
+    }
+
+    auto containers = ListContainers(true, -1, listFilters, true);
+    std::erase_if(containers, [&](const auto& container) {
+        // Docker negates the conjunction of all negative label filters.
+        if (const auto filter = Filters.find("label!"); filter != Filters.end() && MatchPruneLabels(filter->second, container.Labels))
+        {
+            return true;
+        }
+        if (!until || *until == std::pair<std::int64_t, std::int64_t>{-62135596800, 0})
+        {
+            return false;
+        }
+        if (container.Created != until->first)
+        {
+            return container.Created > until->first;
+        }
+
+        try
+        {
+            return timestamp::ParseTimestamp(InspectContainer(container.Id).Created) > *until;
+        }
+        catch (const DockerHTTPException& e)
+        {
+            if (e.StatusCode() != 404)
+            {
+                throw;
+            }
+            WSL_LOG(
+                "ContainerPruneSkipped",
+                TraceLoggingValue(container.Id.c_str(), "Id"),
+                TraceLoggingValue(e.StatusCode(), "StatusCode"));
+            return true;
+        }
+    });
+
+    return containers;
 }
 
 docker_schema::CreateExecResponse DockerHTTPClient::CreateExec(const std::string& Container, const docker_schema::CreateExec& Request)
@@ -622,7 +730,9 @@ wil::unique_socket DockerHTTPClient::ConnectSocket()
 
     // Connect the new hvsocket.
     wsl::shared::SocketChannel newChannel{
-        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_exitingEvent, m_connectTimeoutMs), "DockerClient", {m_exitingEvent}};
+        wsl::windows::common::hvsocket::Connect(m_vmId, response.Port, m_cancelEvents, m_connectTimeoutMs),
+        "DockerClient",
+        std::vector<HANDLE>(m_cancelEvents)};
     lock.reset();
 
     // Connect that socket to the docker unix socket.
@@ -661,7 +771,12 @@ std::pair<DockerHTTPClient::HTTPResponse, std::string> DockerHTTPClient::SendReq
     auto onHttpResponse = [&](const auto& response) { responseHeader = response; };
     MultiHandleWait io;
 
-    io.AddHandle(std::make_unique<io::EventHandle>(m_exitingEvent, [&]() { THROW_HR(E_ABORT); }));
+    // Session termination must cancel requests before shutdown waits for their VM leases.
+    for (const auto event : m_cancelEvents)
+    {
+        io.AddHandle(std::make_unique<io::EventHandle>(event, []() { THROW_HR(E_ABORT); }));
+    }
+
     io.AddHandle(std::make_unique<DockerHttpResponseHandle>(*context, std::move(onHttpResponse), std::move(OnResponse)), MultiHandleWait::CancelOnCompleted);
 
     io.Run({});
@@ -850,7 +965,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         // Peek for the end of the HTTP header '\r\n'
         auto bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_exitingEvent, MSG_PEEK);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), bufferSize), m_cancelEvents, MSG_PEEK);
 
         THROW_HR_IF(E_ABORT, bytesRead == 0);
 
@@ -866,7 +981,7 @@ std::pair<DockerHTTPClient::HTTPResponse, wil::unique_socket> DockerHTTPClient::
 
         // Consume the scanned header bytes from the socket
         bytesRead = common::socket::Receive(
-            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_exitingEvent, 0);
+            context->stream.native_handle(), gsl::span(reinterpret_cast<gsl::byte*>(buffer.data() + Offset), toConsume), m_cancelEvents, 0);
         THROW_HR_IF(E_ABORT, bytesRead == 0); // E_ABORT case after peek but before consume
         THROW_HR_IF_MSG(
             E_UNEXPECTED, static_cast<size_t>(bytesRead) != toConsume, "Short read consuming HTTP header: got %d, expected %zu", bytesRead, toConsume);

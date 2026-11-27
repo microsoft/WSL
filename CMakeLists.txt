@@ -107,13 +107,13 @@ FetchContent_MakeAvailable(boost_headers)
 
 # Import modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-find_package(IDL REQUIRED)
-find_package(LINUXBUILD REQUIRED)
-find_package(NUGET REQUIRED)
-find_package(VERSION REQUIRED)
-find_package(MC REQUIRED)
-find_package(Appx REQUIRED)
-find_package(CSharp REQUIRED)
+include(FindIDL)
+include(FindLINUXBUILD)
+include(findNuget)
+include(findVersion)
+include(FindMC)
+include(findAppx)
+include(FindCSharp)
 
 # Download nuget packages
 restore_nuget_packages()
@@ -165,7 +165,7 @@ set(WSLG_TS_PLUGIN_DLL "WSLDVCPlugin.dll")
 set(SUPPORTED_LANGS cs-CZ;da-DK;de-DE;en-GB;en-US;es-ES;fi-FI;fr-FR;hu-HU;it-IT;ja-JP;ko-KR;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ru-RU;sv-SE;tr-TR;zh-CN;zh-TW)
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
-    find_package(USER REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR})
+    include("${CMAKE_CURRENT_LIST_DIR}/UserConfig.cmake")
 endif()
 
 if (WSL_DEVICEHOST_BIN)
@@ -198,6 +198,17 @@ endif ()
 
 if (NOT WSL_UNITY_BATCH_SIZE MATCHES "^[0-9]+$")
     message(FATAL_ERROR "WSL_UNITY_BATCH_SIZE must be a non-negative integer: got '${WSL_UNITY_BATCH_SIZE}'")
+endif ()
+
+# Applies to every target created below. Targets that can't be unified opt out
+# individually with UNITY_BUILD OFF.
+# N.B. This is set after the FetchContent dependencies are made available so that
+# third party targets keep building file by file.
+if (WSL_UNITY_BATCH_SIZE GREATER 0)
+    set(CMAKE_UNITY_BUILD ON)
+    set(CMAKE_UNITY_BUILD_MODE BATCH)
+    set(CMAKE_UNITY_BUILD_BATCH_SIZE ${WSL_UNITY_BATCH_SIZE})
+    message(STATUS "Unity build enabled with a batch size of ${WSL_UNITY_BATCH_SIZE}")
 endif ()
 find_commit_hash(COMMIT_HASH)
 
@@ -339,6 +350,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Z7 -DDEBUG -DDBG")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /guard:cf /Qspectre")
 
 # Linker flags
+
+# Increase the committed stack size to 64KB (default is 4KB). This avoids crashing executables with stack overflows when the machine is under memory pressure.
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:1048576,65536")
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /debug:full /debugtype:cv,fixup /guard:cf /DYNAMICBASE")
 if (DEFINED SOURCELINK_JSON)
@@ -349,6 +363,14 @@ if (${TARGET_PLATFORM} STREQUAL "x64")
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /CETCOMPAT")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /CETCOMPAT")
 endif()
+
+# Release hybrid CRT: static-link the C++ runtime and STL (/MT from CMAKE_MSVC_RUNTIME_LIBRARY),
+# but dynamic-link the Universal CRT (ucrt.dll) which is an OS component on Windows 10+.
+# This eliminates the VCRUNTIME/MSVCP redistributable dependency while avoiding the size
+# cost of statically linking the UCRT. See https://aka.ms/hybridcrt for details.
+# Debug builds keep the full static CRT (/MTd) so they do not require ucrtbased.dll on the target machine.
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE}    /NODEFAULTLIB:libucrt.lib /defaultlib:ucrt.lib")
 
 # Common link libraries
 link_directories(${WSLDEPS_SOURCE_DIR}/lib/)
@@ -537,6 +559,11 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/service/inc/${TARGET
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/windows/wslinstaller/inc/${TARGET_PLATFORM}/${CMAKE_BUILD_TYPE})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/linux/init/inc)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common/wslc)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common/wslc/cli)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common/wslc/models)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common/wslc/services)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/common/wslc/settings)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/shared/configfile)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/localization)
 include_directories(${CMAKE_BINARY_DIR}/generated)

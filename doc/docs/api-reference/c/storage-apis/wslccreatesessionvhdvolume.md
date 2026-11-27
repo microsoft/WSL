@@ -12,7 +12,7 @@ STDAPI WslcCreateSessionVhdVolume(_In_ WslcSession session, _In_ const WslcVhdRe
 
 Return value: `HRESULT`.
 
-Header notes:
+
 
 - `WSLC_VHD_TYPE_FIXED` is only honored by `WslcCreateSessionVhdVolume`.
 - `uid` and `gid` are honored iff `flags & WSLC_VHD_REQ_FLAG_OWNER`.

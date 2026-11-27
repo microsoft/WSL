@@ -341,9 +341,14 @@ struct Topology
 {
     Processor Processor;
     Memory Memory;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_ONLY_SERIALIZE(Topology, Processor, Memory);
+    std::optional<wsl::shared::EmptyObject> Numa;
 };
+
+inline void to_json(nlohmann::json& j, const Topology& topology)
+{
+    j = nlohmann::json{{"Processor", topology.Processor}, {"Memory", topology.Memory}};
+    OMIT_IF_EMPTY(j, topology, Numa)
+}
 
 struct VirtioSerialPort
 {

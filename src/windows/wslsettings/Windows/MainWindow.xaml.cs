@@ -46,6 +46,11 @@ public sealed partial class MainWindow : WindowEx
     {
         if (App.OOBEWindow == null)
         {
+            if (Content is Views.Settings.ShellPage shellPage)
+            {
+                shellPage.ViewModel.UnregisterNavigationEvents();
+            }
+
             App.MainWindow = null;
             settings.ColorValuesChanged -= Settings_ColorValuesChanged;
         }

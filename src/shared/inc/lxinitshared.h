@@ -118,6 +118,7 @@ Abstract:
 #define LX_INIT_UTILITY_VM_PLAN9_DRVFS_ADMIN_PORT (50003)
 #define LX_INIT_UTILITY_VM_VIRTIOFS_PORT (50004)
 #define LX_INIT_UTILITY_VM_CRASH_DUMP_PORT (50005)
+#define LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT (50006)
 
 //
 // HvSocket buffer size for 9p connections.
@@ -131,7 +132,7 @@ Abstract:
 // Default buffer size for relaying.
 //
 
-#define LX_RELAY_BUFFER_SIZE 0x1000
+#define LX_RELAY_BUFFER_SIZE (65536)
 
 //
 // HVC terminal devices.
@@ -227,6 +228,7 @@ Abstract:
 //
 
 #define LX_INIT_PLAN9 "plan9"
+#define LX_INIT_PLAN9_BIND_ARG "--bind"
 #define LX_INIT_PLAN9_CONTROL_SOCKET_ARG "--control-socket"
 #define LX_INIT_PLAN9_SOCKET_PATH_ARG "--socket-path"
 #define LX_INIT_PLAN9_SERVER_FD_ARG "--server-fd"
@@ -249,6 +251,12 @@ Abstract:
 
 #define LX_INIT_WSLC_GPU_HOOK "wsl-gpu-hook"
 
+#define LX_INIT_WSLC_GPU_START_HOOK "wsl-gpu-start-hook"
+
+// Where init is copied inside GPU containers, so that the startContainer hook can run it.
+#define LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY "/.wslc-gpu-hook"
+#define LX_INIT_WSLC_GPU_START_HOOK_PATH LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY "/init"
+
 #define LX_WSLC_CDI_KIND "microsoft.com/wslc"
 #define LX_WSLC_GPU_CDI_DEVICE LX_WSLC_CDI_KIND "=gpu"
 
@@ -261,6 +269,8 @@ Abstract:
 #define LX_WSL2_GUI_APP_SUPPORT_ENV "WSL2_GUI_APPS_ENABLED"
 #define LX_WSL2_KERNEL_MODULES_MOUNT_ENV "WSL2_KERNEL_MODULES_MOUNT"
 #define LX_WSL2_KERNEL_MODULES_PATH_ENV "WSL2_KERNEL_MODULES_PATH"
+#define LX_WSL2_KERNEL_HEADERS_MOUNT_ENV "WSL2_KERNEL_HEADERS_MOUNT"
+#define LX_WSL2_KERNEL_HEADERS_PATH_ENV "WSL2_KERNEL_HEADERS_PATH"
 #define LX_WSL2_SYSTEM_DISTRO_SHARE_ENV "WSL2_SYSTEM_DISTRO_SHARE"
 #define LX_WSL2_GPU_SHARE_ENV "WSL2_GPU_SHARE_ENV_"
 #define LX_WSL2_SHARED_MEMORY_OB_DIRECTORY "WSL2_SHARED_MEMORY_OB_DIRECTORY"
@@ -273,7 +283,7 @@ Abstract:
 #define LX_WSL2_DISTRO_READ_ONLY_ENV "WSL_DISTRO_READ_ONLY"
 #define LX_WSL2_NETWORKING_MODE_ENV "WSL2_NETWORKING_MODE"
 #define LX_WSL2_DISTRO_INIT_PID "WSL2_DISTRO_INIT_PID"
-#define LX_WSL2_DISTRO_CGROUP_PATH "WSL2_DISTRO_CGROUP_PATH"
+#define LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD "WSL2_DISTRO_CGROUP_NAMESPACE_FD"
 
 //
 // Command line arguments shared between init & mini_init
@@ -418,6 +428,8 @@ typedef enum _LX_MESSAGE_TYPE
     LxMiniInitMessageTrimDistribution,
     LxMiniInitMessageTrimDistributionResponse,
     LxMessageWSLCMountModules,
+    LxMessageWSLCReadFile,
+    LxMessageWSLCReadFileResult,
 } LX_MESSAGE_TYPE,
     *PLX_MESSAGE_TYPE;
 
@@ -537,6 +549,8 @@ inline auto ToString(LX_MESSAGE_TYPE messageType)
         X(LxMiniInitMessageTrimDistribution)
         X(LxMiniInitMessageTrimDistributionResponse)
         X(LxMessageWSLCMountModules)
+        X(LxMessageWSLCReadFile)
+        X(LxMessageWSLCReadFileResult)
 
     default:
         return "<unexpected LX_MESSAGE_TYPE>";
@@ -672,23 +686,47 @@ typedef struct _LX_PROCESS_CRASH
 
 } LX_PROCESS_CRASH, *PLX_PROCESS_CRASH;
 
-typedef struct _LX_INIT_CREATE_PROCESS_COMMON
+template <LX_MESSAGE_TYPE MessageType>
+struct LX_INIT_CREATE_PROCESS_BASE;
+
+template <>
+struct LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcess>
 {
+    MESSAGE_HEADER Header;
     unsigned int FilenameOffset;
     unsigned int CurrentWorkingDirectoryOffset;
     unsigned int CommandLineOffset;
-    unsigned short CommandLineCount;
     unsigned int EnvironmentOffset;
-    unsigned short EnvironmentCount;
     unsigned int NtEnvironmentOffset;
-    unsigned short NtEnvironmentCount;
     unsigned int NtPathOffset;
     unsigned int ShellOptions;
     unsigned int UsernameOffset;
     unsigned int DefaultUid;
     int Flags;
-    char Buffer[];
-} LX_INIT_CREATE_PROCESS_COMMON, *PLX_INIT_CREATE_PROCESS_COMMON;
+    int64_t IpcServerId;
+    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
+    int64_t ForkTokenId;
+    char Buffer[1];
+};
+
+template <>
+struct LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcessUtilityVm>
+{
+    MESSAGE_HEADER Header;
+    unsigned int FilenameOffset;
+    unsigned int CurrentWorkingDirectoryOffset;
+    unsigned int CommandLineOffset;
+    unsigned int EnvironmentOffset;
+    unsigned int NtEnvironmentOffset;
+    unsigned int NtPathOffset;
+    unsigned int ShellOptions;
+    unsigned int UsernameOffset;
+    unsigned int DefaultUid;
+    int Flags;
+    unsigned short Rows;
+    unsigned short Columns;
+    char Buffer[1];
+};
 
 typedef struct _LX_INIT_CREATE_PROCESS_RESPONSE
 {
@@ -702,23 +740,23 @@ typedef struct _LX_INIT_CREATE_PROCESS_RESPONSE
     PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(SignalPipeId), FIELD(Flags));
 } LX_INIT_CREATE_PROCESS_RESPONSE, *PLX_INIT_CREATE_PROCESS_RESPONSE;
 
-typedef struct _LX_INIT_CREATE_PROCESS
+struct LX_INIT_CREATE_PROCESS : LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcess>
 {
+    using Base = LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcess>;
     static inline auto Type = LxInitMessageCreateProcess;
     using TResponse = _LX_INIT_CREATE_PROCESS_RESPONSE;
-
-    MESSAGE_HEADER Header;
-    int64_t IpcServerId;
-    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
-    int64_t ForkTokenId;
-    LX_INIT_CREATE_PROCESS_COMMON Common;
+    using Base::ForkTokenId;
+    using Base::Header;
+    using Base::IpcServerId;
+    using Base::StdFdIds;
 
     PRETTY_PRINT(FIELD(Header), FIELD(IpcServerId), FIELD(StdFdIds), FIELD(ForkTokenId));
-} LX_INIT_CREATE_PROCESS, *PLX_INIT_CREATE_PROCESS;
+};
+
+using PLX_INIT_CREATE_PROCESS = LX_INIT_CREATE_PROCESS*;
 
 typedef struct _LX_INIT_CREATE_NT_PROCESS_COMMON
 {
-    int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
     unsigned int FilenameOffset;
     unsigned int CurrentWorkingDirectoryOffset;
     unsigned int CommandLineOffset;
@@ -728,9 +766,6 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS_COMMON
     unsigned short Columns;
     bool CreatePseudoconsole;
     char Buffer[];
-
-    // Not pretty-printing command line and env since it could contain PII.
-    PRETTY_PRINT(FIELD(StdFdIds), STRING_FIELD(FilenameOffset), STRING_FIELD(CurrentWorkingDirectoryOffset), FIELD(Rows), FIELD(Columns), FIELD(CreatePseudoconsole));
 } LX_INIT_CREATE_NT_PROCESS_COMMON, *PLX_INIT_CREATE_NT_PROCESS_COMMON;
 
 using PCLX_INIT_CREATE_NT_PROCESS_COMMON = const LX_INIT_CREATE_NT_PROCESS_COMMON*;
@@ -743,7 +778,15 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS
     int64_t StdFdIds[LX_INIT_STD_FD_COUNT];
     LX_INIT_CREATE_NT_PROCESS_COMMON Common;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(StdFdIds), FIELD(Common));
+    // Not pretty-printing command line and env since it could contain PII.
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(StdFdIds),
+        STRING_FIELD(Common.FilenameOffset),
+        STRING_FIELD(Common.CurrentWorkingDirectoryOffset),
+        FIELD(Common.Rows),
+        FIELD(Common.Columns),
+        FIELD(Common.CreatePseudoconsole));
 
 } LX_INIT_CREATE_NT_PROCESS, *PLX_INIT_CREATE_NT_PROCESS;
 
@@ -757,7 +800,16 @@ typedef struct _LX_INIT_CREATE_NT_PROCESS_UTILITY_VM
     unsigned int Port;
     LX_INIT_CREATE_NT_PROCESS_COMMON Common;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Port), FIELD(Common));
+    // Not pretty-printing command line and env since it could contain PII.
+    PRETTY_PRINT(
+        FIELD(Header),
+        FIELD(Port),
+        STRING_FIELD(Common.FilenameOffset),
+        STRING_FIELD(Common.CurrentWorkingDirectoryOffset),
+        FIELD(Common.Rows),
+        FIELD(Common.Columns),
+        FIELD(Common.CreatePseudoconsole));
+
 } LX_INIT_CREATE_NT_PROCESS_UTILITY_VM, *PLX_INIT_CREATE_NT_PROCESS_UTILITY_VM;
 
 using PCLX_INIT_CREATE_NT_PROCESS_UTILITY_VM = const LX_INIT_CREATE_NT_PROCESS_UTILITY_VM*;
@@ -1064,19 +1116,19 @@ typedef enum _LX_INIT_CREATE_PROCESS_FLAGS
 } LX_INIT_CREATE_PROCESS_FLAGS,
     *PLX_INIT_CREATE_PROCESS_FLAGS;
 
-typedef struct _LX_INIT_CREATE_PROCESS_UTILITY_VM
+struct LX_INIT_CREATE_PROCESS_UTILITY_VM : LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcessUtilityVm>
 {
+    using Base = LX_INIT_CREATE_PROCESS_BASE<LxInitMessageCreateProcessUtilityVm>;
     static inline auto Type = LxInitMessageCreateProcessUtilityVm;
     using TResponse = RESULT_MESSAGE<uint32_t>;
-
-    MESSAGE_HEADER Header;
-    unsigned short Rows;
-    unsigned short Columns;
-    LX_INIT_CREATE_PROCESS_COMMON Common;
+    using Base::Columns;
+    using Base::Header;
+    using Base::Rows;
 
     PRETTY_PRINT(FIELD(Header), FIELD(Rows), FIELD(Columns));
-} LX_INIT_CREATE_PROCESS_UTILITY_VM, *PLX_INIT_CREATE_PROCESS_UTILITY_VM;
+};
 
+using PLX_INIT_CREATE_PROCESS_UTILITY_VM = LX_INIT_CREATE_PROCESS_UTILITY_VM*;
 using PCLX_INIT_CREATE_PROCESS_UTILITY_VM = const LX_INIT_CREATE_PROCESS_UTILITY_VM*;
 
 //
@@ -1244,6 +1296,7 @@ typedef struct _LX_MINI_INIT_MESSAGE
     unsigned int UserProfileOffset;
     unsigned int Flags;
     unsigned int ConnectPort;
+    GUID InstanceId;
     char Buffer[];
 
     PRETTY_PRINT(
@@ -1257,7 +1310,8 @@ typedef struct _LX_MINI_INIT_MESSAGE
         STRING_FIELD(InstallPathOffset),
         STRING_FIELD(UserProfileOffset),
         FIELD(Flags),
-        FIELD(ConnectPort));
+        FIELD(ConnectPort),
+        FIELD(InstanceId));
 
 } LX_MINI_INIT_MESSAGE, *PLX_MINI_INIT_MESSAGE;
 
@@ -1457,11 +1511,12 @@ typedef struct _LX_INIT_GUEST_CAPABILITIES
 
     MESSAGE_HEADER Header;
     bool SeccompAvailable;
+    bool Ipv6Available;
     uint64_t HvPciSwiotlbBase;
     uint64_t HvPciSwiotlbSize;
     char Buffer[]; // Contains the kernel version string
 
-    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(SeccompAvailable), FIELD(Ipv6Available), FIELD(HvPciSwiotlbBase), FIELD(HvPciSwiotlbSize), BUFFER_FIELD(Buffer));
 } LX_INIT_GUEST_CAPABILITIES, *PLX_INIT_GUEST_CAPABILITIES;
 
 typedef struct _LX_MINI_INIT_WAIT_FOR_PMEM_DEVICE_MESSAGE
@@ -1481,8 +1536,9 @@ typedef struct _LX_MINI_INIT_CHILD_EXIT_MESSAGE
 
     MESSAGE_HEADER Header;
     unsigned int ChildPid;
+    GUID InstanceId;
 
-    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid));
+    PRETTY_PRINT(FIELD(Header), FIELD(ChildPid), FIELD(InstanceId));
 } LX_MINI_INIT_CHILD_EXIT_MESSAGE, *PLX_MINI_INIT_CHILD_EXIT_MESSAGE;
 
 typedef struct _LX_MINI_INIT_MOUNT_FOLDER_MESSAGE
@@ -1545,11 +1601,12 @@ struct CREATE_PROCESS_MESSAGE
     static inline auto Type = LxInitCreateProcess;
 
     MESSAGE_HEADER Header;
+    uint64_t PluginId;
     unsigned int PathIndex;
     unsigned int CommandLineIndex;
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), STRING_FIELD(CommandLineIndex));
+    PRETTY_PRINT(FIELD(Header), FIELD(PluginId), STRING_FIELD(PathIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 
 struct EJECT_VHD_MESSAGE
@@ -1607,7 +1664,7 @@ struct WSLC_GET_DISK_RESULT
     unsigned int Result{};
     char Buffer[];
 
-    PRETTY_PRINT(FIELD(Header), FIELD(Result), FIELD(Buffer));
+    PRETTY_PRINT(FIELD(Header), FIELD(Result), BUFFER_FIELD(Buffer));
 };
 
 struct WSLC_GET_DISK
@@ -1735,13 +1792,7 @@ struct WSLC_EXEC
 
     char Buffer[];
 
-    PRETTY_PRINT(
-        FIELD(Header),
-        STRING_FIELD(ExecutableIndex),
-        STRING_FIELD(CurrentDirectoryIndex),
-        FIELD(FdIndex),
-        STRING_ARRAY_FIELD(CommandLineIndex),
-        STRING_ARRAY_FIELD(EnvironmentIndex));
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(ExecutableIndex), STRING_FIELD(CurrentDirectoryIndex), FIELD(FdIndex), STRING_ARRAY_FIELD(CommandLineIndex));
 };
 struct WSLC_FORK_RESULT
 {
@@ -1967,6 +2018,18 @@ struct WSLC_GET_GUEST_CAPABILITIES
     PRETTY_PRINT(FIELD(Header));
 };
 
+typedef enum _WSLC_WRITE_FILE_FLAGS
+{
+    WSLCWriteFileFlagsNone = 0,
+
+    // Write to <path>.tmp, then rename it over <path> so readers see either the old or the new content.
+    // The file and its directory are flushed to disk before the write completes.
+    WSLCWriteFileFlagsAtomic = 0x1,
+
+    // Fail with ENOENT instead of creating missing parent directories.
+    WSLCWriteFileFlagsNoCreateParents = 0x2,
+} WSLC_WRITE_FILE_FLAGS;
+
 struct WSLC_WRITE_FILE
 {
     static inline auto Type = LxMessageWSLCWriteFile;
@@ -1979,10 +2042,40 @@ struct WSLC_WRITE_FILE
     unsigned int ContentLength;
     int OpenFlags;
     int Permissions;
+    unsigned int Flags;
     char Buffer[];
 
     // Buffer content excluded from PRETTY_PRINT so callers can pass sensitive payloads.
-    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions));
+    PRETTY_PRINT(FIELD(Header), FIELD(OpenFlags), FIELD(Permissions), FIELD(Flags));
+};
+
+struct WSLC_READ_FILE_RESULT
+{
+    static inline auto Type = LxMessageWSLCReadFileResult;
+
+    DECLARE_MESSAGE_CTOR(WSLC_READ_FILE_RESULT);
+    MESSAGE_HEADER Header;
+    int Result{};
+    unsigned int ContentIndex{};
+    char Buffer[];
+
+    // Buffer content excluded from PRETTY_PRINT so files can hold sensitive payloads.
+    PRETTY_PRINT(FIELD(Header), FIELD(Result));
+};
+
+// Reads a regular file. Fails with EFBIG if the file is larger than MaxSize.
+struct WSLC_READ_FILE
+{
+    static inline auto Type = LxMessageWSLCReadFile;
+    using TResponse = WSLC_READ_FILE_RESULT;
+
+    DECLARE_MESSAGE_CTOR(WSLC_READ_FILE);
+    MESSAGE_HEADER Header;
+    unsigned int PathIndex;
+    unsigned int MaxSize;
+    char Buffer[];
+
+    PRETTY_PRINT(FIELD(Header), STRING_FIELD(PathIndex), FIELD(MaxSize));
 };
 
 typedef struct _LX_MINI_INIT_IMPORT_RESULT

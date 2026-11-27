@@ -28,6 +28,8 @@ Abstract:
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <sys/signalfd.h>
+#include <sys/sendfile.h>
+#include <sys/statvfs.h>
 #include <arpa/inet.h>
 
 #include <pty.h>
@@ -78,6 +80,14 @@ try
     dxg.path = "/dev/dxg";
     dxg.permissions = "rwm";
 
+    wsl::shared::cdi::DeviceNode drmCard{};
+    drmCard.path = "/dev/dri/card0";
+    drmCard.permissions = "rwm";
+
+    wsl::shared::cdi::DeviceNode drmRender{};
+    drmRender.path = "/dev/dri/renderD128";
+    drmRender.permissions = "rwm";
+
     wsl::shared::cdi::Mount libs{};
     libs.hostPath = LXSS_LIB_PATH;
     libs.containerPath = LXSS_LIB_PATH;
@@ -88,17 +98,27 @@ try
     drivers.containerPath = LXSS_GPU_DRIVERS_PATH;
     drivers.options = {"ro", "rbind"};
 
+    // Mount setup needs createContainer privileges. Image-provided ldconfig must instead run from
+    // startContainer, after the container's restrictions are installed.
     wsl::shared::cdi::Hook hook{};
     hook.hookName = "createContainer";
     hook.path = "/" LX_INIT_WSLC_GPU_HOOK;
     hook.args = {LX_INIT_WSLC_GPU_HOOK};
 
+    wsl::shared::cdi::Hook startHook{};
+    startHook.hookName = "startContainer";
+    startHook.path = LX_INIT_WSLC_GPU_START_HOOK_PATH;
+    startHook.args = {LX_INIT_WSLC_GPU_START_HOOK};
+
     wsl::shared::cdi::Device gpu{};
     gpu.name = "gpu";
     gpu.containerEdits.deviceNodes.push_back(std::move(dxg));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmCard));
+    gpu.containerEdits.deviceNodes.push_back(std::move(drmRender));
     gpu.containerEdits.mounts.push_back(std::move(libs));
     gpu.containerEdits.mounts.push_back(std::move(drivers));
     gpu.containerEdits.hooks.push_back(std::move(hook));
+    gpu.containerEdits.hooks.push_back(std::move(startHook));
 
     wsl::shared::cdi::Spec spec{};
     spec.cdiVersion = "0.6.0";
@@ -126,6 +146,128 @@ try
 }
 CATCH_LOG()
 
+// Container policy may suppress setuid; skip cache generation rather than bypassing that policy.
+// Resolve the image's ldconfig only after entering the container's root.
+bool ShouldImageLdconfigRebuildCache(uid_t ContainerUid, bool ReadOnlyRoot)
+{
+    return ContainerUid == 0 && !ReadOnlyRoot && std::filesystem::is_regular_file(LDCONFIG_COMMAND) && access(LDCONFIG_COMMAND, X_OK) == 0;
+}
+
+bool IsRootReadOnly()
+{
+    struct statvfs rootInfo{};
+    THROW_LAST_ERROR_IF(statvfs("/", &rootInfo) < 0);
+    return (rootInfo.f_flag & ST_RDONLY) != 0;
+}
+
+bool HasGpuLibraryDirectory(std::string_view Paths)
+{
+    // musl separates entries with ':' or '\n'. Compare whole entries, not similarly named directories.
+    while (!Paths.empty())
+    {
+        const auto separator = Paths.find_first_of(":\n");
+        const auto directory = Paths.substr(0, separator);
+        if (directory == LXSS_LIB_PATH)
+        {
+            return true;
+        }
+        if (separator == std::string_view::npos)
+        {
+            return false;
+        }
+
+        Paths.remove_prefix(separator + 1);
+    }
+
+    return false;
+}
+
+// musl ignores the glibc cache; its loader reads library directories from an architecture-specific .path file.
+void ConfigureMuslLibraryPath()
+{
+    constexpr auto c_defaultMuslLibraryPaths = "/lib\n/usr/local/lib\n/usr/lib\n";
+    constexpr auto c_architecture = wsl::shared::Arm64 ? "aarch64" : "x86_64";
+
+    const auto muslLoader = std::format("/lib/ld-musl-{}.so.1", c_architecture);
+    if (!std::filesystem::exists(muslLoader))
+    {
+        return;
+    }
+
+    const auto pathFile = std::format("/etc/ld-musl-{}.path", c_architecture);
+    const bool pathFileExists = std::filesystem::exists(pathFile);
+    wil::unique_fd file{open(pathFile.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)};
+    THROW_LAST_ERROR_IF(!file);
+
+    std::string pathsToAppend;
+    if (pathFileExists)
+    {
+        const auto existingPaths = UtilReadFileContent(pathFile);
+
+        // Docker can recreate the runtime task on restart; don't append the same directory each time.
+        if (HasGpuLibraryDirectory(existingPaths))
+        {
+            return;
+        }
+
+        // O_APPEND doesn't insert a separator; without one, the GPU directory would join the last existing path.
+        if (!existingPaths.empty() && existingPaths.back() != '\n' && existingPaths.back() != ':')
+        {
+            pathsToAppend = "\n";
+        }
+    }
+    else
+    {
+        // Without a .path file, musl searches its built-in defaults. With one, it uses the file's contents instead.
+        // Include the defaults so creating the file for GPU discovery doesn't hide normal system libraries.
+        pathsToAppend = c_defaultMuslLibraryPaths;
+    }
+
+    pathsToAppend += LXSS_LIB_PATH "\n";
+    THROW_LAST_ERROR_IF(UtilWriteStringView(file.get(), pathsToAppend) < 0);
+}
+
+[[noreturn]] void ExecImageLdconfig()
+{
+    // Shell-based ldconfig wrappers otherwise drop the setuid helper's effective root identity.
+    THROW_LAST_ERROR_IF(setresuid(0, 0, 0) < 0);
+
+    // Alpine's ldconfig exits with 1 when no folders are given.
+    const char* const arguments[] = {LDCONFIG_COMMAND, LXSS_LIB_PATH, nullptr};
+    execv(LDCONFIG_COMMAND, const_cast<char* const*>(arguments));
+    THROW_LAST_ERROR();
+}
+
+// Start hooks cannot unmount a bind-mounted helper. A copy in tmpfs can unlink itself before running image code,
+// without leaving a reusable setuid executable in the container's filesystem.
+void CopyInitForStartHook(int Init, gid_t ContainerGid)
+{
+    // Root ownership permits cleanup even without CAP_DAC_OVERRIDE. Group write/search lets the container user
+    // remove the helper when no_new_privs prevents elevation.
+    constexpr mode_t c_directoryMode = S_IRWXU | S_IWGRP | S_IXGRP;
+    constexpr mode_t c_executableMode = S_IRUSR | S_IXUSR;
+    THROW_LAST_ERROR_IF(mkdir(LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, c_directoryMode) < 0 && errno != EEXIST);
+
+    const auto options = std::format("mode={:#o},uid=0,gid={}", c_directoryMode, ContainerGid);
+    THROW_LAST_ERROR_IF(mount("tmpfs", LX_INIT_WSLC_GPU_START_HOOK_DIRECTORY, "tmpfs", MS_NODEV, options.c_str()) < 0);
+
+    wil::unique_fd copy{open(LX_INIT_WSLC_GPU_START_HOOK_PATH, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, c_executableMode)};
+    THROW_LAST_ERROR_IF(!copy);
+
+    ssize_t bytesCopied{};
+    do
+    {
+        bytesCopied = sendfile(copy.get(), Init, nullptr, 1024 * 1024);
+        THROW_LAST_ERROR_IF(bytesCopied < 0);
+    } while (bytesCopied > 0);
+
+    // Elevate only this VM-supplied copy so non-root workloads can rebuild the image's cache.
+    // Apply the mode after chown, which can clear the setuid bit.
+    THROW_LAST_ERROR_IF(fchown(copy.get(), 0, 0) < 0);
+    THROW_LAST_ERROR_IF(fchmod(copy.get(), S_ISUID | c_executableMode | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0);
+}
+
+// createContainer hook. Runs as root before the container's restrictions apply, so it must not run image code.
 int WslcGpuHookEntry()
 try
 {
@@ -146,14 +288,22 @@ try
     rootfsPath = std::filesystem::canonical(rootfsPath);
     THROW_ERRNO_IF(EINVAL, rootfsPath == "/");
 
-    THROW_LAST_ERROR_IF(chroot(rootfsPath.c_str()) < 0);
+    // runc applies the container's user after this hook, so read it from the spec.
+    const gid_t containerGid = spec.at("process").at("user").at("gid").get<gid_t>();
+
+    // Capture the trusted VM binary before chroot makes /init refer to image-controlled content.
+    wil::unique_fd vmInit{open(LX_INIT_PATH, O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!vmInit);
+
+    // chroot alone would leave the working directory outside the new root.
+    THROW_LAST_ERROR_IF(chdir(rootfsPath.c_str()) < 0);
+    THROW_LAST_ERROR_IF(chroot(".") < 0);
+
+    CopyInitForStartHook(vmInit.get(), containerGid);
 
     THROW_LAST_ERROR_IF(UtilMkdirPath("/etc/ld.so.conf.d", 0755) < 0);
     THROW_LAST_ERROR_IF(WriteToFile("/etc/ld.so.conf.d/ld.wsl.conf", LXSS_LIB_PATH "\n", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC) < 0);
-
-    // Run the container's own ldconfig so it updates /etc/ld.so.cache.
-    const char* const ldArgv[] = {LDCONFIG_COMMAND, nullptr};
-    THROW_LAST_ERROR_IF(UtilCreateProcessAndWait(ldArgv[0], ldArgv) < 0);
+    ConfigureMuslLibraryPath();
 
     constexpr auto c_binPath = "/usr/bin";
     if (std::filesystem::is_directory(LXSS_LIB_PATH))
@@ -172,6 +322,22 @@ try
                 LOG_ERROR("UtilMountFile({}, {}) failed {}", entry.path().c_str(), target, errno);
             }
         }
+    }
+
+    return 0;
+}
+CATCH_RETURN_ERRNO()
+
+// startContainer hook. Setuid elevates to container root unless prohibited by the container's restrictions.
+int WslcGpuStartHookEntry()
+try
+{
+    // Image code must not inherit access to a reusable root helper, so failed cleanup must prevent ldconfig execution.
+    THROW_LAST_ERROR_IF(unlink(LX_INIT_WSLC_GPU_START_HOOK_PATH) < 0);
+
+    if (ShouldImageLdconfigRebuildCache(geteuid(), IsRootReadOnly()))
+    {
+        ExecImageLdconfig();
     }
 
     return 0;
@@ -587,6 +753,8 @@ void HandleMessageImpl(
                 if (Message.ForkType == WSLC_FORK::Process || Message.ForkType == WSLC_FORK::Pty)
                 {
                     Channel.Close();
+
+                    THROW_LAST_ERROR_IF(UtilClearSignalMask() < 0);
                 }
 
                 if (Message.ForkType == WSLC_FORK::Thread)
@@ -645,10 +813,6 @@ void HandleMessageImpl(
 
             if (result == 0) // Child
             {
-                sigset_t SignalMask;
-                sigemptyset(&SignalMask);
-                THROW_LAST_ERROR_IF(sigprocmask(SIG_SETMASK, &SignalMask, nullptr) < 0);
-
                 try
                 {
                     childLogic();
@@ -801,7 +965,13 @@ void HandleMountMessage(
 
             // Start the memory reduction thread now that procfs is in its final location.
             static std::once_flag memoryReductionFlag;
-            std::call_once(memoryReductionFlag, [] { StartMemoryReductionThread(LxMiniInitMemoryReclaimModeDropCache); });
+            std::call_once(memoryReductionFlag, [] {
+                try
+                {
+                    std::thread([] { RunMemoryReduction(LxMiniInitMemoryReclaimModeDropCache); }).detach();
+                }
+                CATCH_LOG()
+            });
         }
 
         response.Result = 0;
@@ -921,6 +1091,56 @@ void HandleMessageImpl(wsl::shared::SocketChannel& Channel, wsl::shared::Transac
     Transaction.SendResultMessage<int32_t>(result);
 }
 
+int WriteFileAtomic(const std::filesystem::path& Path, const gsl::span<gsl::byte>& Content, int Permissions)
+{
+    // Every step goes through the same directory fd so the staging file and the rename target can't diverge.
+    wil::unique_fd directory{open(Path.parent_path().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
+    if (!directory)
+    {
+        return errno;
+    }
+
+    const auto name = Path.filename();
+    auto tmpName = name;
+    tmpName += ".tmp";
+
+    // Always stage into a freshly created regular file. Opening a leftover FIFO or device would block or have side effects.
+    if (unlinkat(directory.get(), tmpName.c_str(), 0) < 0 && errno != ENOENT)
+    {
+        return errno;
+    }
+
+    wil::unique_fd fd{openat(directory.get(), tmpName.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, Permissions)};
+    if (!fd)
+    {
+        return errno;
+    }
+
+    auto removeTmp = wil::scope_exit([&]() { unlinkat(directory.get(), tmpName.c_str(), 0); });
+
+    if (UtilWriteBuffer(fd.get(), Content) != static_cast<ssize_t>(Content.size()) || fsync(fd.get()) < 0)
+    {
+        return errno;
+    }
+
+    fd.reset();
+
+    if (renameat(directory.get(), tmpName.c_str(), directory.get(), name.c_str()) < 0)
+    {
+        return errno;
+    }
+
+    removeTmp.release();
+
+    // The rename is only durable once the directory entry is flushed.
+    if (fsync(directory.get()) < 0)
+    {
+        return errno;
+    }
+
+    return 0;
+}
+
 void HandleMessageImpl(
     wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_WRITE_FILE& Message, const gsl::span<gsl::byte>& Buffer)
 {
@@ -934,25 +1154,109 @@ void HandleMessageImpl(
     const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
     const auto content = Buffer.subspan(Message.ContentIndex, Message.ContentLength);
 
+    if (WI_IsFlagClear(Message.Flags, WSLCWriteFileFlagsNoCreateParents) && UtilMkdirPath(path, 0755, true) < 0)
+    {
+        Transaction.SendResultMessage<int32_t>(errno);
+        return;
+    }
+
+    // Atomic writes always create or replace the target, so OpenFlags does not apply.
+    if (WI_IsFlagSet(Message.Flags, WSLCWriteFileFlagsAtomic))
+    {
+        Transaction.SendResultMessage<int32_t>(WriteFileAtomic(path, content, Message.Permissions));
+        return;
+    }
+
     int result = 0;
-    if (UtilMkdirPath(path, 0755, true) < 0)
+    wil::unique_fd fd{open(path, Message.OpenFlags, Message.Permissions)};
+    if (!fd)
     {
         result = errno;
     }
-    else
+    else if (UtilWriteBuffer(fd.get(), content) != static_cast<ssize_t>(content.size()))
     {
-        wil::unique_fd fd{open(path, Message.OpenFlags, Message.Permissions)};
-        if (!fd)
-        {
-            result = errno;
-        }
-        else if (UtilWriteBuffer(fd.get(), content) != static_cast<ssize_t>(content.size()))
-        {
-            result = errno;
-        }
+        result = errno;
     }
 
     Transaction.SendResultMessage<int32_t>(result);
+}
+
+int ReadFileWithLimit(const char* Path, size_t MaxSize, std::string& Content)
+{
+    // O_NONBLOCK keeps a FIFO from blocking the open so the regular-file check below can reject it.
+    wil::unique_fd fd{open(Path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)};
+    if (!fd)
+    {
+        return errno;
+    }
+
+    struct stat status{};
+    if (fstat(fd.get(), &status) < 0)
+    {
+        return errno;
+    }
+
+    if (!S_ISREG(status.st_mode))
+    {
+        return EINVAL;
+    }
+
+    if (static_cast<size_t>(status.st_size) > MaxSize)
+    {
+        return EFBIG;
+    }
+
+    // Read one byte past MaxSize so a file that grew after fstat is still rejected.
+    Content.resize(MaxSize + 1);
+    size_t offset = 0;
+    while (offset < Content.size())
+    {
+        const auto bytesRead = TEMP_FAILURE_RETRY(read(fd.get(), Content.data() + offset, Content.size() - offset));
+        if (bytesRead < 0)
+        {
+            return errno;
+        }
+
+        if (bytesRead == 0)
+        {
+            break;
+        }
+
+        offset += bytesRead;
+    }
+
+    if (offset > MaxSize)
+    {
+        return EFBIG;
+    }
+
+    Content.resize(offset);
+    return 0;
+}
+
+void HandleMessageImpl(
+    wsl::shared::SocketChannel& Channel, wsl::shared::Transaction& Transaction, const WSLC_READ_FILE& Message, const gsl::span<gsl::byte>& Buffer)
+{
+    wsl::shared::MessageWriter<WSLC_READ_FILE_RESULT> writer;
+
+    try
+    {
+        const auto* path = wsl::shared::string::FromSpan(Buffer, Message.PathIndex);
+
+        std::string content;
+        writer->Result = ReadFileWithLimit(path, Message.MaxSize, content);
+        if (writer->Result == 0)
+        {
+            auto output = writer.InsertBuffer(writer->ContentIndex, content.size());
+            gsl::copy(gsl::as_bytes(gsl::make_span(content)), output);
+        }
+    }
+    catch (...)
+    {
+        writer->Result = wil::ResultFromCaughtException();
+    }
+
+    Transaction.Send<WSLC_READ_FILE::TResponse>(writer.Span());
 }
 
 void HandleMessageImpl(
@@ -1104,7 +1408,7 @@ void ProcessMessage(wsl::shared::SocketChannel& Channel, wsl::shared::Transactio
 {
     try
     {
-        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE>(
+        HandleMessage<WSLC_GET_DISK, WSLC_MOUNT, WSLC_MOUNT_VIRTIOFS, WSLC_MOUNT_MODULES, WSLC_EXEC, WSLC_FORK, WSLC_CONNECT, WSLC_SIGNAL, WSLC_TTY_RELAY, WSLC_PORT_RELAY, WSLC_UNMOUNT, WSLC_DETACH, WSLC_ACCEPT, WSLC_WATCH_PROCESSES, WSLC_UNIX_CONNECT, WSLC_GET_GUEST_CAPABILITIES, WSLC_LISTDIR, WSLC_WRITE_FILE, WSLC_READ_FILE>(
             Channel, Transaction, Type, Buffer);
     }
     catch (...)

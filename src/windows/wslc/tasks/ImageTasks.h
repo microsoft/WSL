@@ -18,8 +18,8 @@ using wsl::windows::wslc::execution::CLIExecutionContext;
 
 namespace wsl::windows::wslc::task {
 void BuildImage(CLIExecutionContext& context);
+void FormatImageOutput(CLIExecutionContext& context);
 void GetImages(CLIExecutionContext& context);
-void ListImages(CLIExecutionContext& context);
 void LoadImage(CLIExecutionContext& context);
 void ImportImage(CLIExecutionContext& context);
 void PullImage(CLIExecutionContext& context);

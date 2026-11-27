@@ -50,6 +50,9 @@ std::atomic<bool> g_leakedProcessDied = false;
 
 std::optional<uint32_t> g_previousInitPid;
 
+// Set by the WslcContainerStoppingDuringTerminate test once the terminating session announces the VM stop.
+wil::unique_event g_terminateVmStopping{wil::EventOptions::ManualReset};
+
 std::vector<char> ReadFromSocket(SOCKET socket)
 {
     // Simplified error handling for the sake of the demo.
@@ -131,7 +134,12 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
         RETURN_IF_FAILED(
             g_api->MountFolder(Session->SessionId, mountSource.c_str(), L"/test-plugin-access", false, L"test-plugin-access"));
 
-        std::vector<const char*> arguments = {"/bin/sh", "-c", "{ echo test > /test-plugin-access/plugin-test.txt; } 2>&1", nullptr};
+        std::vector<const char*> arguments = {
+            "/bin/sh",
+            "-c",
+            "{ echo allowed > /test-plugin-access/allowed/plugin-allowed.txt; echo denied > /test-plugin-access/plugin-test.txt; "
+            "} 2>&1",
+            nullptr};
         wil::unique_socket socket;
         RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, arguments[0], arguments.data(), &socket));
 
@@ -215,6 +223,16 @@ HRESULT OnVmStarted(const WSLSessionInformation* Session, const WSLVmCreationSet
         }
 
         return S_OK;
+    }
+    else if (g_testType == PluginTestType::CgroupIsolation)
+    {
+        const auto moduleName = std::filesystem::path(wil::GetModuleFileNameW(wil::GetModuleInstanceHandle()).get()).filename().string();
+        const char* arguments[] = {moduleName.c_str(), "3600", nullptr};
+        for (int processIndex = 0; processIndex < 2; ++processIndex)
+        {
+            wil::unique_socket socket;
+            RETURN_IF_FAILED(g_api->ExecuteBinary(Session->SessionId, "/bin/sleep", arguments, &socket));
+        }
     }
 
     return S_OK;
@@ -316,6 +334,19 @@ HRESULT OnDistroStarted(const WSLSessionInformation* Session, const WSLDistribut
         const GUID guid{};
         g_logfile << "Invalid distro launch returned:  "
                   << g_api->ExecuteBinaryInDistribution(Session->SessionId, &guid, arguments[0], arguments.data(), &socket) << std::endl;
+
+        // Verify that plugin-launched processes do not inherit init's ignored SIGTERM disposition.
+        arguments = {"/bin/sh", "-c", "printf 'ready\\n'; kill -TERM $$; printf 'survived\\n'", nullptr};
+        socket.reset();
+        RETURN_IF_FAILED(g_api->ExecuteBinaryInDistribution(Session->SessionId, &Distribution->Id, arguments[0], arguments.data(), &socket));
+        output = ReadFromSocket(socket.get());
+        if (std::string(output.begin(), output.end()) != "ready\n")
+        {
+            g_logfile << "Unexpected output after SIGTERM: " << std::string(output.begin(), output.end()) << std::endl;
+            return E_ABORT;
+        }
+
+        g_logfile << "Process terminated by SIGTERM" << std::endl;
     }
 
     return S_OK;
@@ -424,34 +455,49 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
                 Session->SessionId, arguments[0], arguments.data(), env.empty() ? nullptr : env.data(), &process, nullptr));
             auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
-            wil::unique_handle stdinHandle;
-            wil::unique_handle stdoutHandle;
-            wil::unique_handle stderrHandle;
+            wil::unique_socket stdinSocket;
+            wil::unique_socket stdoutSocket;
+            wil::unique_socket stderrSocket;
             wil::unique_handle exitEvent;
-            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdin, &stdinHandle));
-            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdout, &stdoutHandle));
-            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrHandle));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdin, &stdinSocket));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStdout, &stdoutSocket));
+            THROW_IF_FAILED(g_api->WSLCProcessGetFd(process, WSLCProcessFdStderr, &stderrSocket));
             THROW_IF_FAILED(g_api->WSLCProcessGetExitEvent(process, &exitEvent));
+
+            const auto validateSocket = [](SOCKET socket) {
+                int socketType = 0;
+                int socketTypeSize = sizeof(socketType);
+                if (getsockopt(socket, SOL_SOCKET, SO_TYPE, reinterpret_cast<char*>(&socketType), &socketTypeSize) == SOCKET_ERROR)
+                {
+                    THROW_HR(HRESULT_FROM_WIN32(WSAGetLastError()));
+                }
+
+                THROW_HR_IF(E_UNEXPECTED, socketType != SOCK_STREAM);
+            };
+
+            validateSocket(stdinSocket.get());
+            validateSocket(stdoutSocket.get());
+            validateSocket(stderrSocket.get());
 
             std::string out;
             std::string err;
 
             MultiHandleWait io;
             io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stdoutHandle), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
+                std::move(stdoutSocket), [&out](const auto& span) { out.append(span.begin(), span.end()); }));
 
             io.AddHandle(std::make_unique<ReadHandle>(
-                std::move(stderrHandle), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
+                std::move(stderrSocket), [&err](const auto& span) { err.append(span.begin(), span.end()); }));
 
             io.AddHandle(std::make_unique<EventHandle>(std::move(exitEvent)));
 
             if (input.has_value())
             {
-                io.AddHandle(std::make_unique<WriteHandle>(std::move(stdinHandle), std::vector<char>(input->begin(), input->end())));
+                io.AddHandle(std::make_unique<WriteHandle>(std::move(stdinSocket), std::vector<char>(input->begin(), input->end())));
             }
             else
             {
-                stdinHandle.reset();
+                stdinSocket.reset();
             }
 
             io.Run(60000ms);
@@ -489,7 +535,7 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
             auto releaseProcess = wil::scope_exit([&]() { g_api->WSLCReleaseProcess(process); });
 
             // Validate that getting an fd that doesn't exist fails with the expected error code.
-            HANDLE dummy = nullptr;
+            SOCKET dummy = INVALID_SOCKET;
             g_logfile << "WSLCProcessGetFd(999): " << g_api->WSLCProcessGetFd(process, static_cast<WSLCProcessFd>(999), &dummy) << std::endl;
             int exitCode = -1;
 
@@ -511,6 +557,48 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
                 file << "Windows-content";
             }
 
+            const auto deniedFilePath = std::wstring(testFolder) + L"plugin-denied.txt";
+            {
+                wil::unique_hfile deniedFile{
+                    CreateFileW(deniedFilePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                THROW_LAST_ERROR_IF(!deniedFile);
+            }
+
+            auto deniedFileCleanup = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() { std::filesystem::remove(deniedFilePath); });
+
+            PACL originalAcl = nullptr;
+            wil::unique_hlocal originalDescriptor;
+            THROW_IF_WIN32_ERROR(GetNamedSecurityInfoW(
+                deniedFilePath.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &originalAcl, nullptr, &originalDescriptor));
+
+            auto restoreAcl = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&]() {
+                THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                    const_cast<LPWSTR>(deniedFilePath.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, originalAcl, nullptr));
+            });
+
+            EXPLICIT_ACCESSW deniedAccess{};
+            deniedAccess.grfAccessPermissions = FILE_READ_DATA;
+            deniedAccess.grfAccessMode = DENY_ACCESS;
+            deniedAccess.grfInheritance = NO_INHERITANCE;
+            deniedAccess.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+            deniedAccess.Trustee.ptstrName = static_cast<LPWSTR>(Session->UserSid);
+
+            wsl::windows::common::security::unique_acl deniedAcl;
+            THROW_IF_WIN32_ERROR(SetEntriesInAclW(1, &deniedAccess, originalAcl, &deniedAcl));
+            THROW_IF_WIN32_ERROR(SetNamedSecurityInfoW(
+                const_cast<LPWSTR>(deniedFilePath.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, deniedAcl.get(), nullptr));
+
+            {
+                wil::unique_handle impersonationToken;
+                THROW_LAST_ERROR_IF(!DuplicateTokenEx(
+                    Session->UserToken, TOKEN_IMPERSONATE | TOKEN_QUERY, nullptr, SecurityImpersonation, TokenImpersonation, &impersonationToken));
+                auto revert = wil::impersonate_token(impersonationToken.get());
+                wil::unique_hfile deniedFile{
+                    CreateFileW(deniedFilePath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)};
+                const auto openError = GetLastError();
+                THROW_HR_IF(E_UNEXPECTED, deniedFile || openError != ERROR_ACCESS_DENIED);
+            }
+
             // Mount read-write and verify the file can be read from Linux.
             THROW_IF_FAILED(g_api->WSLCMountFolder(Session->SessionId, testFolder, rwMountpoint, false));
 
@@ -518,6 +606,9 @@ void RunWslcSuccessChecks(const WSLCSessionInformation* Session)
 
             auto readCmd = std::format("cat {}/{}", rwMountpoint, testFileName);
             runCommand(readCmd.c_str());
+
+            auto deniedReadCmd = std::format("cat {}/plugin-denied.txt", rwMountpoint);
+            runCommand(deniedReadCmd.c_str());
 
             THROW_IF_FAILED(g_api->WSLCUnmountFolder(Session->SessionId, rwMountpoint));
         }
@@ -581,8 +672,8 @@ try
 {
     auto container = wsl::shared::FromJson<wsl::windows::common::wslc_schema::InspectContainer>(InspectJson);
 
-    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id
-              << ", name=" << container.Name << ", image=" << container.Image << ", state=" << container.State.Status << std::endl;
+    g_logfile << "WSLC Container started, session=" << Session->SessionId << ", id=" << container.Id << ", name=" << container.Name
+              << ", image=" << container.Config.Image << ", state=" << container.State.Status << std::endl;
 
     if (g_testType == PluginTestType::WslcContainerRejected)
     {
@@ -595,10 +686,35 @@ try
 CATCH_RETURN();
 
 HRESULT OnWslcContainerStopping(const WSLCSessionInformation* Session, LPCSTR ContainerId)
+try
 {
     g_logfile << "WSLC Container stopping, session=" << Session->SessionId << ", id=" << ContainerId << std::endl;
+
+    if (g_testType == PluginTestType::WslcContainerStoppingDuringTerminate)
+    {
+        wil::unique_event entered;
+        entered.open(c_containerStoppingEnteredEvent, EVENT_MODIFY_STATE);
+
+        // Reenter only once the test has started terminating the session and its teardown has begun.
+        entered.SetEvent();
+        THROW_WIN32_IF(ERROR_TIMEOUT, !g_terminateVmStopping.wait(30000));
+
+        std::vector<const char*> args = {"/bin/true", nullptr};
+        WSLCProcessHandle process = nullptr;
+        const auto processHr = g_api->WSLCCreateProcess(Session->SessionId, args[0], args.data(), nullptr, &process, nullptr);
+        g_logfile << std::format("WSLC Container stopping reentrant WSLCCreateProcess: {:#x}", static_cast<uint32_t>(processHr)) << std::endl;
+        if (SUCCEEDED(processHr))
+        {
+            g_api->WSLCReleaseProcess(process);
+        }
+
+        const auto mountHr = g_api->WSLCMountFolder(Session->SessionId, L"C:\\", "/test-plugin/container-stopping-mount", TRUE);
+        g_logfile << std::format("WSLC Container stopping reentrant WSLCMountFolder: {:#x}", static_cast<uint32_t>(mountHr)) << std::endl;
+    }
+
     return S_OK;
 }
+CATCH_RETURN();
 
 HRESULT OnWslcImageCreated(const WSLCSessionInformation* Session, LPCSTR InspectJson)
 {
@@ -684,6 +800,24 @@ CATCH_RETURN();
 HRESULT OnWslcVmStopping(const WSLCSessionInformation* Session)
 try
 {
+    if (g_testType == PluginTestType::WslcVmExitDuringSessionRelease)
+    {
+        wil::unique_event entered;
+        entered.open(c_vmStoppingEnteredEvent, EVENT_MODIFY_STATE);
+        wil::unique_event release;
+        release.open(c_vmStoppingReleaseEvent, SYNCHRONIZE);
+
+        entered.SetEvent();
+        THROW_WIN32_IF(ERROR_TIMEOUT, !release.wait(30000));
+        return S_OK;
+    }
+
+    if (g_testType == PluginTestType::WslcContainerStoppingDuringTerminate)
+    {
+        g_terminateVmStopping.SetEvent();
+        return S_OK;
+    }
+
     if (g_testType == PluginTestType::WslcVmNeverStarted)
     {
         g_logfile << "WSLC VM stopping, session=" << Session->SessionId << std::endl;
@@ -802,7 +936,10 @@ EXTERN_C __declspec(dllexport) HRESULT WSLPLUGINAPI_ENTRYPOINTV1(const WSLPlugin
         THROW_HR_IF(E_UNEXPECTED, !g_logfile);
 
         g_testType = static_cast<PluginTestType>(ReadDword(key.get(), nullptr, c_testType, static_cast<DWORD>(PluginTestType::Invalid)));
-        THROW_HR_IF(E_INVALIDARG, static_cast<DWORD>(g_testType) <= 0 || static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::MountFolderAccess));
+        THROW_HR_IF(
+            E_INVALIDARG,
+            static_cast<DWORD>(g_testType) <= 0 ||
+                static_cast<DWORD>(g_testType) > static_cast<DWORD>(PluginTestType::WslcContainerStoppingDuringTerminate));
 
         g_logfile << "Plugin loaded. TestMode=" << static_cast<DWORD>(g_testType) << std::endl;
         g_api = Api;

@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 #include "precomp.h"
+#include <linux/vm_sockets.h>
 #include "p9io.h"
 
 #ifndef TEMP_FAILURE_RETRY
@@ -187,17 +188,29 @@ void EpollWatcher::Run()
     std::thread(WatchThread, this).detach();
 }
 
-void EpollWatcher::Add(int fd, int events, EpollDispatcher& dispatcher)
+uint64_t EpollWatcher::Add(int fd, int events, EpollDispatcher& dispatcher)
 {
+    std::scoped_lock<std::mutex> lock{m_Lock};
+
+    FAIL_FAST_IF(m_NextRegistrationId == 0);
+    const auto registrationId = m_NextRegistrationId++;
+    m_Dispatchers.emplace(registrationId, &dispatcher);
+    auto cleanup = wil::scope_exit([&]() { m_Dispatchers.erase(registrationId); });
+
     epoll_event event{};
     event.events = events;
-    event.data.ptr = &dispatcher;
+    event.data.u64 = registrationId;
     THROW_LAST_ERROR_IF(epoll_ctl(m_EpollFileDescriptor, EPOLL_CTL_ADD, fd, &event) < 0);
+
+    cleanup.release();
+    return registrationId;
 }
 
-void EpollWatcher::Remove(int fd)
+void EpollWatcher::Remove(int fd, uint64_t registrationId)
 {
+    std::scoped_lock<std::mutex> lock{m_Lock};
     THROW_LAST_ERROR_IF(epoll_ctl(m_EpollFileDescriptor, EPOLL_CTL_DEL, fd, nullptr) < 0);
+    m_Dispatchers.erase(registrationId);
 }
 
 void EpollWatcher::WatchThread(EpollWatcher* watcher)
@@ -210,10 +223,12 @@ void EpollWatcher::WatchThread(EpollWatcher* watcher)
 
         for (int i = 0; i < result; ++i)
         {
-            if (events[i].data.ptr != nullptr)
+            std::scoped_lock<std::mutex> lock{watcher->m_Lock};
+            const auto dispatcher = watcher->m_Dispatchers.find(events[i].data.u64);
+
+            if (dispatcher != watcher->m_Dispatchers.end())
             {
-                const auto dispatcher = static_cast<EpollDispatcher*>(events[i].data.ptr);
-                dispatcher->Notify(events[i].events);
+                dispatcher->second->Notify(events[i].events);
             }
         }
     }
@@ -249,16 +264,35 @@ Task<size_t> SendAsync(CoroutineEpollIssuer& socket, gsl::span<const gsl::byte> 
 
 Task<int> AcceptAsync(CoroutineEpollIssuer& listen, CancelToken& token)
 {
-    CoroutineEpollOperation operation;
-    auto result = co_await listen.Issue<int>(
-        operation, token, EPOLLIN, [&](int fd) { return accept4(fd, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC); });
-
-    if (result < 0)
+    for (;;)
     {
-        THROW_ERRNO(-result);
-    }
+        THROW_ERRNO_IF(ECANCELED, token.Cancelled());
 
-    co_return result;
+        sockaddr_storage address{};
+        socklen_t addressSize = sizeof(address);
+        CoroutineEpollOperation operation;
+
+        auto result = co_await listen.Issue<int>(operation, token, EPOLLIN, [&](int fd) {
+            return accept4(fd, reinterpret_cast<sockaddr*>(&address), &addressSize, SOCK_NONBLOCK | SOCK_CLOEXEC);
+        });
+
+        if (result < 0)
+        {
+            THROW_ERRNO(-result);
+        }
+
+        wil::unique_fd client{result};
+
+        if (address.ss_family == AF_VSOCK &&
+            (addressSize < sizeof(sockaddr_vm) || reinterpret_cast<const sockaddr_vm*>(&address)->svm_cid != VMADDR_CID_HOST))
+        {
+            Plan9TraceLoggingProvider::LogMessage("Rejected unexpected hvsocket connection.", TRACE_LEVEL_WARNING);
+
+            continue;
+        }
+
+        co_return client.release();
+    }
 }
 
 Task<IoResult> ReadAsync(CoroutineIoIssuer& file, std::uint64_t offset, gsl::span<gsl::byte> buffer, CancelToken& token)

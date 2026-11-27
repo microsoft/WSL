@@ -317,7 +317,7 @@ void ClientExecutionContext::EnableInteractiveWarnings()
     });
 }
 
-ServiceExecutionContext::ServiceExecutionContext(LXSS_ERROR_INFO* outError) noexcept : ExecutionContext(Empty)
+ServiceExecutionContext::ServiceExecutionContext(LXSS_ERROR_INFO* outError) : ExecutionContext(Empty)
 {
     if (outError != nullptr)
     {

@@ -16,53 +16,9 @@ Abstract:
 #include "relay.hpp"
 #pragma hdrstop
 
+using wsl::windows::common::io::InitializeFileOffset;
 using wsl::windows::common::relay::ScopedMultiRelay;
 using wsl::windows::common::relay::ScopedRelay;
-
-namespace {
-
-LARGE_INTEGER InitializeFileOffset(HANDLE File)
-{
-    LARGE_INTEGER Offset{};
-    if (GetFileType(File) == FILE_TYPE_DISK)
-    {
-        LOG_IF_WIN32_BOOL_FALSE(SetFilePointerEx(File, {}, &Offset, FILE_CURRENT));
-    }
-
-    return Offset;
-}
-
-void CancelPendingIo(auto Handle, OVERLAPPED& Overlapped)
-{
-    DWORD bytesTransferred{};
-    if (CancelIoEx((HANDLE)Handle, &Overlapped))
-    {
-        if constexpr (std::is_same_v<decltype(Handle), SOCKET>)
-        {
-            if (!WSAGetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true, nullptr))
-            {
-                auto error = WSAGetLastError();
-                LOG_LAST_ERROR_IF(error != WSAECONNABORTED && error != WSA_OPERATION_ABORTED && error != WSAECONNRESET);
-            }
-        }
-        else
-        {
-            static_assert(std::is_same_v<decltype(Handle), HANDLE>);
-            if (!GetOverlappedResult(Handle, &Overlapped, &bytesTransferred, true))
-            {
-                auto error = GetLastError();
-                LOG_LAST_ERROR_IF(error != ERROR_CONNECTION_ABORTED && error != ERROR_OPERATION_ABORTED);
-            }
-        }
-    }
-    else
-    {
-        // ERROR_NOT_FOUND is returned if there was no IO to cancel.
-        LOG_LAST_ERROR_IF(GetLastError() != ERROR_NOT_FOUND);
-    }
-}
-
-} // namespace
 
 std::thread wsl::windows::common::relay::CreateThread(_In_ HANDLE InputHandle, _In_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
 {
@@ -170,11 +126,6 @@ wsl::windows::common::relay::InterruptableRead(
 
 void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _In_opt_ HANDLE OutputHandle, _In_opt_ HANDLE ExitHandle, _In_ size_t BufferSize)
 {
-    // If the handle file is seekable, make sure to respect the offset.
-    // This is useful in cases when WSL is invoked on an existing file, like: wsl.exe echo foo >> file
-    // See: https://github.com/microsoft/WSL/issues/11799
-
-    LARGE_INTEGER writeOffset = InitializeFileOffset(OutputHandle);
     LARGE_INTEGER readOffset = InitializeFileOffset(InputHandle);
 
     std::vector<gsl::byte> buffer(BufferSize);
@@ -203,8 +154,9 @@ void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _I
 
         if (OutputHandle)
         {
-            overlapped.Offset = writeOffset.LowPart;
-            overlapped.OffsetHigh = writeOffset.HighPart;
+            // An offset of -1 appends to files and is ignored for other handle types.
+            overlapped.Offset = MAXDWORD;
+            overlapped.OffsetHigh = MAXDWORD;
             auto writeSpan = readSpan.first(bytesRead);
             const auto bytesWritten = InterruptableWrite(OutputHandle, writeSpan, exitHandles, &overlapped);
             if (bytesWritten == 0)
@@ -214,8 +166,6 @@ void wsl::windows::common::relay::InterruptableRelay(_In_ HANDLE InputHandle, _I
 
             WI_ASSERT(bytesWritten == bytesRead);
         }
-
-        writeOffset.QuadPart += bytesRead;
     }
 }
 

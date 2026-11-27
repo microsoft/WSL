@@ -21,7 +21,7 @@ typedef struct WslcVhdRequirements
 | `uid` | `uint32_t` |
 | `gid` | `uint32_t` |
 
-Header notes:
+
 
 - `name` is ignored by `WslcSetSessionSettingsVhd`.
 - The remaining fields after `type` are only honored by `WslcCreateSessionVhdVolume`.

@@ -147,27 +147,41 @@ ConsommeNetworking::ConsommeNetworking(
 
 ConsommeNetworking::~ConsommeNetworking()
 {
-    // Unregister the network notification callback to prevent it from using the GNS channel.
-    m_networkNotifyHandle.reset();
-
     // Stop the GNS channel to unblock any stuck communications with the guest.
     m_gnsChannel.Stop();
+
+    // Unregister notification callbacks before destroying the state they access.
+    m_dnsSuffixRegistryWatcher.reset();
+    m_networkNotifyHandle.reset();
 }
 
 void ConsommeNetworking::Initialize()
 {
+    m_dnsSuffixRegistryWatcher.emplace([this]() noexcept {
+        try
+        {
+            RefreshGuestConnection();
+        }
+        CATCH_LOG()
+    });
+
     // Initialize adapter state.
     RefreshGuestConnection();
 
-    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
     {
-        SetupLoopbackDevice();
-    }
+        // Serialize loopback setup with DNS refresh callbacks sharing the GNS channel.
+        auto lock = m_lock.lock_exclusive();
 
-    if (!m_hostLoopback.empty())
-    {
-        THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
-        SetupHostLoopback();
+        if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay))
+        {
+            SetupLoopbackDevice();
+        }
+
+        if (!m_hostLoopback.empty())
+        {
+            THROW_HR_IF(E_UNEXPECTED, !WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay));
+            SetupHostLoopback();
+        }
     }
 
     THROW_IF_WIN32_ERROR(NotifyNetworkConnectivityHintChange(&ConsommeNetworking::OnNetworkConnectivityChange, this, TRUE, &m_networkNotifyHandle));
@@ -194,10 +208,64 @@ void ConsommeNetworking::StartPortTracker(wil::unique_socket&& socket)
 
     m_gnsPortTrackerChannel.emplace(
         std::move(socket),
-        [&](const SOCKADDR_INET& addr, int protocol, bool allocate) {
-            return wil::ResultFromException([&]() {
-                HandlePortNotification(addr, protocol, INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)), allocate);
+        [&, trackerState = PortTrackerState{}](const SOCKADDR_INET& addr, int protocol, bool allocate) mutable {
+            const auto result = wil::ResultFromException([&]() {
+                const auto port = INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr));
+                const PortTrackerState::GuestOnlyPort key{
+                    .Address = wsl::windows::common::string::SockAddrInetToString(addr), .Port = port, .Protocol = protocol};
+                if (!allocate && trackerState.GuestOnlyPorts.erase(key) != 0)
+                {
+                    return;
+                }
+
+                const auto result =
+                    wil::ResultFromException([&]() { HandlePortNotification(addr, protocol, port, allocate, &trackerState); });
+
+                // If the bind address is not available on the host, let the bind flow through so the kernel can decide if it is
+                // valid. Keep track of bind requests that are not available on the host so we don't try to unbind them later.
+                if (allocate && result == HRESULT_FROM_WIN32(WSAEADDRNOTAVAIL))
+                {
+                    auto family = addr.si_family;
+                    const void* ipAddress = family == AF_INET ? static_cast<const void*>(&addr.Ipv4.sin_addr)
+                                                              : static_cast<const void*>(&addr.Ipv6.sin6_addr);
+
+                    if (family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&addr.Ipv6.sin6_addr))
+                    {
+                        family = AF_INET;
+                        ipAddress = &addr.Ipv6.sin6_addr.u.Byte[12];
+                    }
+
+                    if (!INET_IS_ADDR_UNSPECIFIED(family, ipAddress) && !INET_IS_ADDR_LOOPBACK(family, ipAddress))
+                    {
+                        // Guest-only addresses need no host forwarding. Let Linux validate the bind.
+                        trackerState.GuestOnlyPorts.insert(key);
+                        return;
+                    }
+                }
+
+                THROW_IF_FAILED(result);
             });
+
+            LOG_IF_FAILED_MSG(
+                result,
+                "Port mapping failed: address=%hs port=%u protocol=%d allocate=%d",
+                wsl::windows::common::string::SockAddrInetToString(addr).c_str(),
+                INETADDR_PORT(reinterpret_cast<const SOCKADDR*>(&addr)),
+                protocol,
+                allocate);
+
+            switch (result)
+            {
+            case S_OK:
+                return 0;
+
+            case HRESULT_FROM_WIN32(WSAEADDRINUSE):
+            case HRESULT_FROM_WIN32(WSAEACCES):
+                return -LX_EADDRINUSE;
+
+            default:
+                return -LX_EINVAL;
+            }
         },
         [](const std::string&, bool) {}); // TODO: reconsider if InterfaceStateCallback is needed.
 }
@@ -209,8 +277,19 @@ try
 }
 CATCH_LOG()
 
-uint16_t ConsommeNetworking::HandlePortNotification(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate) const
+uint16_t ConsommeNetworking::HandlePortNotification(SOCKADDR_INET addr, int protocol, uint16_t guestPort, bool allocate, PortTrackerState* trackerState) const
 {
+    if (addr.si_family == AF_INET6 && IN6_IS_ADDR_V4MAPPED(&addr.Ipv6.sin6_addr))
+    {
+        SOCKADDR_IN ipv4Address{};
+        ipv4Address.sin_family = AF_INET;
+        ipv4Address.sin_port = addr.Ipv6.sin6_port;
+        // IPv4-mapped IPv6 addresses have a 96-bit prefix, with the IPv4 address in bytes 12-15.
+        memcpy(&ipv4Address.sin_addr, &addr.Ipv6.sin6_addr.u.Byte[12], sizeof(ipv4Address.sin_addr));
+        addr = {};
+        addr.Ipv4 = ipv4Address;
+    }
+
     if (addr.si_family == AF_INET6 && WI_IsFlagClear(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
         return 0;
@@ -228,6 +307,57 @@ uint16_t ConsommeNetworking::HandlePortNotification(const SOCKADDR_INET& addr, i
             return 0;
         }
     }
+
+    const bool mapLoopback = WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay) && (unspecified || loopback);
+    // Only guest tracker requests can share the loopback relay.
+    if (!mapLoopback || !trackerState)
+    {
+        return ModifyDevicePorts(addr, protocol, guestPort, allocate, mapLoopback, !loopback);
+    }
+
+    // Count wildcard and loopback owners of the same relay endpoint separately.
+    const PortTrackerState::LoopbackPort key{.Family = addr.si_family, .Protocol = protocol, .Port = guestPort};
+    auto& ports = trackerState->LoopbackPorts;
+    const auto entry = allocate ? ports.try_emplace(key).first : ports.find(key);
+    THROW_HR_IF_MSG(
+        E_UNEXPECTED, entry == ports.end(), "Untracked loopback relay port: family=%hu protocol=%d port=%hu", key.Family, key.Protocol, key.Port);
+    auto& [wildcardOwners, loopbackOwners] = entry->second;
+    auto& owners = unspecified ? wildcardOwners : loopbackOwners;
+    THROW_HR_IF_MSG(
+        E_UNEXPECTED,
+        !allocate && owners == 0,
+        "No %hs owner for loopback relay port: family=%hu protocol=%d port=%hu",
+        unspecified ? "wildcard" : "loopback",
+        key.Family,
+        key.Protocol,
+        key.Port);
+    // A failed first bind must not leave an empty entry.
+    auto removeEmpty = wil::scope_exit([&]() {
+        if (wildcardOwners == 0 && loopbackOwners == 0)
+        {
+            ports.erase(entry);
+        }
+    });
+
+    // Both bind orders share the relay: the first owner binds it and the last unbinds it.
+    const auto totalOwners = wildcardOwners + loopbackOwners;
+    const bool modifyLoopback = allocate ? totalOwners == 0 : totalOwners == 1;
+    const auto result = ModifyDevicePorts(addr, protocol, guestPort, allocate, modifyLoopback, !loopback);
+    // Change ownership only after the device operation succeeds.
+    if (allocate)
+    {
+        ++owners;
+    }
+    else
+    {
+        --owners;
+    }
+
+    return result;
+}
+
+uint16_t ConsommeNetworking::ModifyDevicePorts(const SOCKADDR_INET& addr, int protocol, uint16_t guestPort, bool allocate, bool mapLoopback, bool mapEth0) const
+{
     SOCKADDR_INET localAddr = addr;
     std::function<void()> removePort;
 
@@ -239,9 +369,9 @@ uint16_t ConsommeNetworking::HandlePortNotification(const SOCKADDR_INET& addr, i
         }
     });
 
-    if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::LocalhostRelay) && (unspecified || loopback))
+    if (mapLoopback)
     {
-        if (!loopback)
+        if (mapEth0)
         {
             INETADDR_SETLOOPBACK(reinterpret_cast<PSOCKADDR>(&localAddr));
             if (addr.si_family == AF_INET)
@@ -260,7 +390,7 @@ uint16_t ConsommeNetworking::HandlePortNotification(const SOCKADDR_INET& addr, i
         removePort = [&]() { ModifyOpenPorts(c_loopbackDeviceName, localAddr, hostPort, guestPort, protocol, !allocate); };
     }
 
-    if (!loopback)
+    if (mapEth0)
     {
         hostPort = ModifyOpenPorts(c_eth0DeviceName, addr, hostPort, guestPort, protocol, allocate);
     }
@@ -332,15 +462,46 @@ CATCH_RETURN()
 
 void ConsommeNetworking::RefreshGuestConnection()
 {
-    // Query current networking information before acquiring the lock.
+    // Serialize host queries and guest updates across notification callbacks.
+    auto lock = m_lock.lock_exclusive();
     auto networkSettings = GetHostEndpointSettings();
 
-    std::wstring default_route = networkSettings->GetBestGatewayAddressString();
+    auto defaultRouteIpv4 = networkSettings->GetBestGatewayAddressString(AF_INET);
+    const auto defaultRouteIpv6 = networkSettings->GetBestGatewayAddressString(AF_INET6);
+
+    // Generate a fallback gateway address if the host doesn't have a usable one.
+    // See: https://github.com/microsoft/WSL/issues/41740
+    if (defaultRouteIpv4.empty() || defaultRouteIpv4 == LX_INIT_UNSPECIFIED_ADDRESS)
+    {
+        const auto gateway = GetFallbackIpv4Gateway(networkSettings->PreferredIpAddress);
+        if (gateway.si_family == AF_INET)
+        {
+            std::erase_if(
+                networkSettings->Routes, [](const auto& existing) { return existing.Family == AF_INET && existing.IsDefault(); });
+
+            const auto route = EndpointRoute::DefaultRoute(AF_INET, gateway);
+            networkSettings->Routes.emplace(route);
+            defaultRouteIpv4 = route.NextHopString;
+
+            WSL_LOG(
+                "ConsommeGeneratedIpv4Gateway",
+                TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+                TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
+                TraceLoggingValue(defaultRouteIpv4.c_str(), "GatewayIp"));
+        }
+        else
+        {
+            WSL_LOG(
+                "ConsommeIpv4GatewayUnavailable",
+                TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
+                TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"));
+        }
+    }
 
     networking::DnsInfo currentDns{};
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::DnsTunneling))
     {
-        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(default_route);
+        currentDns = networking::HostDnsInfo::GetDnsTunnelingSettings(defaultRouteIpv4);
     }
     else
     {
@@ -353,9 +514,6 @@ void ConsommeNetworking::RefreshGuestConnection()
     auto virtioNetConfig = BuildVirtioNetConfig(networkSettings, WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6));
     auto nameservers = ToIpAddresses(currentDns);
 
-    // Acquire the lock and perform device updates.
-    auto lock = m_lock.lock_exclusive();
-
     // Add the virtio net adapter to the guest, or update its runtime configuration.
     if (!m_adapterId.has_value())
     {
@@ -363,8 +521,9 @@ void ConsommeNetworking::RefreshGuestConnection()
             "RefreshVirtioNetConnection",
             TraceLoggingValue(networkSettings->PreferredIpAddress.AddressString.c_str(), "ClientIp"),
             TraceLoggingValue(networkSettings->PreferredIpAddress.PrefixLength, "PrefixLength"),
-            TraceLoggingValue(default_route.c_str(), "GatewayIp"),
-            TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"));
+            TraceLoggingValue(defaultRouteIpv4.c_str(), "GatewayIp"),
+            TraceLoggingValue(networkSettings->PreferredIpv6Address.AddressString.c_str(), "ClientIpv6"),
+            TraceLoggingValue(defaultRouteIpv6.c_str(), "GatewayIpv6"));
         m_adapterId = m_guestDeviceManager->AddVirtioNetDevice(c_eth0DeviceName, virtioNetConfig, nameservers, m_userToken.get());
     }
     else if (!m_virtioNetConfig.has_value() || !AreEqual(m_virtioNetConfig.value(), virtioNetConfig) || !AreEqual(m_virtioNetNameservers, nameservers))
@@ -379,12 +538,17 @@ void ConsommeNetworking::RefreshGuestConnection()
     m_virtioNetNameservers = std::move(nameservers);
 
     UpdateIpv4Address(networkSettings->PreferredIpAddress);
+    UpdateDefaultRoute(AF_INET, defaultRouteIpv4, m_trackedDefaultRouteIpv4);
+
     if (WI_IsFlagSet(m_flags, ConsommeNetworkingFlags::Ipv6))
     {
-        UpdateIpv6Address(networkSettings->PreferredIpv6Address);
+        try
+        {
+            UpdateIpv6Address(networkSettings->PreferredIpv6Address);
+            UpdateDefaultRoute(AF_INET6, defaultRouteIpv6, m_trackedDefaultRouteIpv6);
+        }
+        CATCH_LOG()
     }
-
-    UpdateDefaultRoute(default_route);
 
     UpdateDnsSettings(currentDns);
     UpdateMtu(minMtu);
@@ -407,9 +571,7 @@ void ConsommeNetworking::SetupHostLoopback()
     uint32_t addressBytes{};
     std::memcpy(&addressBytes, &virtualAddress.bytes[0], sizeof(addressBytes));
 
-    std::string virtualAddressString(INET_ADDRSTRLEN, '\0');
-    RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(&virtualAddress.bytes[0]), virtualAddressString.data());
-    virtualAddressString.resize(std::strlen(virtualAddressString.data()));
+    const auto virtualAddressString = wsl::windows::common::string::IpAddressToString(virtualAddress);
 
     const auto eth0 = m_guestDeviceManager->GetVirtioNetDevice(c_eth0DeviceName);
     THROW_IF_FAILED(eth0->CreateDNSRecord(DnsRecordType_A, m_hostLoopback.c_str(), virtualAddressString.c_str()));
@@ -452,8 +614,10 @@ void ConsommeNetworking::SetupLoopbackDevice()
     m_gnsChannel.SendNetworkDeviceMessage(loopbackType, ToJsonW(createLoopbackDevice).c_str());
 }
 
-void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::ModifyRequestType requestType)
+void ConsommeNetworking::SendDefaultRoute(ADDRESS_FAMILY family, const std::wstring& gateway, hns::ModifyRequestType requestType)
 {
+    WI_ASSERT(family == AF_INET || family == AF_INET6);
+
     if (gateway.empty() || !m_adapterId.has_value())
     {
         return;
@@ -461,8 +625,8 @@ void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::Modi
 
     wsl::shared::hns::Route route;
     route.NextHop = gateway;
-    route.DestinationPrefix = LX_INIT_DEFAULT_ROUTE_PREFIX;
-    route.Family = AF_INET;
+    route.DestinationPrefix = (family == AF_INET) ? LX_INIT_DEFAULT_ROUTE_PREFIX : LX_INIT_DEFAULT_ROUTE_V6_PREFIX;
+    route.Family = family;
 
     hns::ModifyGuestEndpointSettingRequest<hns::Route> request;
     request.RequestType = requestType;
@@ -471,16 +635,23 @@ void ConsommeNetworking::SendDefaultRoute(const std::wstring& gateway, hns::Modi
     m_gnsChannel.SendHnsNotification(ToJsonW(request).c_str(), m_adapterId.value());
 }
 
-void ConsommeNetworking::UpdateDefaultRoute(const std::wstring& gateway)
+void ConsommeNetworking::UpdateDefaultRoute(ADDRESS_FAMILY family, const std::wstring& gateway, std::wstring& trackedGateway)
 {
-    if (gateway == m_trackedDefaultRoute || !m_adapterId.has_value())
+    WI_ASSERT(family == AF_INET || family == AF_INET6);
+
+    if (!m_adapterId.has_value())
     {
         return;
     }
 
-    SendDefaultRoute(m_trackedDefaultRoute, hns::ModifyRequestType::Remove);
-    m_trackedDefaultRoute = gateway;
-    SendDefaultRoute(gateway, hns::ModifyRequestType::Add);
+    if (gateway != trackedGateway)
+    {
+        SendDefaultRoute(family, trackedGateway, hns::ModifyRequestType::Remove);
+        trackedGateway.clear();
+    }
+
+    SendDefaultRoute(family, gateway, hns::ModifyRequestType::Add);
+    trackedGateway = gateway;
 }
 
 void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
@@ -490,13 +661,13 @@ void ConsommeNetworking::UpdateDnsSettings(const networking::DnsInfo& dns)
         return;
     }
 
-    m_trackedDnsSettings = dns;
-
     hns::ModifyGuestEndpointSettingRequest<hns::DNS> notification{};
     notification.RequestType = hns::ModifyRequestType::Update;
     notification.ResourceType = hns::GuestEndpointResourceType::DNS;
     notification.Settings = networking::BuildDnsNotification(dns, m_dnsOptions);
     m_gnsChannel.SendHnsNotification(ToJsonW(notification).c_str(), m_adapterId.value());
+
+    m_trackedDnsSettings = dns;
 }
 
 void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& ipAddress)
@@ -506,8 +677,6 @@ void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& 
         return;
     }
 
-    m_trackedIpv4Address = ipAddress;
-
     // N.B. SendEndpointState triggers SetAdapterConfiguration on the Linux side
     // which brings the interface UP and configures the full adapter state.
     hns::HNSEndpoint endpointProperties;
@@ -515,6 +684,8 @@ void ConsommeNetworking::UpdateIpv4Address(const networking::EndpointIpAddress& 
     endpointProperties.IPAddress = ipAddress.AddressString;
     endpointProperties.PrefixLength = ipAddress.PrefixLength;
     m_gnsChannel.SendEndpointState(endpointProperties);
+
+    m_trackedIpv4Address = ipAddress;
 }
 
 void ConsommeNetworking::SendIpv6Address(const networking::EndpointIpAddress& ipAddress, hns::ModifyRequestType requestType)

@@ -281,11 +281,6 @@ void GnsEngine::ProcessRouteChange(Interface& interface, const wsl::shared::hns:
         GNS_LOG_INFO("Remove route {} on interfaceName {}", routeString.c_str(), interface.Name().c_str());
         manager.ModifyRoute(interfaceRoute, Operation::Remove);
     }
-    else if (action == ModifyRequestType::Update)
-    {
-        GNS_LOG_INFO("Update route {} on interfaceName {}", routeString.c_str(), interface.Name().c_str());
-        manager.ModifyRoute(interfaceRoute, Operation::Update);
-    }
     else
     {
         throw RuntimeErrorWithSourceLocation(std::format("Unexpected route action: {}", static_cast<int>(action)));

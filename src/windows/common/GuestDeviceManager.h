@@ -13,6 +13,29 @@ struct VirtioFsShareOptions
 };
 
 //
+// Formats virtio-fs mount options as the semicolon separated 'name[=value]' list that the device host expects.
+//
+std::wstring FormatVirtioFsMountOptions(_In_ const std::map<std::wstring, std::wstring>& Options);
+
+//
+// Parses the semicolon separated 'name[=value]' list that the device host expects into a map, so that shares
+// whose options differ only in order (for example "uid=1000;gid=1000" and "gid=1000;uid=1000") can share a
+// single device. Empty options are ignored.
+//
+std::map<std::wstring, std::wstring> ParseVirtioFsMountOptions(_In_ std::wstring_view Options);
+
+//
+// Returns the canonical form of a file system share path with a trailing path separator, so that requests
+// naming the same directory resolve to the same share.
+//
+std::wstring NormalizeSharePath(_In_ const std::filesystem::path& Path);
+
+//
+// Adds a path to a Plan9 file system server, treating a share that is already present as success.
+//
+void AddPlan9SharePath(_In_ const wil::com_ptr<IPlan9FileSystem>& Server, _In_ PCWSTR AccessName, _In_ PCWSTR Path, _In_ UINT32 Flags);
+
+//
 // Provides synchronized access to guest device operations.
 //
 class GuestDeviceManager
@@ -43,7 +66,9 @@ public:
 
     void AddRemoteFileSystem(_In_ REFCLSID clsid, _In_ PCWSTR tag, _In_ const wil::com_ptr<IPlan9FileSystem>& server);
 
-    void AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
+    void RemoveRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag) noexcept;
+
+    GUID AddSharedMemoryDevice(_In_ PCWSTR Tag, _In_ PCWSTR Path, _In_ UINT32 SizeMb, _In_ HANDLE UserToken);
 
     wil::com_ptr<IPlan9FileSystem> GetRemoteFileSystem(_In_ REFCLSID clsid, _In_ std::wstring_view tag);
 
@@ -66,6 +91,6 @@ private:
     wil::srwlock m_lock;
     std::wstring m_machineId;
     wil::com_ptr<DeviceHostProxy> m_deviceHostSupport;
-    _Guarded_by_(m_lock) std::vector<DirectoryObjectLifetime> m_objectDirectories;
+    _Guarded_by_(m_lock) std::map<GUID, DirectoryObjectLifetime, wsl::windows::common::helpers::GuidLess> m_objectDirectories;
     _Guarded_by_(m_lock) std::map<std::wstring, GUID> m_virtioNetDevices;
 };

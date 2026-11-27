@@ -170,7 +170,7 @@ try
 
     while (totalBytesSent < bufferSize)
     {
-        int bytesSent = Syscall(write, tcpConnection, dnsBuffer.data() + totalBytesSent, bufferSize - totalBytesSent);
+        int bytesSent = Syscall(send, tcpConnection, dnsBuffer.data() + totalBytesSent, bufferSize - totalBytesSent, MSG_NOSIGNAL);
         totalBytesSent += bytesSent;
     }
 }

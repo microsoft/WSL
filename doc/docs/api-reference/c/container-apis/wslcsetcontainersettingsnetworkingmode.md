@@ -11,6 +11,11 @@ STDAPI WslcSetContainerSettingsNetworkingMode(_In_ WslcContainerSettings* contai
 
 Return value: `HRESULT`.
 
+Notes:
+
+- Defaults to `WSLC_CONTAINER_NETWORKING_MODE_NONE` when neither this nor [WslcSetContainerSettingsNetworks](wslcsetcontainersettingsnetworks.md) is called.
+- Cannot be combined with [WslcSetContainerSettingsNetworks](wslcsetcontainersettingsnetworks.md); [WslcCreateContainer](wslccreatecontainer.md) returns `E_INVALIDARG` if both are set.
+
 Example:
 
 ```c

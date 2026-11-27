@@ -7,7 +7,7 @@ STDAPI WslcStartContainer(_In_ WslcContainer container, _In_ WslcContainerStartF
 | Parameter | Type | Direction |
 |---|---|---|
 | `container` | `WslcContainer` | in |
-| `flags` | `WslcContainerStartFlags` | in |
+| `flags` | [`WslcContainerStartFlags`](../enumerations/wslccontainerstartflags.md) | in |
 | `errorMessage` | `PWSTR*` | out, optional |
 
 Return value: `HRESULT`.

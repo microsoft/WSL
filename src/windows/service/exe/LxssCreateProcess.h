@@ -22,17 +22,17 @@ Abstract:
 
 #define LXSS_INTEROP_ENABLED(_flags) (((_flags) & LXSS_INTEROP_FLAGS) == LXSS_INTEROP_FLAGS)
 
-using CreateLxProcessConsoleData = struct
+struct CreateLxProcessConsoleData
 {
     wil::unique_handle ConsoleHandle;
     wil::unique_handle ClientProcess;
 };
 
-using CreateLxProcessContext = struct
+struct CreateLxProcessContext
 {
     ULONG Flags;
     std::vector<std::string> DefaultEnvironment;
-    wil::unique_handle UserToken;
+    wil::shared_handle UserToken{};
     bool Elevated;
 };
 
@@ -52,11 +52,6 @@ class LxssCreateProcess
 {
 public:
     /// <summary>
-    /// Allocates and initializes a create process message.
-    /// </summary>
-    static std::vector<gsl::byte> CreateMessage(_In_ LX_MESSAGE_TYPE MessageType, _In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid);
-
-    /// <summary>
     /// Parses create process arguments.
     /// </summary>
     static CreateLxProcessData ParseArguments(
@@ -71,20 +66,20 @@ public:
         _In_ const std::vector<std::string>& DefaultEnvironment,
         _In_ ULONG Flags);
 
+public:
     static inline wil::unique_socket CreateLinuxProcess(
-        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout)
+        _In_ LPCSTR Path, _In_ LPCSTR* Arguments, const GUID& RuntimeId, wsl::shared::SocketChannel& channel, HANDLE terminatingEvent, DWORD Timeout, uint64_t PluginId = 0)
     {
-        std::vector<char> ArgumentsData;
-        for (const auto* e = Arguments; *e != nullptr; e++)
+        size_t argumentCount = 0;
+        while (Arguments[argumentCount] != nullptr)
         {
-            ArgumentsData.insert(ArgumentsData.end(), *e, *e + strlen(*e) + 1);
+            ++argumentCount;
         }
 
-        ArgumentsData.emplace_back('\0');
-
         wsl::shared::MessageWriter<CREATE_PROCESS_MESSAGE> message(LxInitCreateProcess);
+        message->PluginId = PluginId;
         message.WriteString(message->PathIndex, Path);
-        gsl::copy(as_bytes(gsl::span(ArgumentsData)), message.InsertBuffer(message->CommandLineIndex, ArgumentsData.size()));
+        message.WriteStringArray(message->CommandLineIndex, Arguments, argumentCount);
         auto transaction = channel.StartTransaction(Timeout);
         transaction.Send<CREATE_PROCESS_MESSAGE>(message.Span());
 
@@ -98,6 +93,33 @@ public:
         THROW_HR_IF_MSG(E_FAIL, execResult != 0, "Failed to execute '%hs', error=%d", Path, execResult);
 
         return processSocket;
+    }
+
+public:
+    template <typename TMessage>
+    static std::vector<gsl::byte> CreateMessage(_In_ const CreateLxProcessData& CreateProcessData, _In_ ULONG DefaultUid)
+    {
+        wsl::shared::MessageWriter<TMessage> message;
+
+        message->DefaultUid = DefaultUid;
+        message->Flags = 0;
+        message->ShellOptions = CreateProcessData.ShellOptions;
+
+        message.WriteString(message->FilenameOffset, CreateProcessData.Filename);
+        message.WriteString(message->CurrentWorkingDirectoryOffset, CreateProcessData.CurrentWorkingDirectory);
+
+        const auto commandLine = wsl::shared::string::StringPointersFromArray(CreateProcessData.CommandLine, false);
+        const auto environment = wsl::shared::string::StringPointersFromArray(CreateProcessData.Environment, false);
+        const auto ntEnvironment = wsl::shared::string::StringPointersFromArray(CreateProcessData.NtEnvironment, false);
+
+        message.WriteStringArray(message->CommandLineOffset, commandLine.data(), commandLine.size());
+        message.WriteStringArray(message->EnvironmentOffset, environment.data(), environment.size());
+        message.WriteStringArray(message->NtEnvironmentOffset, ntEnvironment.data(), ntEnvironment.size());
+
+        message.WriteString(message->NtPathOffset, CreateProcessData.NtPath);
+        message.WriteString(message->UsernameOffset, CreateProcessData.Username);
+
+        return message.MoveBuffer();
     }
 };
 

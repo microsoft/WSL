@@ -23,3 +23,7 @@ target_compile_definitions(wsldevicehostproxystub PRIVATE
     PROXY_CLSID_IS={0x6D32A4B7,0x9E1F,0x4C82,{0xA5,0x73,0xF8,0xB1,0xC4,0xD2,0x9E,0x60}})
 
 set_target_properties(wsldevicehostproxystub PROPERTIES FOLDER windows)
+
+# MIDL generated proxy files each define their own MIDL_TYPE_FORMAT_STRING and
+# related symbols, so they can't share a translation unit.
+set_target_properties(wsldevicehostproxystub PROPERTIES UNITY_BUILD OFF)

@@ -50,26 +50,27 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
 {
     using namespace wsl::windows::wslc;
     using namespace wsl::windows::wslc::argument;
+    using Argument = wsl::windows::wslc::Argument;
 
     switch (argumentSet)
     {
     case ArgumentSet::Run:
         return {
-            Argument::Create(ArgType::ImageId, true),  // Required positional argument
-            Argument::Create(ArgType::Command, false), // Optional positional argument
-            Argument::Create(ArgType::ForwardArgs, false),
+            Argument::Create(ArgType::ImageId, {.Required = true}), // Required positional argument
+            Argument::Create(ArgType::Command),                     // Optional positional argument
+            Argument::Create(ArgType::ForwardArgs),
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Interactive),
             Argument::Create(ArgType::Verbose),
             Argument::Create(ArgType::Remove),
             Argument::Create(ArgType::Signal),
             Argument::Create(ArgType::Time),
-            Argument::Create(ArgType::Publish, false, Limit::Unlimited), // Not required, unlimited.
+            Argument::Create(ArgType::Publish, {.Limit = Limit::Unlimited}), // Not required, unlimited.
         };
 
     case ArgumentSet::List:
         return {
-            Argument::Create(ArgType::ContainerId, false, Limit::Unlimited), // Optional positional
+            Argument::Create(ArgType::ContainerId, {.Limit = Limit::Unlimited}), // Optional positional
             Argument::Create(ArgType::Help),
             Argument::Create(ArgType::Verbose),
         };
@@ -78,17 +79,17 @@ inline std::vector<wsl::windows::wslc::Argument> GetArgumentsForSet(ArgumentSet 
         // Mirrors ImageBuildCommand::GetArguments() so the parser tests exercise the
         // real `wslc build` option set (notably the --progress value option).
         return {
-            Argument::Create(ArgType::Path, true), // Required positional (build context path)
-            Argument::Create(ArgType::BuildArg, false, Limit::Unlimited),
+            Argument::Create(ArgType::Path, {.Required = true}), // Required positional (build context path)
+            Argument::Create(ArgType::BuildArg, {.Limit = Limit::Unlimited}),
             Argument::Create(ArgType::BuildPull),
             Argument::Create(ArgType::BuildTarget),
             Argument::Create(ArgType::File),
-            Argument::Create(ArgType::Label, false, Limit::Unlimited),
+            Argument::Create(ArgType::Label, {.Limit = Limit::Unlimited}),
             Argument::Create(ArgType::NoCache),
             Argument::Create(ArgType::Output),
             Argument::Create(ArgType::Progress),
-            Argument::Create(ArgType::Secret, false, Limit::Unlimited),
-            Argument::Create(ArgType::Tag, false, Limit::Unlimited),
+            Argument::Create(ArgType::Secret, {.Limit = Limit::Unlimited}),
+            Argument::Create(ArgType::Tag, {.Limit = Limit::Unlimited}),
             Argument::Create(ArgType::Verbose),
             Argument::Create(ArgType::Help),
         };
@@ -142,12 +143,11 @@ WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --signal 9 -t 5 --signal 1 image1)") \
 /* Flag parse tests */ \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -? image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -?i image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -i?p- image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi?=80:80 image1)") \
-WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -pi? 80:80 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p 80:80 image1)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p=80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -i?p80:80 image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -p80:80 -p443:443 image1)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc -i?xp80:80 image1)") \
 \
 /* Validation tests */ \
 WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --signal FOO image1)") \
@@ -177,6 +177,15 @@ WSLC_PARSER_TEST_CASE(Run, true, L"wslc jrottenberg/ffmpeg:4.4-alpine \\\nffmpeg
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc - command)") \
 WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose -)") \
+\
+/* End of options ('--'). Later tokens are positional even if they look like options. \
+ * A '--' after the image is the container command and is covered by execution tests. */ \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc -- image1)") \
+WSLC_PARSER_TEST_CASE(Run, true, LR"(wslc --verbose -- -image)") \
+WSLC_PARSER_TEST_CASE(Run, false, LR"(wslc --)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc --)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc -- --verbose --)") \
+WSLC_PARSER_TEST_CASE(List, true, LR"(wslc cont1 -- --invalidarg)") \
 \
 /* List cases with multiple args and flags that can come after the optional multi-positional. */ \
 WSLC_PARSER_TEST_CASE(List, true, LR"(wslc)") \

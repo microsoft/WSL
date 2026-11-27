@@ -304,16 +304,26 @@ try
 
         WSL_LOG("PortRelayUsage", TraceLoggingValue(Arguments->Family, "family"), TraceLoggingValue(Arguments->Port, "port"), TraceLoggingLevel(WINEVENT_LEVEL_INFO));
 
-        auto RelayThread = std::thread([Arguments, InetSocket = std::move(*InetSocket)]() {
+        // Established connections must not retain the port's listening socket.
+        auto RelayThread = std::thread([VmId = Arguments->VmId,
+                                        HvSocketPort = Arguments->HvSocketPort,
+                                        Family = Arguments->Family,
+                                        Port = Arguments->Port,
+                                        InetSocket = std::move(*InetSocket)]() {
             try
             {
                 wsl::windows::common::wslutil::SetThreadDescription(L"Port relay");
-                const auto HvSocket = wsl::windows::common::hvsocket::Connect(Arguments->VmId, Arguments->HvSocketPort);
+                constexpr DWORD c_noDelay = 1;
+                THROW_LAST_ERROR_IF(
+                    setsockopt(InetSocket.get(), IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&c_noDelay), sizeof(c_noDelay)) ==
+                    SOCKET_ERROR);
+
+                const auto HvSocket = wsl::windows::common::hvsocket::Connect(VmId, HvSocketPort);
                 LX_INIT_START_SOCKET_RELAY Message{};
                 Message.Header.MessageType = LxInitMessageStartSocketRelay;
                 Message.Header.MessageSize = sizeof(Message);
-                Message.Family = Arguments->Family;
-                Message.Port = Arguments->Port;
+                Message.Family = Family;
+                Message.Port = Port;
                 Message.BufferSize = LOCALHOST_RELAY_BUFFER_SIZE;
                 wsl::windows::common::socket::Send(HvSocket.get(), gslhelpers::struct_as_bytes(Message));
                 wsl::windows::common::relay::SocketRelay(InetSocket.get(), HvSocket.get(), Message.BufferSize);
@@ -385,6 +395,10 @@ struct PortRelay
 
     static void RunRelay(SOCKET WindowsSocket, const GUID& VmId, uint32_t LinuxPort, uint32_t RelayPort, uint32_t Family)
     {
+        constexpr DWORD c_noDelay = 1;
+        THROW_LAST_ERROR_IF(
+            setsockopt(WindowsSocket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&c_noDelay), sizeof(c_noDelay)) == SOCKET_ERROR);
+
         wsl::shared::SocketChannel channel(wsl::windows::common::hvsocket::Connect(VmId, RelayPort), "SocketRelay");
 
         WI_VERIFY(Family == AF_INET || Family == AF_INET6);

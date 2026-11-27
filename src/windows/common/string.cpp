@@ -13,6 +13,7 @@ Abstract:
 --*/
 
 #include "precomp.h"
+#include <WslDeviceHost.h>
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -97,6 +98,56 @@ std::wstring_view wsl::windows::common::string::StripQuotes(_In_ std::wstring_vi
 std::string wsl::windows::common::string::IpPrefixAddressToString(const IP_ADDRESS_PREFIX& ipAddressPrefix)
 {
     return std::format("{}/{}", SockAddrInetToString(ipAddressPrefix.Prefix), static_cast<uint32_t>(ipAddressPrefix.PrefixLength));
+}
+
+std::string wsl::windows::common::string::IpAddressToString(const IpAddress& ipAddress)
+{
+    switch (ipAddress.family)
+    {
+    case IpAddressFamily_V4:
+    {
+        std::string formatted(INET_ADDRSTRLEN, '\0');
+        RtlIpv4AddressToStringA(reinterpret_cast<const IN_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::strlen(formatted.data()));
+        return formatted;
+    }
+    case IpAddressFamily_V6:
+    {
+        std::string formatted(INET6_ADDRSTRLEN, '\0');
+        RtlIpv6AddressToStringA(reinterpret_cast<const IN6_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::strlen(formatted.data()));
+        return formatted;
+    }
+    default:
+        THROW_HR(E_INVALIDARG);
+    }
+}
+
+std::wstring wsl::windows::common::string::IpAddressToWstring(const IpAddress& ipAddress, uint32_t scopeId)
+{
+    switch (ipAddress.family)
+    {
+    case IpAddressFamily_V4:
+    {
+        std::wstring formatted(INET_ADDRSTRLEN, L'\0');
+        RtlIpv4AddressToStringW(reinterpret_cast<const IN_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::wcslen(formatted.data()));
+        return formatted;
+    }
+    case IpAddressFamily_V6:
+    {
+        std::wstring formatted(INET6_ADDRSTRLEN, L'\0');
+        RtlIpv6AddressToStringW(reinterpret_cast<const IN6_ADDR*>(ipAddress.bytes), formatted.data());
+        formatted.resize(std::wcslen(formatted.data()));
+        if (scopeId != 0)
+        {
+            formatted += std::format(L"%{}", scopeId);
+        }
+        return formatted;
+    }
+    default:
+        THROW_HR(E_INVALIDARG);
+    }
 }
 
 std::string wsl::windows::common::string::SockAddrInetToString(const SOCKADDR_INET& sockAddrInet)
@@ -375,45 +426,26 @@ std::optional<uint64_t> wsl::windows::common::string::ParseStorageSize(std::wstr
     return static_cast<uint64_t>(bytes);
 }
 
-std::wstring wsl::windows::common::string::FormatStorageSize(uint64_t Bytes, StorageSizeUnit Unit, uint32_t DecimalPlaces, bool IncludeSpace)
+std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision, StorageSizeUnit Unit)
 {
-    constexpr size_t c_unitCount = 6;
-    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{L"B", L"KB", L"MB", L"GB", L"TB", L"PB"};
-    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB"};
+    constexpr size_t c_unitCount = 9;
+    constexpr std::array<std::wstring_view, c_unitCount> c_decimalUnits{
+        L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
+    constexpr std::array<std::wstring_view, c_unitCount> c_binaryUnits{
+        L"B", L"KiB", L"MiB", L"GiB", L"TiB", L"PiB", L"EiB", L"ZiB", L"YiB"};
 
     const double base = Unit == StorageSizeUnit::Decimal ? 1000.0 : 1024.0;
     const auto& units = Unit == StorageSizeUnit::Decimal ? c_decimalUnits : c_binaryUnits;
 
-    double value = static_cast<double>(Bytes);
+    auto value = static_cast<double>(Bytes);
     size_t unitIndex = 0;
     while (value >= base && unitIndex + 1 < c_unitCount)
     {
         value /= base;
-        ++unitIndex;
-    }
-
-    const auto formattedValue = unitIndex == 0 ? std::to_wstring(Bytes) : std::format(L"{:.{}f}", value, DecimalPlaces);
-    return std::format(L"{}{}{}", formattedValue, IncludeSpace ? L" " : L"", units[unitIndex]);
-}
-
-std::wstring wsl::windows::common::string::FormatBytes(uint64_t Bytes)
-{
-    return FormatStorageSize(Bytes, StorageSizeUnit::Decimal, 2, true);
-}
-
-std::wstring wsl::windows::common::string::FormatHumanReadableSize(uint64_t Bytes, uint32_t Precision)
-{
-    constexpr std::wstring_view c_units[] = {L"B", L"kB", L"MB", L"GB", L"TB", L"PB", L"EB", L"ZB", L"YB"};
-
-    auto value = static_cast<double>(Bytes);
-    size_t unitIndex = 0;
-    while (value >= 1000.0 && unitIndex + 1 < std::size(c_units))
-    {
-        value /= 1000.0;
         unitIndex++;
     }
 
-    return std::format(L"{:.{}g}{}", value, Precision, c_units[unitIndex]);
+    return std::format(L"{:.{}g}{}", value, Precision, units[unitIndex]);
 }
 
 std::wstring wsl::windows::common::string::TruncateId(_In_ std::wstring_view id, bool shortenLength)
@@ -426,65 +458,53 @@ std::string wsl::windows::common::string::TruncateId(_In_ std::string_view id, b
     return TruncateIdImpl(id, shortenLength);
 }
 
-std::uint64_t wsl::windows::common::string::Rfc3339ToEpoch(const std::string& timestamp)
+// Returns the number of terminal columns a code point occupies. This mirrors docker's charWidth, which treats
+// East Asian wide and fullwidth code points as two columns and everything else as one.
+static size_t CharacterWidth(UChar32 CodePoint)
 {
-    std::chrono::sys_seconds utcSeconds;
-    std::istringstream stream(timestamp);
-    stream >> std::chrono::parse("%FT%H:%M:%S%Z", utcSeconds);
-    THROW_HR_IF_MSG(E_INVALIDARG, stream.fail(), "Failed to parse timestamp '%hs'", timestamp.c_str());
-
-    return static_cast<std::uint64_t>(utcSeconds.time_since_epoch().count());
+    const auto width = u_getIntPropertyValue(CodePoint, UCHAR_EAST_ASIAN_WIDTH);
+    return (width == U_EA_WIDE || width == U_EA_FULLWIDTH) ? 2 : 1;
 }
 
-std::string wsl::windows::common::string::EpochToLocalDisplayTime(LONGLONG timestamp)
+std::wstring wsl::windows::common::string::Ellipsis(_In_ std::wstring_view Value, _In_ size_t MaxDisplayWidth)
 {
-    const auto time =
-        std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::from_time_t(static_cast<std::time_t>(timestamp)));
-
-    try
-    {
-        const auto* zone = std::chrono::current_zone();
-        return std::format("{:%F %T %z} {}", std::chrono::zoned_time{zone, time}, zone->get_info(time).abbrev);
-    }
-    catch (...)
-    {
-        // The time zone database is unavailable, so report UTC rather than failing the caller.
-        LOG_CAUGHT_EXCEPTION();
-        return std::format("{:%F %T} +0000 UTC", time);
-    }
-}
-
-std::string wsl::windows::common::string::Rfc3339ToUtcDisplayTime(std::string_view timestamp)
-{
-    if (timestamp.empty())
+    if (MaxDisplayWidth == 0 || Value.empty())
     {
         return {};
     }
 
-    // Fractional digits vary in length, so they are captured verbatim and re-inserted after formatting.
-    std::string parsable{timestamp};
-    std::string fraction;
-    const auto separator = parsable.find('.');
-    if (separator != std::string::npos)
+    const auto length = gsl::narrow_cast<int32_t>(Value.size());
+    if (MaxDisplayWidth == 1)
     {
-        auto end = separator + 1;
-        while (end < parsable.size() && (std::isdigit(static_cast<unsigned char>(parsable[end])) != 0))
+        // There is no room for both content and an ellipsis, so the leading code point is kept as-is even
+        // if it is wider than the limit.
+        int32_t index = 0;
+        UChar32 codePoint{};
+        U16_NEXT(Value.data(), index, length, codePoint);
+        return std::wstring{Value.substr(0, index)};
+    }
+
+    // The ellipsis occupies one column, so the retained content has one column less to work with.
+    const auto budget = MaxDisplayWidth - 1;
+    size_t totalWidth = 0;
+    size_t cutoff = 0;
+    for (int32_t index = 0; index < length;)
+    {
+        UChar32 codePoint{};
+        U16_NEXT(Value.data(), index, length, codePoint);
+        totalWidth += CharacterWidth(codePoint);
+        if (totalWidth <= budget)
         {
-            end++;
+            cutoff = index;
         }
-
-        fraction = parsable.substr(separator, end - separator);
-        parsable.erase(separator, end - separator);
     }
 
-    std::chrono::sys_seconds parsed{};
-    std::istringstream stream(parsable);
-    stream >> std::chrono::parse("%FT%H:%M:%S%Z", parsed);
-    if (stream.fail())
+    // A cutoff of zero means the first code point alone leaves no room for the ellipsis, in which case docker
+    // returns the value untouched.
+    if (totalWidth <= MaxDisplayWidth || cutoff == 0)
     {
-        return std::string{timestamp};
+        return std::wstring{Value};
     }
 
-    // Network timestamps are reported in UTC rather than the local time zone.
-    return std::format("{:%F %T}{} +0000 UTC", parsed, fraction);
+    return std::wstring{Value.substr(0, cutoff)} + L'\u2026';
 }

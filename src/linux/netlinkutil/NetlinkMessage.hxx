@@ -4,6 +4,7 @@
 #include <format>
 #include <string>
 #include <linux/if_link.h>
+#include <linux/inet_diag.h>
 
 #include "NetlinkMessage.h"
 #include "NetlinkParseException.h"
@@ -44,6 +45,12 @@ inline const rtattr* NetlinkMessage<ifaddrmsg>::FirstAttribute() const
     return IFA_RTA(NLMSG_DATA(&*m_begin));
 }
 
+template <>
+inline const rtattr* NetlinkMessage<inet_diag_msg>::FirstAttribute() const
+{
+    return reinterpret_cast<const rtattr*>(reinterpret_cast<const char*>(Payload()) + NLMSG_ALIGN(sizeof(inet_diag_msg)));
+}
+
 template <typename TAttribute>
 const rtattr* NetlinkMessage<TAttribute>::FirstAttribute() const
 {
@@ -63,7 +70,7 @@ std::vector<const TAttribute*> NetlinkMessage<TMessage>::Attributes(int type) co
         {
             const auto* ptr = reinterpret_cast<const TAttribute*>(RTA_DATA(e));
 
-            if (sizeof(TAttribute) > e->rta_len)
+            if (sizeof(TAttribute) > RTA_PAYLOAD(e))
             {
                 throw NetlinkParseException(
                     m_response,
@@ -71,7 +78,7 @@ std::vector<const TAttribute*> NetlinkMessage<TMessage>::Attributes(int type) co
                         "Attribute at offset {}: attempted to access beyond attribute offset ({} > {})",
                         (reinterpret_cast<const char*>(e) - &*m_responseBegin),
                         sizeof(TAttribute),
-                        e->rta_len));
+                        RTA_PAYLOAD(e)));
             }
 
             attributes.push_back(ptr);

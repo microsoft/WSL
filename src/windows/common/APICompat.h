@@ -60,6 +60,7 @@ public:
     DEFAULT_MOVABLE(ContainerOptionsConversion);
 
     explicit ContainerOptionsConversion(const WSLCCompatContainerOptions& Options);
+    explicit ContainerOptionsConversion(const WSLCCompatContainerOptions2& Options);
 
     const WSLCContainerOptions* Get() const noexcept
     {
@@ -68,6 +69,7 @@ public:
 
 private:
     WSLCContainerOptions m_value{};
+    std::vector<KeyValuePair> m_primaryNetworkSettings;
     std::vector<WSLCVolume> m_volumes;
     std::vector<WSLCPortMapping> m_ports;
     std::vector<WSLCLabel> m_labels;
@@ -122,6 +124,7 @@ public:
     DEFAULT_MOVABLE(SessionSettingsConversion);
 
     explicit SessionSettingsConversion(const WSLCCompatSessionSettings& Settings);
+    explicit SessionSettingsConversion(const WSLCCompatSessionSettings2& Settings);
 
     const WSLCSessionSettings* Get() const noexcept
     {
@@ -137,6 +140,11 @@ inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions& Opti
     return ContainerOptionsConversion(Options);
 }
 
+inline ContainerOptionsConversion Convert(const WSLCCompatContainerOptions2& Options)
+{
+    return ContainerOptionsConversion(Options);
+}
+
 inline ListImagesOptionsConversion Convert(const WSLCCompatListImagesOptions& Options)
 {
     return ListImagesOptionsConversion(Options);
@@ -148,6 +156,11 @@ inline VolumeOptionsConversion Convert(const WSLCCompatVolumeOptions& Options)
 }
 
 inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings& Settings)
+{
+    return SessionSettingsConversion(Settings);
+}
+
+inline SessionSettingsConversion Convert(const WSLCCompatSessionSettings2& Settings)
 {
     return SessionSettingsConversion(Settings);
 }

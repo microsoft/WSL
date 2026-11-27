@@ -21,6 +21,7 @@ Abstract:
 
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
+#include "HandleIO.h"
 #include "MsiQuery.h"
 #include "WslInstall.h"
 
@@ -33,9 +34,26 @@ using namespace wsl::windows::common::wslutil;
 
 constexpr auto c_latestReleaseUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/latest";
 constexpr auto c_releaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases";
+
+wsl::windows::common::io::HandleWrapper COMOutputHandle::Release()
+{
+    const auto type = Type;
+    const auto handle = Handle.File;
+    Handle.File = nullptr;
+    Type = WSLCHandleTypeUnknown;
+
+    if (type == WSLCHandleTypeSocket)
+    {
+        return wsl::windows::common::io::HandleWrapper{wil::unique_socket{reinterpret_cast<SOCKET>(handle)}};
+    }
+
+    return wsl::windows::common::io::HandleWrapper{wil::unique_handle{handle}};
+}
 constexpr auto c_specificReleaseListUrl = L"https://api.github.com/repos/Microsoft/WSL/releases/tags/";
 constexpr auto c_userAgent = L"wsl-install"; // required to use the GitHub API
 constexpr auto c_pipePrefix = L"\\\\.\\pipe\\";
+constexpr auto c_dockerHubDomain = "docker.io";
+constexpr std::string_view c_officialRepositoryPrefix = "library/";
 
 namespace {
 
@@ -89,10 +107,12 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSL_E_DISTRIBUTION_NAME_NEEDED),
     X(WSL_E_INVALID_JSON),
     X(WSL_E_VM_CRASHED),
+    X(WSL_E_GITHUB_RATE_LIMITED),
     X(WSL_E_NOT_A_LINUX_DISTRO),
     X(WSLC_E_CONTAINER_DISABLED),
     X(WSLC_E_REGISTRY_BLOCKED_BY_POLICY),
     X(WSLC_E_CONTAINER_PREFIX_AMBIGUOUS),
+    X(WSLC_E_CAPABILITY_ADDITIONS_DISABLED),
     X(E_ACCESSDENIED),
     X_WIN32(ERROR_NOT_FOUND),
     X_WIN32(ERROR_VERSION_PARSE_ERROR),
@@ -162,8 +182,12 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X(WSLC_E_SESSION_RESERVED),
     X(WSLC_E_INVALID_SESSION_NAME),
     X(WSLC_E_NETWORK_NOT_FOUND),
+    X(WSLC_E_NETWORK_PREFIX_AMBIGUOUS),
     X(WSLC_E_SESSION_NOT_FOUND),
     X(WSLC_E_VM_NOT_RUNNING),
+    X(WSLC_E_CONTAINER_DELETED),
+    X(WSLC_E_EVENTS_LOST),
+    X(WSLC_E_EVENT_STREAM_FINISHED),
     X(WSLC_E_WU_SEARCH_FAILED),
     X_WIN32(RPC_S_SERVER_UNAVAILABLE),
     X_WIN32(ERROR_ELEVATION_REQUIRED),
@@ -226,7 +250,8 @@ static const std::map<HRESULT, LPCWSTR> g_commonErrors{
     X_NT(STATUS_ACCESS_DENIED),
     X_NT(STATUS_CONNECTION_DISCONNECTED),
     X_NT(STATUS_INVALID_PARAMETER),
-    X_NT(STATUS_RETRY)};
+    X_NT(STATUS_RETRY),
+    X_WIN32(ERROR_INTERNAL_ERROR)};
 
 #undef X_NT
 #undef X_WIN32
@@ -354,6 +379,19 @@ std::regex BuildImageReferenceRegex()
     return std::regex("^" + capture(namePat) + optional(":" + capture(tag)) + optional("@" + capture(digest)) + "$");
 }
 
+void ThrowIfGitHubRateLimited(const winrt::Windows::Web::Http::HttpResponseMessage& response)
+{
+    const auto statusCode = response.StatusCode();
+    if (statusCode != winrt::Windows::Web::Http::HttpStatusCode::Forbidden && statusCode != winrt::Windows::Web::Http::HttpStatusCode::TooManyRequests)
+    {
+        return;
+    }
+
+    WSL_LOG("GitHubRateLimited", TraceLoggingValue(static_cast<uint32_t>(statusCode), "statusCode"));
+
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited());
+}
+
 } // namespace
 
 template <typename TInterface>
@@ -448,6 +486,7 @@ std::wstring wsl::windows::common::wslutil::DownloadFileImpl(
     auto filenameStem = std::filesystem::path(Filename).stem().wstring();
     auto filenameExtension = std::filesystem::path(Filename).extension().wstring();
     std::wstring filePath{};
+
     winrt::Windows::Storage::Streams::IRandomAccessStream outputStream{};
     for (int suffix = 1; outputStream == nullptr; suffix++)
     {
@@ -982,6 +1021,7 @@ std::pair<std::wstring, GitHubReleaseAsset> wsl::windows::common::wslutil::GetLa
     winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
+    ThrowIfGitHubRateLimited(response);
     response.EnsureSuccessStatusCode();
 
     return GetLatestGitHubRelease(preRelease, response.Content().ReadAsStringAsync().get().c_str());
@@ -1026,6 +1066,7 @@ GitHubRelease wsl::windows::common::wslutil::GetGitHubReleaseByTag(_In_ const st
     client.DefaultRequestHeaders().Append(L"User-Agent", c_userAgent);
     const auto url = c_specificReleaseListUrl + inTag;
     const auto response = client.GetAsync(winrt::Windows::Foundation::Uri(url)).get();
+    ThrowIfGitHubRateLimited(response);
     response.EnsureSuccessStatusCode();
 
     const auto content = response.Content().ReadAsStringAsync().get();
@@ -1231,6 +1272,36 @@ bool wsl::windows::common::wslutil::IsVhdFile(_In_ const std::filesystem::path& 
            wsl::windows::common::string::IsPathComponentEqual(path.extension().native(), c_vhdxFileExtension);
 }
 
+int wsl::windows::common::wslutil::LaunchElevated(_In_ LPCWSTR CommandLine)
+{
+    PrintMessage(GetSystemErrorString(HRESULT_FROM_WIN32(ERROR_ELEVATION_REQUIRED)));
+
+    // Add the attach parent process argument to the command line and shell execute an elevated version of wsl.exe.
+    std::wstring arguments;
+    arguments += WSL_PARENT_CONSOLE_ARG L" ";
+    arguments += std::to_wstring(GetCurrentProcessId());
+    arguments += L" ";
+    arguments += CommandLine;
+
+    const auto path = wil::GetModuleFileNameW<std::wstring>(wil::GetModuleInstanceHandle());
+    SHELLEXECUTEINFOW execInfo{};
+    execInfo.cbSize = sizeof(execInfo);
+    execInfo.fMask = (SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE | SEE_MASK_FLAG_NO_UI);
+    execInfo.lpFile = path.c_str();
+    execInfo.lpVerb = L"runas";
+    execInfo.nShow = SW_HIDE;
+    execInfo.lpParameters = arguments.c_str();
+    THROW_IF_WIN32_BOOL_FALSE(ShellExecuteExW(&execInfo));
+    const wil::unique_handle process{execInfo.hProcess};
+
+    // Get the process exit code.
+    WI_VERIFY(WaitForSingleObject(process.get(), INFINITE) == WAIT_OBJECT_0);
+
+    DWORD exitCode;
+    THROW_IF_WIN32_BOOL_FALSE(GetExitCodeProcess(process.get(), &exitCode));
+    return static_cast<int>(exitCode);
+}
+
 std::vector<DWORD> wsl::windows::common::wslutil::ListRunningProcesses()
 {
     std::vector<DWORD> pids(1024);
@@ -1251,15 +1322,13 @@ wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil
 {
     // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L126
 
-    constexpr auto defaultDomain = "docker.io";
-    constexpr auto officialPrefix = "library/";
     constexpr auto legacyDomain = "index.docker.io";
     constexpr auto localhost = "localhost";
 
     auto slash = input.find('/');
     if (slash == std::string::npos)
     {
-        return RepositoryReference{input, defaultDomain, officialPrefix + input};
+        return RepositoryReference{input, c_dockerHubDomain, std::format("{}{}", c_officialRepositoryPrefix, input)};
     }
 
     auto domain = input.substr(0, slash);
@@ -1267,19 +1336,19 @@ wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil
 
     if (domain == legacyDomain)
     {
-        domain = defaultDomain;
+        domain = c_dockerHubDomain;
     }
     else if (domain != localhost && domain.find_first_of(".:") == std::string::npos && !std::ranges::any_of(domain, [](unsigned char e) {
                  return std::isupper(e);
              }))
     {
-        domain = defaultDomain;
+        domain = c_dockerHubDomain;
         path = input;
     }
 
-    if (domain == defaultDomain && path.find('/') == std::string::npos)
+    if (domain == c_dockerHubDomain && path.find('/') == std::string::npos)
     {
-        path = "library/" + path;
+        path = std::format("{}{}", c_officialRepositoryPrefix, path);
     }
 
     return RepositoryReference{input, std::move(domain), std::move(path)};
@@ -1288,6 +1357,25 @@ wsl::windows::common::wslutil::RepositoryReference wsl::windows::common::wslutil
 std::string wsl::windows::common::wslutil::RepositoryReference::GetCanonical() const
 {
     return std::format("{}/{}", Server, Path);
+}
+
+std::string wsl::windows::common::wslutil::RepositoryReference::GetFamiliar() const
+{
+    // See: https://github.com/distribution/reference/blob/ff14fafe2236e51c2894ac07d4bdfc778e96d682/normalize.go#L179
+
+    if (Server != c_dockerHubDomain)
+    {
+        return GetCanonical();
+    }
+
+    // Only a single-component official repository drops its prefix, so "library/a/b" stays as is.
+    const std::string_view path{Path};
+    if (path.starts_with(c_officialRepositoryPrefix) && path.find('/', c_officialRepositoryPrefix.size()) == std::string_view::npos)
+    {
+        return std::string{path.substr(c_officialRepositoryPrefix.size())};
+    }
+
+    return Path;
 }
 
 std::pair<wil::unique_hfile, wil::unique_hfile> wsl::windows::common::wslutil::OpenAnonymousPipe(DWORD Size, bool ReadPipeOverlapped, bool WritePipeOverlapped)
@@ -1416,11 +1504,22 @@ std::tuple<uint32_t, uint32_t, uint32_t> wsl::windows::common::wslutil::ParseWsl
 
 wsl::windows::common::wslutil::ImageReference wsl::windows::common::wslutil::ImageReference::Parse(const std::string& input)
 {
+    auto reference = TryParse(input);
+    if (!reference.has_value())
+    {
+        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+    }
+
+    return std::move(reference.value());
+}
+
+std::optional<wsl::windows::common::wslutil::ImageReference> wsl::windows::common::wslutil::ImageReference::TryParse(const std::string& input)
+{
     static const auto regex = BuildImageReferenceRegex();
     std::smatch match;
     if (!std::regex_match(input, match, regex))
     {
-        THROW_HR_WITH_USER_ERROR(E_INVALIDARG, wsl::shared::Localization::MessageWslcInvalidImage(input.c_str()));
+        return std::nullopt;
     }
 
     const auto& repo = match[1];

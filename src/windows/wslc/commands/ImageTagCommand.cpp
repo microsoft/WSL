@@ -27,8 +27,8 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ImageTagCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Source, true),
-        Argument::Create(ArgType::Target, true),
+        Argument::Create(ArgType::Source, {.Required = true}),
+        Argument::Create(ArgType::Target, {.Required = true}),
     };
 }
 

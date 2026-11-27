@@ -53,6 +53,7 @@ Abstract:
 #include <unistd.h>
 #include <utmp.h>
 #include <assert.h>
+#include <iostream>
 #include "configfile.h"
 #include "lxfsshares.h"
 #include "common.h"
@@ -63,6 +64,7 @@ Abstract:
 #include "binfmt.h"
 #include "address.h"
 #include "SocketChannel.h"
+#include "WslDistributionConfig.h"
 
 #define BSDTAR_PATH "/usr/bin/bsdtar"
 #define BINFMT_REGISTER_STRING BINFMT_INTEROP_REGISTRATION_STRING_VM(LX_INIT_BINFMT_NAME) "\n"
@@ -85,6 +87,8 @@ Abstract:
 #define KERNEL_MODULES_PATH "/lib/modules"
 #define KERNEL_MODULES_VHD_PATH "/modules"
 #define KERNEL_MODULES_OVERLAY "/modules_overlay"
+#define KERNEL_HEADERS_TEMP_PATH "/kernel_headers"
+#define KERNEL_HEADERS_PATH_PREFIX "/usr/src/linux-headers-"
 #define MODPROBE_PATH "/sbin/modprobe"
 #define PROCFS_PATH "/proc"
 #define RESOLV_CONF_FILE "resolv.conf"
@@ -115,18 +119,49 @@ struct VmConfiguration
     bool EnableSystemDistro = false;
     bool EnableCrashDumpCollection = false;
     std::string KernelModulesPath;
+    std::string KernelHeadersTarget;
     LX_MINI_INIT_NETWORKING_MODE NetworkingMode = LxMiniInitNetworkingModeNone;
 };
 
 int g_LogFd = STDERR_FILENO;
 int g_TelemetryFd = -1;
 std::optional<bool> g_EnableSocketLogging;
+static std::set<pid_t> g_WorkerProcesses;
+
+void StartWorkerProcess(const char* Name, const std::function<void()>& Worker, std::set<int> InheritedFds = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd})
+{
+    // Keep mini_init single-threaded: raw namespace clones cannot safely inherit libc locks held by another thread.
+    const auto pid = UtilCreateChildProcess(Name, [&Worker, &InheritedFds]() {
+        g_LogFd = InheritedFds.contains(g_LogFd) ? g_LogFd : -1;
+        g_TelemetryFd = InheritedFds.contains(g_TelemetryFd) ? g_TelemetryFd : -1;
+
+        unsigned int firstFd = 0;
+        for (const int fd : InheritedFds)
+        {
+            if (firstFd < static_cast<unsigned int>(fd))
+            {
+                THROW_LAST_ERROR_IF(syscall(SYS_close_range, firstFd, static_cast<unsigned int>(fd) - 1, 0) < 0);
+            }
+
+            firstFd = static_cast<unsigned int>(fd) + 1;
+        }
+
+        THROW_LAST_ERROR_IF(syscall(SYS_close_range, firstFd, UINT_MAX, 0) < 0);
+        THROW_LAST_ERROR_IF(UtilRestoreBlockedSignals() < 0);
+        Worker();
+    });
+
+    THROW_LAST_ERROR_IF(pid < 0);
+    g_WorkerProcesses.insert(pid);
+}
 
 int Chroot(const char* Target);
 
 void CreateSwap(unsigned int Lun);
 
 int CreateTempDirectory(const char* ParentPath, std::string& Path);
+
+wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath);
 
 int DetachScsiDisk(unsigned int Lun);
 
@@ -163,7 +198,7 @@ void LaunchInit(
     const char* InstallPath = nullptr,
     const char* UserProfile = nullptr,
     std::optional<pid_t> DistroInitPid = {},
-    const char* DistroCgroupPath = nullptr);
+    int DistroCgroupNamespaceFd = -1);
 
 void LaunchSystemDistro(
     int SocketFd,
@@ -175,7 +210,7 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    const char* DistroCgroupPath);
+    int DistroCgroupNamespaceFd);
 
 std::map<unsigned long, std::string> ListDiskPartitions(const std::string& DeviceName, std::optional<unsigned long> WaitForIndex = {});
 
@@ -189,9 +224,10 @@ int MountSystemDistro(LX_MINI_INIT_MOUNT_DEVICE_TYPE DeviceType, unsigned int De
 
 int MountInit(const char* Target);
 
-int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize = {});
+int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort = LX_INIT_UTILITY_VM_PLAN9_PORT, std::optional<int> BufferSize = {});
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config);
+int ProcessMessage(
+    wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config, std::map<pid_t, GUID>& DistroInstances);
 
 wil::unique_fd RegisterSeccompHook();
 
@@ -1000,7 +1036,8 @@ Return Value:
         //
 
         std::string Config = std::format(
-            "option subnet_mask, routers, broadcast, domain_name, domain_name_servers, domain_search, host_name, interface_mtu\n"
+            "option subnet_mask, routers, broadcast_address, domain_name, domain_name_servers, domain_search, host_name, "
+            "interface_mtu\n"
             "noarp\n"
             "timeout {}\n",
             DhcpTimeout);
@@ -1427,7 +1464,7 @@ void LaunchInit(
     const char* InstallPath,
     const char* UserProfile,
     std::optional<pid_t> DistroInitPid,
-    const char* DistroCgroupPath)
+    int DistroCgroupNamespaceFd)
 
 /*++
 
@@ -1466,7 +1503,7 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
-    DistroCgroupPath - Supplies the cgroup path of this distribution.
+    DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
 
 Return Value:
 
@@ -1573,7 +1610,12 @@ Return Value:
     AddEnvironmentVariable(LX_WSL2_INSTALL_PATH, InstallPath);
     AddEnvironmentVariable(LX_WSL2_USER_PROFILE, UserProfile);
     AddEnvironmentVariable(LX_WSL2_NETWORKING_MODE_ENV, std::to_string(static_cast<int>(Config.NetworkingMode)).c_str());
-    AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_PATH, DistroCgroupPath);
+
+    if (DistroCgroupNamespaceFd >= 0)
+    {
+        THROW_LAST_ERROR_IF(SetCloseOnExec(DistroCgroupNamespaceFd, false));
+        AddEnvironmentVariable(LX_WSL2_DISTRO_CGROUP_NAMESPACE_FD, std::to_string(DistroCgroupNamespaceFd).c_str());
+    }
 
     if (DistroInitPid.has_value())
     {
@@ -1618,6 +1660,19 @@ Return Value:
     {
         AddTemporaryMount(LX_WSL2_KERNEL_MODULES_MOUNT_ENV, Config.KernelModulesPath.c_str(), (MS_MOVE | MS_REC));
         AddEnvironmentVariable(LX_WSL2_KERNEL_MODULES_PATH_ENV, Config.KernelModulesPath.c_str());
+    }
+
+    //
+    // If kernel headers were mounted, move them to a temporary location and pass the desired
+    // target path to the distro init via an environment variable. Distro init will move the
+    // mount to /usr/src/linux-headers-<uname -r> and create the
+    // /lib/modules/<release>/build symlink.
+    //
+
+    if (!Config.KernelHeadersTarget.empty())
+    {
+        AddTemporaryMount(LX_WSL2_KERNEL_HEADERS_MOUNT_ENV, KERNEL_HEADERS_TEMP_PATH, (MS_MOVE | MS_REC));
+        AddEnvironmentVariable(LX_WSL2_KERNEL_HEADERS_PATH_ENV, Config.KernelHeadersTarget.c_str());
     }
 
     //
@@ -1671,7 +1726,7 @@ void LaunchSystemDistro(
     const char* InstallPath,
     const char* UserProfile,
     pid_t DistroInitPid,
-    const char* DistroCgroupPath)
+    int DistroCgroupNamespaceFd)
 
 /*++
 
@@ -1708,7 +1763,7 @@ Arguments:
 
     DistroInitPid - Supplies the pid of the user distribution's init process.
 
-    DistroCgroupPath - Supplies the cgroup path of this distribution.
+    DistroCgroupNamespaceFd - Supplies the cgroup namespace shared by the user and system distros.
 
 Return Value:
 
@@ -1728,7 +1783,7 @@ try
     // Launch the init daemon, this method does not return.
     //
 
-    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupPath);
+    LaunchInit(SocketFd, Target, true, Config, VmId, DistributionName, SharedMemoryRoot, InstallPath, UserProfile, DistroInitPid, DistroCgroupNamespaceFd);
     _exit(1);
 }
 catch (...)
@@ -1896,7 +1951,7 @@ try
 }
 CATCH_RETURN_ERRNO()
 
-int MountPlan9(const char* Name, const char* Target, bool ReadOnly, std::optional<int> BufferSize)
+int MountPlan9(const char* Name, const char* Target, bool ReadOnly, unsigned int HostPort, std::optional<int> BufferSize)
 
 /*++
 
@@ -1912,6 +1967,8 @@ Arguments:
 
     ReadOnly - Supplies a boolean specifying if the share should be mounted as read-only.
 
+    HostPort - Supplies the host Plan 9 server port.
+
     BufferSize - Optionally supplies a buffer size to use for the hvsocket send / receive buffers and 9p msize.
 
 Return Value:
@@ -1923,7 +1980,7 @@ Return Value:
 try
 {
     int Size = BufferSize.value_or(LX_INIT_UTILITY_VM_PLAN9_BUFFER_SIZE);
-    wil::unique_fd Fd{UtilConnectVsock(LX_INIT_UTILITY_VM_PLAN9_PORT, true, Size)};
+    wil::unique_fd Fd{UtilConnectVsock(HostPort, true, Size)};
     if (!Fd)
     {
         return -1;
@@ -2164,7 +2221,9 @@ Return Value:
 
 try
 {
-    wil::unique_fd InitFd{open(Target, (O_CREAT | O_WRONLY | O_TRUNC), 0755)};
+    THROW_LAST_ERROR_IF(unlink(Target) < 0 && errno != ENOENT);
+
+    wil::unique_fd InitFd{open(Target, (O_CREAT | O_EXCL | O_WRONLY), 0755)};
     THROW_LAST_ERROR_IF(!InitFd);
 
     THROW_LAST_ERROR_IF(mount(LX_INIT_PATH, Target, nullptr, (MS_RDONLY | MS_BIND), nullptr) < 0);
@@ -2238,17 +2297,6 @@ void ProcessLaunchInitMessage(
         auto MiniInitDirectChildPidPath = std::filesystem::read_symlink(PROCFS_PATH "/self");
         pid_t MiniInitDirectChildPid = std::stoul(MiniInitDirectChildPidPath.string());
 
-        bool bootInit = false;
-        bool enableGuiApps = Config.EnableGuiApps;
-        {
-            wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
-            if (File)
-            {
-                std::vector<ConfigKey> ConfigKeys = {ConfigKey("boot.systemd", bootInit), ConfigKey("general.guiApplications", enableGuiApps)};
-                ParseConfigFile(ConfigKeys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(CONFIG_FILE));
-            }
-        }
-
         //
         // Set up the per-distro cgroup before potentially forking into two inits.
         //
@@ -2260,7 +2308,6 @@ void ProcessLaunchInitMessage(
 
             auto cleanup = wil::scope_exit([&]() {
                 rmdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str());
-                rmdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str());
                 rmdir(DistroCgroupPath.c_str());
                 DistroCgroupPath.clear();
             });
@@ -2268,17 +2315,17 @@ void ProcessLaunchInitMessage(
             try
             {
                 THROW_LAST_ERROR_IF(UtilMkdir(DistroCgroupPath.c_str(), 0755) < 0);
-
-                if (bootInit)
-                {
-                    THROW_LAST_ERROR_IF(UtilEnableAllCgroupControllers(DistroCgroupPath) < 0);
-                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
-                    THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
-                }
+                THROW_LAST_ERROR_IF(UtilMkdir((DistroCgroupPath + WSL_USER_NON_SYSTEMD_CGROUP_DIR).c_str(), 0755) < 0);
 
                 cleanup.release();
             }
             CATCH_LOG();
+        }
+
+        wil::unique_fd DistroCgroupNamespace;
+        if (!DistroCgroupPath.empty())
+        {
+            DistroCgroupNamespace = CreateDistroCgroupNamespace(DistroCgroupPath);
         }
 
         //
@@ -2288,9 +2335,20 @@ void ProcessLaunchInitMessage(
         //      of GUI app support because WslService is waiting to accept a connection.
         //
 
+        bool enableGuiApps = false;
         if (Message->Flags & LxMiniInitMessageFlagLaunchSystemDistro && Config.EnableGuiApps)
         {
             Step = LxInitCreateInstanceStepLaunchSystemDistro;
+
+            enableGuiApps = true;
+            {
+                wil::unique_file File{fopen(DISTRO_PATH ETC_PATH "/wsl.conf", "r")};
+                if (File)
+                {
+                    std::vector<ConfigKey> ConfigKeys = {ConfigKey("general.guiApplications", enableGuiApps)};
+                    ParseConfigFile(ConfigKeys, File.get(), (CFG_SKIP_INVALID_LINES | CFG_SKIP_UNKNOWN_VALUES), STRING_TO_WSTRING(CONFIG_FILE));
+                }
+            }
 
             //
             // If the distro did not opt-out of GUI applications, continue launching the system distro.
@@ -2348,7 +2406,7 @@ void ProcessLaunchInitMessage(
                         wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
                         wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
                         ChildPid,
-                        DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
+                        DistroCgroupNamespace.get());
                 }
             }
 
@@ -2371,7 +2429,7 @@ void ProcessLaunchInitMessage(
             wsl::shared::string::FromSpan(Buffer, Message->InstallPathOffset),
             wsl::shared::string::FromSpan(Buffer, Message->UserProfileOffset),
             std::nullopt,
-            DistroCgroupPath.empty() ? nullptr : DistroCgroupPath.c_str());
+            DistroCgroupNamespace.get());
     }
     catch (...)
     {
@@ -2431,29 +2489,16 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
         Message.WriteString(Message->VersionIndex, version.value());
     }
 
-    std::string defaultName{};
-    std::string shortcutIconPath;
-    std::string terminalProfileTemplatePath;
-    Message->GenerateTerminalProfile = true;
-    Message->GenerateShortcut = true;
+    const auto manifest = wsl::linux::ParseWslDistributionManifest();
+    Message->GenerateTerminalProfile = manifest.GenerateTerminalProfile;
+    Message->GenerateShortcut = manifest.GenerateShortcut;
 
-    std::vector<ConfigKey> keys = {
-        ConfigKey("shortcut.icon", shortcutIconPath),
-        ConfigKey("shortcut.enabled", Message->GenerateShortcut),
-        ConfigKey("oobe.defaultName", defaultName),
-        ConfigKey("windowsterminal.profileTemplate", terminalProfileTemplatePath),
-        ConfigKey("windowsterminal.enabled", Message->GenerateTerminalProfile)};
-
+    if (!manifest.DefaultName.empty())
     {
-        wil::unique_file File{fopen(WSL_DISTRIBUTION_CONF, "r")};
-        ParseConfigFile(keys, File.get(), CFG_SKIP_UNKNOWN_VALUES, STRING_TO_WSTRING(WSL_DISTRIBUTION_CONF));
+        Message.WriteString(Message->DefaultNameIndex, manifest.DefaultName);
     }
 
-    if (!defaultName.empty())
-    {
-        Message.WriteString(Message->DefaultNameIndex, defaultName);
-    }
-
+    const auto& shortcutIconPath = manifest.ShortcutIconPath;
     try
     {
         if (!shortcutIconPath.empty())
@@ -2473,6 +2518,7 @@ void PostProcessImportedDistribution(wsl::shared::MessageWriter<LX_MINI_INIT_IMP
     }
     CATCH_LOG();
 
+    const auto& terminalProfileTemplatePath = manifest.TerminalProfileTemplatePath;
     try
     {
         if (Message->GenerateTerminalProfile && !terminalProfileTemplatePath.empty())
@@ -2633,7 +2679,7 @@ Return Value:
         return -1;
     }
 
-    int Result = MountPlan9(Name, Target, Message->ReadOnly);
+    int Result = MountPlan9(Name, Target, Message->ReadOnly, LX_INIT_UTILITY_VM_PLAN9_PLUGIN_PORT);
     Transaction.SendResultMessage<int32_t>(Result);
     return 0;
 }
@@ -2769,10 +2815,8 @@ Return Value:
                 }
 
                 Step = LxMiniInitMountStepRmDir;
-                Result = rmdir(Target.c_str());
-                if (Result < 0)
+                if (rmdir(Target.c_str()) < 0)
                 {
-                    Result = -errno;
                     LOG_ERROR("rmdir({}) failed, {}", Target.c_str(), errno);
                 }
             }
@@ -2933,7 +2977,9 @@ try
             auto DevicePath = GetLunDevicePath(Message->ScsiLun);
 
             auto CommandLine = std::format("/usr/sbin/e2fsck -f -y '{}'", DevicePath);
-            THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str()) < 0);
+            // 1: filesystem errors were corrected.
+            // 2: filesystem errors were corrected and system needs reboot.
+            THROW_LAST_ERROR_IF(UtilExecCommandLine(CommandLine.c_str(), nullptr, {0, 1, 2}) < 0);
 
             if (Message->NewSize == 0)
             {
@@ -3006,7 +3052,7 @@ try
 }
 CATCH_RETURN_ERRNO();
 
-int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config)
+int ProcessMessage(wsl::shared::Transaction& Transaction, LX_MESSAGE_TYPE Type, gsl::span<gsl::byte> Buffer, VmConfiguration& Config, std::map<pid_t, GUID>& DistroInstances)
 
 /*++
 
@@ -3021,6 +3067,8 @@ Arguments:
     Buffer - Supplies the message.
 
     Config - Supplies the VM configuration.
+
+    DistroInstances - Maps unreaped distribution processes to their launch identities.
 
 Return Value:
 
@@ -3082,6 +3130,11 @@ try
                     }
                 },
                 (CLONE_NEWIPC | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS | SIGCHLD));
+
+            if (ChildPid > 0)
+            {
+                DistroInstances.emplace(ChildPid, Message->InstanceId);
+            }
 
             return (ChildPid < 0) ? -1 : 0;
         }
@@ -3149,12 +3202,6 @@ try
         }
 
         //
-        // Configure memory reclamation.
-        //
-
-        StartMemoryReductionThread(EarlyConfig->MemoryReclaimMode);
-
-        //
         // Initialize system distro if supported.
         //
 
@@ -3218,7 +3265,7 @@ try
         // N.B. The VHD is mounted as read-only but with a writable overlayfs layer. The modules
         //      directory must be writable for tools like depmod to work.
         //
-        // N.B. The artifacts VHD nests the modules under <release>/modules.
+        // N.B. The artifacts VHD nests its modules and headers under <release>/{modules,linux-headers}.
         //      Older module-only VHDs place the modules tree at the filesystem root; fall back to that
         //      layout when the nested modules directory is not present.
         //
@@ -3248,7 +3295,7 @@ try
             {
                 LOG_WARNING(
                     "kernel modules VHD uses the legacy flat layout; support for the legacy modules VHD format will be "
-                    "removed in a future version");
+                    "removed in a future version; kernel headers are unavailable");
             }
             else if (!NestedLayout)
             {
@@ -3271,6 +3318,20 @@ try
             }
 
             Config.KernelModulesPath = std::move(Target);
+
+            //
+            // When the nested artifacts layout is present, bind mount the kernel headers to a temporary
+            // location. Each distro init moves them to /usr/src/linux-headers-<release> (see config.cpp).
+            //
+
+            if (NestedLayout)
+            {
+                const std::string HeadersSource = ArtifactsBase + "/linux-headers";
+                if (UtilMount(HeadersSource.c_str(), KERNEL_HEADERS_TEMP_PATH, nullptr, (MS_BIND | MS_REC), nullptr) == 0)
+                {
+                    Config.KernelHeadersTarget = std::format("{}{}", KERNEL_HEADERS_PATH_PREFIX, Release);
+                }
+            }
         }
 
         //
@@ -3289,6 +3350,16 @@ try
         if (StartGuestNetworkService(SocketFd.get(), std::move(DnsTunnelingSocketFd), EarlyConfig->DnsTunnelingIpAddress) < 0)
         {
             return -1;
+        }
+
+        // Start after the system-distro chroot so the worker uses the final procfs and cgroup mounts.
+        if (EarlyConfig->MemoryReclaimMode != LxMiniInitMemoryReclaimModeDisabled)
+        {
+            try
+            {
+                StartWorkerProcess("MemoryReclaim", [mode = EarlyConfig->MemoryReclaimMode]() { RunMemoryReduction(mode); });
+            }
+            CATCH_LOG()
         }
 
         return 0;
@@ -3371,14 +3442,15 @@ try
         return ProcessMountFolderMessage(Transaction, Buffer);
 
     case LxInitCreateProcess:
-        if (access(WSL_USER_NON_DISTRO_CGROUP_PATH, F_OK) == 0)
+    {
+        std::optional<std::string> CgroupPath;
+        if (access(WSL_USER_INTERNAL_CGROUP_PATH, F_OK) == 0)
         {
-            return ProcessCreateProcessMessage(Transaction, Buffer, WSL_USER_NON_DISTRO_CGROUP_PATH);
+            CgroupPath = WSL_USER_INTERNAL_CGROUP_PATH;
         }
-        else
-        {
-            return ProcessCreateProcessMessage(Transaction, Buffer, std::nullopt);
-        }
+
+        return ProcessCreateProcessMessage(Transaction, Buffer, CgroupPath);
+    }
 
     case LxMiniInitMessageWaitForPmemDevice:
     {
@@ -3474,12 +3546,14 @@ Return Value:
         //     return SECCOMP_RET_ALLOW;
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
-    // Note: 32bit on x86_64 uses the __NR_socketcall with the first argument
-    // set to SYS_BIND/SYS_LISTEN to make bind()/listen() system calls.
+    // On x86, 32-bit bind()/listen() can use direct syscalls or socketcall with
+    // SYS_BIND/SYS_LISTEN as its first argument.
 #ifdef __x86_64__
         // 32bit:
-        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_nr),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_bind, 5, 0),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_listen, 4, 0),
+        // If syscall_nr == __NR_socketcall then continue else goto allow:
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, I386_NR_socketcall, 0, 4),
         // if syscall arg0 == SYS_BIND then goto user_notify: else continue
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, syscall_arg(0)),
@@ -3565,6 +3639,10 @@ try
     // and the kernel version is >= 5.10, then SECCOMP_USER_NOTIF_FLAG_CONTINUE is available.
     uint32_t SeccompFlag = SECCOMP_RET_USER_NOTIF;
     Message->SeccompAvailable = syscall(__NR_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &SeccompFlag) == 0;
+
+    wil::unique_fd ipv6Socket{socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0)};
+    // Treat any error as not available.
+    Message->Ipv6Available = !!ipv6Socket;
 
     auto pool = UtilReadHvPciSwiotlbPool();
     Message->HvPciSwiotlbBase = pool.Base;
@@ -3798,27 +3876,30 @@ void EnableDebugMode(const std::string& Mode)
             WriteToFile(e, "1");
         }
 
+        // Open before forking: mini_init can move sysfs into the system distro before the worker runs.
+        constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
+        wil::unique_fd tracePipe{open(path, O_RDONLY | O_CLOEXEC)};
+        if (!tracePipe)
+        {
+            LOG_ERROR("Failed to open {}, {}", path, errno);
+            return;
+        }
+
         // Relay logs to the host.
-        std::thread relayThread{[]() {
-            constexpr auto path = "/sys/kernel/debug/tracing/trace_pipe";
-            std::ifstream file(path);
+        StartWorkerProcess(
+            "TracePipe",
+            [path, traceFd = tracePipe.get()]() {
+                THROW_LAST_ERROR_IF(dup2(traceFd, STDIN_FILENO) < 0);
 
-            if (!file)
-            {
-                LOG_ERROR("Failed to open {}, {}", path, errno);
-                return;
-            }
+                std::string line;
+                while (std::getline(std::cin, line))
+                {
+                    LOG_INFO("{}", line);
+                }
 
-            std::string line;
-            while (std::getline(file, line))
-            {
-                LOG_INFO("{}", line);
-            }
-
-            LOG_ERROR("{}: closed", path);
-        }};
-
-        relayThread.detach();
+                LOG_ERROR("{}: closed", path);
+            },
+            {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, g_LogFd, tracePipe.get()});
     }
     else
     {
@@ -3889,9 +3970,9 @@ Return Value:
         return;
     }
 
-    if (UtilMkdir(WSL_USER_NON_DISTRO_CGROUP_PATH, 0755) < 0)
+    if (UtilMkdir(WSL_USER_INTERNAL_CGROUP_PATH, 0755) < 0)
     {
-        LOG_ERROR("Failed to create wsl-user non-distro cgroup directory {}", errno);
+        LOG_ERROR("Failed to create wsl-user internal cgroup directory {}", errno);
         return;
     }
 
@@ -3922,11 +4003,55 @@ Return Value:
     LOG_INFO("WSL user cgroup cpu.max={} (nproc={}, reserved={}us)", userCpuMax, nproc, c_systemReservedCpuMicros);
 }
 
+wil::unique_fd CreateDistroCgroupNamespace(const std::string& CgroupPath)
+{
+    wil::unique_fd OriginalCgroupNamespace{open(PROCFS_PATH "/self/ns/cgroup", O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!OriginalCgroupNamespace);
+
+    wil::unique_fd OriginalCgroup{open(CGROUP_MOUNTPOINT "/cgroup.procs", O_WRONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!OriginalCgroup);
+
+    bool RestoreNamespace = false;
+    bool RestoreCgroup = false;
+    auto RestoreOriginalState = wil::scope_exit([&]() {
+        if (RestoreNamespace && setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0)
+        {
+            LOG_ERROR("Failed to restore cgroup namespace {}", errno);
+            return;
+        }
+
+        if (RestoreCgroup && UtilWriteStringView(OriginalCgroup.get(), "0") != 1)
+        {
+            LOG_ERROR("Failed to restore cgroup {}", errno);
+        }
+    });
+
+    THROW_LAST_ERROR_IF(UtilMoveSelfToCgroup(CgroupPath, "cgroup namespace") < 0);
+    RestoreCgroup = true;
+
+    THROW_LAST_ERROR_IF(unshare(CLONE_NEWCGROUP) < 0);
+    RestoreNamespace = true;
+
+    wil::unique_fd CgroupNamespace{open(PROCFS_PATH "/self/ns/cgroup", O_RDONLY | O_CLOEXEC)};
+    THROW_LAST_ERROR_IF(!CgroupNamespace);
+
+    THROW_LAST_ERROR_IF(setns(OriginalCgroupNamespace.get(), CLONE_NEWCGROUP) < 0);
+    RestoreNamespace = false;
+    THROW_LAST_ERROR_IF(UtilWriteStringView(OriginalCgroup.get(), "0") != 1);
+    RestoreCgroup = false;
+    RestoreOriginalState.release();
+
+    wil::unique_fd InheritedCgroupNamespace{fcntl(CgroupNamespace.get(), F_DUPFD_CLOEXEC, LX_INIT_UTILITY_VM_INIT_SOCKET_FD + 1)};
+    THROW_LAST_ERROR_IF(!InheritedCgroupNamespace);
+    return InheritedCgroupNamespace;
+}
+
 int main(int Argc, char* Argv[])
 {
     std::vector<gsl::byte> Buffer;
     ssize_t BytesRead;
     VmConfiguration Config{};
+    std::map<pid_t, GUID> DistroInstances;
     wil::unique_fd ConsoleFd{};
     wsl::shared::SocketChannel channel;
     wil::unique_fd NotifyFd{};
@@ -4129,7 +4254,7 @@ int main(int Argc, char* Argv[])
         }
     }
 
-    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, nullptr) < 0)
+    if (UtilMount(nullptr, CGROUP_MOUNTPOINT, CGROUP2_DEVICE, 0, "nsdelegate") < 0)
     {
         Result = -1;
         LOG_ERROR("Failed to mount cgroup2: {}", errno);
@@ -4194,7 +4319,7 @@ int main(int Argc, char* Argv[])
                 break; // Socket was closed, exit
             }
 
-            Result = ProcessMessage(transaction, Message->MessageType, Range, Config);
+            Result = ProcessMessage(transaction, Message->MessageType, Range, Config, DistroInstances);
             if (Result < 0)
             {
                 goto ErrorExit;
@@ -4235,6 +4360,12 @@ int main(int Argc, char* Argv[])
                 }
                 else if (Result > 0)
                 {
+                    if (g_WorkerProcesses.erase(Result) != 0)
+                    {
+                        LOG_WARNING("Background process {} exited with status {}", Result, Status);
+                        continue;
+                    }
+
                     //
                     // Perform a sync to flush all writes.
                     //
@@ -4248,8 +4379,6 @@ int main(int Argc, char* Argv[])
                     auto CgroupDir = UtilGetDistroCgroupPath(Result);
                     if (access(CgroupDir.c_str(), F_OK) == 0)
                     {
-                        LOG_INFO("Process {} exited, removing cgroup {}", Result, CgroupDir);
-
                         //
                         // Recursively rmdir the cgroup subtree.
                         //
@@ -4290,6 +4419,12 @@ int main(int Argc, char* Argv[])
                     Message.Header.MessageType = LxMiniInitMessageChildExit;
                     Message.Header.MessageSize = sizeof(Message);
                     Message.ChildPid = Result;
+                    // Preserve the launch identity even if this PID is reused before the host processes the notification.
+                    if (const auto instance = DistroInstances.extract(Result); !instance.empty())
+                    {
+                        Message.InstanceId = instance.mapped();
+                    }
+
                     Result = UtilWriteBuffer(NotifyFd.get(), gslhelpers::struct_as_bytes(Message));
                     if (Result < 0)
                     {

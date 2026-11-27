@@ -22,6 +22,8 @@ public:
     DnsTunnelingChannel(DnsTunnelingChannel&&) = delete;
     DnsTunnelingChannel& operator=(DnsTunnelingChannel&&) = delete;
 
+    void Start();
+
     // Construct and send a LX_GNS_DNS_TUNNELING_MESSAGE message on the channel.
     // Note: Callers are responsible for sequencing calls to this method.
     //

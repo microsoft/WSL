@@ -14,6 +14,7 @@ Abstract:
 
 #pragma once
 
+#include "wslc.h"
 #include <cstdint>
 #include <exception>
 #include <optional>
@@ -21,17 +22,11 @@ Abstract:
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace wsl::windows::common::mount {
 
-inline constexpr std::string_view c_dockerCliMountGrammarVersion = "25.0.3";
-
-enum class Type
-{
-    Bind,
-    Volume,
-    Tmpfs,
-};
+using Type = WSLCMountType;
 
 enum class BindSourcePolicy
 {
@@ -41,7 +36,7 @@ enum class BindSourcePolicy
 
 struct Spec
 {
-    Type MountType = Type::Volume;
+    Type MountType = WSLCMountTypeVolume;
     std::wstring Source;
     std::string Target;
     bool ReadOnly = false;
@@ -49,6 +44,11 @@ struct Spec
     std::optional<int64_t> TmpfsSizeBytes;
     std::optional<uint32_t> TmpfsMode;
     std::optional<std::string> TmpfsOptions;
+    std::vector<std::wstring> Modes;
+
+    // Anonymous volume declared in the container config instead of as a structured mount.
+    // The target may be relative; it is resolved against the container root.
+    bool ConfigVolume = false;
 };
 
 enum class ValidationError

@@ -7,6 +7,7 @@ nav:
   - container-apis
   - process-apis
   - image-apis
+  - network-apis
   - storage-apis
   - install-and-version-apis
   - enumerations

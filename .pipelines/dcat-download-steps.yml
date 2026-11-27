@@ -1,0 +1,29 @@
+# DCAT requires using a custom pool, and custom pools don't get automatic artifact downloads from
+# templateContext.inputs, so artifacts need to be downloaded explicitly.
+parameters:
+  # Build pipeline resource to download from. Defaults to the current pipeline if empty.
+  - name: artifactPipeline
+    type: string
+    default: ''
+
+  # Each item has a name, a targetPath to download into, and optionally a patterns filter.
+  - name: artifacts
+    type: object
+
+steps:
+  - ${{ each artifact in parameters.artifacts }}:
+      - task: DownloadPipelineArtifact@2
+        displayName: Download ${{ artifact.name }}
+        inputs:
+          ${{ if ne(parameters.artifactPipeline, '') }}:
+            source: specific
+            project: $(resources.pipeline.${{ parameters.artifactPipeline }}.projectID)
+            pipeline: $(resources.pipeline.${{ parameters.artifactPipeline }}.pipelineID)
+            runVersion: specific
+            runId: $(resources.pipeline.${{ parameters.artifactPipeline }}.runID)
+          ${{ else }}:
+            source: current
+          artifact: ${{ artifact.name }}
+          ${{ if artifact.patterns }}:
+            patterns: ${{ artifact.patterns }}
+          targetPath: ${{ artifact.targetPath }}

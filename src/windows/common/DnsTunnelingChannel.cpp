@@ -9,14 +9,16 @@ DnsTunnelingChannel::DnsTunnelingChannel(wil::unique_socket&& socket, DnsTunneli
     m_channel{std::move(socket), "DnsTunneling", {m_stopEvent.get()}}, m_reportDnsRequest(std::move(reportDnsRequest))
 {
     WSL_LOG("DnsTunnelingChannel::DnsTunnelingChannel [Windows]", TraceLoggingValue(m_channel.Socket(), "socket"));
-
-    // Start thread waiting for incoming messages from Linux side
-    m_receiveWorkerThread = std::thread([this]() { ReceiveLoop(); });
 }
 
 DnsTunnelingChannel::~DnsTunnelingChannel()
 {
     Stop();
+}
+
+void DnsTunnelingChannel::Start()
+{
+    m_receiveWorkerThread = std::thread([this]() { ReceiveLoop(); });
 }
 
 void DnsTunnelingChannel::SendDnsMessage(const gsl::span<gsl::byte> dnsBuffer, const LX_GNS_DNS_CLIENT_IDENTIFIER& dnsClientIdentifier) noexcept

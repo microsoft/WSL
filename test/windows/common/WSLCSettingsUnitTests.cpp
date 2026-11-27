@@ -1,0 +1,927 @@
+/*++
+
+Copyright (c) Microsoft. All rights reserved.
+
+Module Name:
+
+    WSLCCLISettingsUnitTests.cpp
+
+Abstract:
+
+    Unit tests for the wslc UserSettings system: SettingsMap, YAML loading,
+    per-setting validation, fallback logic, and UserSettingsType detection.
+
+--*/
+
+#include "precomp.h"
+#include "Common.h"
+#include "WSLCCLITestHelpers.h"
+#include "WSLCUserSettings.h"
+#include "wslc/WSLCProxy.h"
+
+#include <atomic>
+#include <fstream>
+
+using namespace wsl::windows::wslc::settings;
+using namespace wsl::windows::wslc;
+using namespace WSLCTestHelpers;
+using namespace WEX::Logging;
+using namespace WEX::Common;
+using namespace WEX::TestExecution;
+using Loc = wsl::shared::Localization;
+
+namespace WSLCCLISettingsUnitTests {
+
+// Thin subclass that makes the protected constructor publicly accessible,
+// allowing tests to load settings from an arbitrary directory without
+// going through the singleton.
+class UserSettingsTest : public UserSettings
+{
+public:
+    explicit UserSettingsTest(const std::filesystem::path& settingsDir) : UserSettings(settingsDir)
+    {
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+static std::atomic<int> s_dirCounter{0};
+
+static std::filesystem::path UniqueTempDir()
+{
+    auto dir = std::filesystem::temp_directory_path() / L"WSLCSettingsTests" / std::to_wstring(GetCurrentProcessId()) /
+               std::to_wstring(++s_dirCounter);
+    std::filesystem::create_directories(dir);
+    return dir;
+}
+
+static void WriteFile(const std::filesystem::path& path, std::string_view content)
+{
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream f(path, std::ios::binary);
+    VERIFY_IS_TRUE(f.is_open());
+    f.write(content.data(), static_cast<std::streamsize>(content.size()));
+}
+
+// ---------------------------------------------------------------------------
+// Test class
+// ---------------------------------------------------------------------------
+
+class WSLCCLISettingsUnitTests
+{
+    WSLC_TEST_CLASS(WSLCCLISettingsUnitTests)
+
+    TEST_CLASS_SETUP(TestClassSetup)
+    {
+        return true;
+    }
+
+    TEST_CLASS_CLEANUP(TestClassCleanup)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(std::filesystem::temp_directory_path() / L"WSLCSettingsTests", ec);
+        return true;
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsMap — pure unit tests, no I/O
+    // -----------------------------------------------------------------------
+
+    // All four settings should return their compile-time defaults when the map
+    // is empty (no values have been inserted).
+    TEST_METHOD(SettingsMap_GetOrDefault_ReturnsBuiltInWhenAbsent)
+    {
+        SettingsMap map;
+        VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, map.GetOrDefault<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(map.GetOrDefault<Setting::CredentialStore>()));
+    }
+
+    // After inserting a value, GetOrDefault must return it rather than the default.
+    TEST_METHOD(SettingsMap_GetOrDefault_ReturnsStoredWhenPresent)
+    {
+        SettingsMap map;
+        map.Add<Setting::SessionCpuCount>(16u);
+        VERIFY_ARE_EQUAL(16u, map.GetOrDefault<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, map.GetOrDefault<Setting::SessionMemoryMb>());
+    }
+
+    // -----------------------------------------------------------------------
+    // Default (setting file missing)
+    // -----------------------------------------------------------------------
+
+    // When settings file missing, the type must be Default, there
+    // must be no warnings, and all values must be at their built-in defaults.
+    TEST_METHOD(LoadSettings_NoFiles_YieldsDefaultTypeAndNoWarnings)
+    {
+        UserSettingsTest s{UniqueTempDir()};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Standard (valid settings)
+    // -----------------------------------------------------------------------
+
+    // A well-formed settings file must set the type to Standard with no
+    // warnings and the specified values loaded.
+    TEST_METHOD(LoadSettings_ValidSettings_YieldsStandardTypeAndValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 8\n"
+            "  memorySize: 4GB\n"
+            "  maxStorageSize: 20000MB\n"
+            "credentialStore: file\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(4096u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(20000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::File), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    TEST_METHOD(LoadSettings_StorageSizeFormats_YieldExpectedValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  memorySize: \" 1.5GiB\"\n"
+            "  maxStorageSize: 20.5GB\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(1536u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(20992u, s.Get<Setting::SessionStorageSizeMb>());
+    }
+
+    // An empty settings file is valid YAML (null document) but not a mapping;
+    // a structure warning is emitted and all settings use defaults.
+    TEST_METHOD(LoadSettings_EmptySettings_WarnsInvalidStructure)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(Loc::WSLCUserSettings_Warning_InvalidStructure(s.SettingsFilePath().wstring()), s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+    }
+
+    // A non-map root (e.g. bare scalar) is valid YAML but invalid structure;
+    // a warning is emitted and all settings use defaults.
+    TEST_METHOD(LoadSettings_NonMapRoot_WarnsInvalidStructure)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "just a string\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(Loc::WSLCUserSettings_Warning_InvalidStructure(s.SettingsFilePath().wstring()), s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+    }
+
+    // When the settings file fails to parse, the type is Default and a warning is emitted.
+    TEST_METHOD(LoadSettings_InvalidSettings_YieldsDefaultTypeWithWarning)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session: [\n"); // broken YAML (unclosed flow seq)
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Default), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        // Parse errors include yaml-cpp details, so check prefix including the file path.
+        VERIFY_IS_TRUE(s.GetWarnings().front().Message.starts_with(
+            L"Warning: Settings file at " + s.SettingsFilePath().wstring() + L" could not be parsed."));
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+    }
+
+    // -----------------------------------------------------------------------
+    // Per-setting validation
+    // -----------------------------------------------------------------------
+
+    // cpuCount: 0 is rejected by validation; the default (0) is used and a warning emitted.
+    TEST_METHOD(Validation_CpuCount_Zero_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 0\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.cpuCount", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.cpuCount"), s.GetWarnings().front().SettingPath);
+    }
+
+    // memorySize: 0 is rejected by validation; the default (0) is used.
+    TEST_METHOD(Validation_MemoryMb_Zero_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  memorySize: 0\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.memorySize", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+    }
+
+    TEST_METHOD(Validation_MemoryMb_Limits_AreEnforced)
+    {
+        struct TestCase
+        {
+            std::string Value;
+            uint32_t Expected;
+            bool IsValid;
+        };
+
+        const std::vector<TestCase> TestCases{
+            {"0.5MiB", 0, false},
+            {"4294967295MiB", std::numeric_limits<uint32_t>::max(), true},
+            {"4294967296MiB", 0, false},
+        };
+
+        for (const auto& TestCase : TestCases)
+        {
+            auto dir = UniqueTempDir();
+            WriteFile(dir / L"settings.yaml", std::format("session:\n  memorySize: {}\n", TestCase.Value));
+
+            UserSettingsTest s{dir};
+
+            VERIFY_ARE_EQUAL(TestCase.Expected, s.Get<Setting::SessionMemoryMb>());
+            VERIFY_ARE_EQUAL(TestCase.IsValid ? 0u : 1u, s.GetWarnings().size());
+            if (!TestCase.IsValid)
+            {
+                VERIFY_ARE_EQUAL(
+                    Loc::WSLCUserSettings_Warning_InvalidValue(L"session.memorySize", s.SettingsFilePath().wstring(), 2),
+                    s.GetWarnings().front().Message);
+            }
+        }
+    }
+
+    // maxStorageSize: 0 must be rejected; the default is used.
+    TEST_METHOD(Validation_StorageSizeMb_Zero_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  maxStorageSize: 0\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.maxStorageSize", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+    }
+
+    // A string where a uint32_t is expected must emit a type warning and fall
+    // back to the default.
+    TEST_METHOD(Validation_WrongType_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: \"not-a-number\"\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidType(L"session.cpuCount", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+    }
+
+    // Absent keys must silently use defaults — no warnings emitted.
+    TEST_METHOD(Validation_AbsentKeys_NoWarningsAndDefaults)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+    }
+
+    // The string "default" for any setting must silently use the built-in
+    // default, same as if the key were absent.
+    TEST_METHOD(Validation_DefaultString_UsesBuiltInDefaultsNoWarnings)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: default\n"
+            "  memorySize: default\n"
+            "  maxStorageSize: default\n"
+            "  networkingMode: default\n"
+            "  hostFileShareMode: default\n"
+            "  dnsTunneling: default\n"
+            "  hostLoopback: default\n"
+            "experimental:\n"
+            "  portRelay: default\n"
+            "credentialStore: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(1048576u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeConsomme), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(HostFileShareMode::VirtioFs), static_cast<int>(s.Get<Setting::SessionHostFileShareMode>()));
+        VERIFY_IS_TRUE(s.Get<Setting::SessionDnsTunneling>());
+        VERIFY_ARE_EQUAL(std::string("host.wslc.internal"), s.Get<Setting::SessionHostLoopback>());
+        VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::VirtioNet), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    // "default" on a single setting uses the built-in default for that setting
+    // while explicit values on other settings are preserved.
+    TEST_METHOD(Validation_DefaultString_MixedWithExplicitValues)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 8\n"
+            "  memorySize: default\n"
+            "  maxStorageSize: 50000MB\n"
+            "credentialStore: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(8u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+        VERIFY_ARE_EQUAL(50000u, s.Get<Setting::SessionStorageSizeMb>());
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    // Quoted "default" string must behave the same as unquoted default.
+    TEST_METHOD(Validation_DefaultString_QuotedIsAlsoValid)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: \"default\"\n"
+            "  memorySize: \"default\"\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(0u, s.Get<Setting::SessionMemoryMb>());
+    }
+
+    // "Default" (capitalized) is NOT the magic string — it must be treated as
+    // an invalid value and fall back to the built-in default with a warning.
+    TEST_METHOD(Validation_DefaultString_IsCaseSensitive)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  networkingMode: Default\n"
+            "credentialStore: DEFAULT\n");
+
+        UserSettingsTest s{dir};
+
+        // Both should be rejected by their validators and produce warnings.
+        VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.networkingMode", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings()[0].Message);
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"credentialStore", s.SettingsFilePath().wstring(), 3), s.GetWarnings()[1].Message);
+        // Values still fall back to built-in defaults.
+        VERIFY_ARE_EQUAL(static_cast<int>(WSLCNetworkingModeConsomme), static_cast<int>(s.Get<Setting::SessionNetworkingMode>()));
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
+    }
+
+    // credentialStore: invalid value must fall back to default and warn.
+    TEST_METHOD(Validation_CredentialStore_Invalid_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "credentialStore: badvalue\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(CredentialStoreType::WinCred), static_cast<int>(s.Get<Setting::CredentialStore>()));
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"credentialStore", s.SettingsFilePath().wstring(), 1),
+            s.GetWarnings().front().Message);
+    }
+
+    // -----------------------------------------------------------------------
+    // Unknown key warnings
+    // -----------------------------------------------------------------------
+
+    // Unknown keys in a known section and unknown root sections both produce warnings.
+    TEST_METHOD(Validation_UnknownKeys_WarnsAboutUnknownKeys)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "  unknownSetting: 99\n"
+            "unknownSection:\n"
+            "  foo: bar\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(static_cast<int>(UserSettingsType::Standard), static_cast<int>(s.GetType()));
+        VERIFY_ARE_EQUAL(4u, s.Get<Setting::SessionCpuCount>());
+        VERIFY_ARE_EQUAL(2u, s.GetWarnings().size());
+        // Root-level keys are processed before nested keys due to stack-based traversal.
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_UnknownSection(L"unknownSection", s.SettingsFilePath().wstring(), 4), s.GetWarnings()[0].Message);
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_UnknownKey(L"session.unknownSetting", s.SettingsFilePath().wstring(), 3),
+            s.GetWarnings()[1].Message);
+    }
+
+    // An unknown key under a known section produces a warning with the full path.
+    TEST_METHOD(Validation_UnknownKeys_UnknownInKnownSection)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "  typoSetting: true\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_UnknownKey(L"session.typoSetting", s.SettingsFilePath().wstring(), 3),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.typoSetting"), s.GetWarnings().front().SettingPath);
+    }
+
+    // An unknown root-level section produces a warning.
+    TEST_METHOD(Validation_UnknownKeys_UnknownRootSection)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "badSection:\n"
+            "  key: value\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_UnknownSection(L"badSection", s.SettingsFilePath().wstring(), 1),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"badSection"), s.GetWarnings().front().SettingPath);
+    }
+
+    // An unknown root-level scalar key produces a warning.
+    TEST_METHOD(Validation_UnknownKeys_UnknownRootScalar)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "badKey: hello\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_UnknownKey(L"badKey", s.SettingsFilePath().wstring(), 3), s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"badKey"), s.GetWarnings().front().SettingPath);
+    }
+
+    // A complex YAML key (sequence) cannot be converted to string;
+    // a non-string key warning is emitted.
+    TEST_METHOD(Validation_UnknownKeys_ComplexKey_WarnsNonStringKey)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 4\n"
+            "  [1, 2]: value\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_NonStringKey(L"session", s.SettingsFilePath().wstring(), 3), s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session"), s.GetWarnings().front().SettingPath);
+    }
+
+    // A complex YAML key (map) at root level warns with "root" location.
+    TEST_METHOD(Validation_UnknownKeys_ComplexKeyAtRoot_WarnsNonStringKey)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "{a: b}: value\n"
+            "credentialStore: wincred\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_NonStringKey(L"root", s.SettingsFilePath().wstring(), 1), s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"root"), s.GetWarnings().front().SettingPath);
+    }
+
+    // A file with only valid known keys produces no warnings.
+    TEST_METHOD(Validation_UnknownKeys_AllKnownKeys_NoWarnings)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  cpuCount: 8\n"
+            "  memorySize: 4GB\n"
+            "  maxStorageSize: 50000MB\n"
+            "  networkingMode: nat\n"
+            "  hostFileShareMode: virtiofs\n"
+            "  dnsTunneling: true\n"
+            "  storagePath: C:\\wslc-data\n"
+            "experimental:\n"
+            "  portRelay: wslrelay\n"
+            "credentialStore: wincred\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+    }
+
+    TEST_METHOD(Validation_PortRelay_ExplicitValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "experimental:\n"
+            "  portRelay: wslrelay\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(static_cast<int>(PortRelayType::WslRelay), static_cast<int>(s.Get<Setting::SessionPortRelay>()));
+    }
+
+    // -----------------------------------------------------------------------
+    // session.hostLoopback
+    // -----------------------------------------------------------------------
+
+    TEST_METHOD(Validation_HostLoopback_CustomName)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  hostLoopback: host.containers.internal\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("host.containers.internal"), s.Get<Setting::SessionHostLoopback>());
+    }
+
+    TEST_METHOD(Validation_HostLoopback_NoneDisablesEntry)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  hostLoopback: none\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionHostLoopback>());
+    }
+
+    TEST_METHOD(ProxyEnvironment_ExplicitCasingSuppressesDefaultAliases)
+    {
+        const std::vector<std::string> defaults{
+            "http_proxy=http://windows:3128",
+            "HTTP_PROXY=http://windows:3128",
+            "https_proxy=http://windows:3128",
+            "HTTPS_PROXY=http://windows:3128",
+            "no_proxy=.example.com",
+            "NO_PROXY=.example.com"};
+        std::vector<std::string> allDefaults;
+        AddProxyEnvironmentDefaults(allDefaults, defaults);
+        VERIFY_IS_TRUE(allDefaults == defaults);
+
+        for (const bool upper : {false, true})
+        {
+            const auto* name = upper ? "HTTP_PROXY" : "http_proxy";
+            for (const auto* value : {"http://manual:8080", ""})
+            {
+                std::vector<std::string> environment{std::format("{}={}", name, value), "PATH=/bin"};
+                AddProxyEnvironmentDefaults(environment, defaults);
+                const std::vector<std::string> expected{
+                    std::format("{}={}", name, value),
+                    "PATH=/bin",
+                    "https_proxy=http://windows:3128",
+                    "HTTPS_PROXY=http://windows:3128",
+                    "no_proxy=.example.com",
+                    "NO_PROXY=.example.com"};
+                VERIFY_IS_TRUE(environment == expected);
+            }
+        }
+    }
+
+    TEST_METHOD(ProxyEnvironment_EmptyAndConflictingExplicitValuesWin)
+    {
+        std::vector<std::string> environment{
+            "http_proxy=http://lower:8080", "HTTP_PROXY=http://upper:8080", "https_proxy=", "no_proxy="};
+        const auto expected = environment;
+        AddProxyEnvironmentDefaults(
+            environment,
+            {"http_proxy=http://windows:3128",
+             "HTTP_PROXY=http://windows:3128",
+             "https_proxy=http://windows:3128",
+             "HTTPS_PROXY=http://windows:3128",
+             "no_proxy=.example.com",
+             "NO_PROXY=.example.com"});
+        VERIFY_IS_TRUE(environment == expected);
+    }
+
+    TEST_METHOD(ProxyEnvironment_MixedCaseNamesDoNotSuppressDefaults)
+    {
+        std::vector<std::string> environment{"Http_Proxy=http://localhost:8080", "hTtPs_PrOxY=", "No_PrOxY=LocalHost"};
+        const std::vector<std::string> defaults{
+            "HTTP_PROXY=http://windows:3128", "https_proxy=http://windows:8443", "NO_PROXY=.example.com"};
+        auto expected = environment;
+        expected.insert(expected.end(), defaults.begin(), defaults.end());
+
+        AddProxyEnvironmentDefaults(environment, defaults);
+        VERIFY_IS_TRUE(environment == expected);
+    }
+
+    TEST_METHOD(ResolveProxyUrl_RewritesOnlyLocalhost)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+
+        VERIFY_ARE_EQUAL(std::string("http://host.wslc.internal:3128"), ResolveProxyUrl("http://localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://host.wslc.internal:3128/"), ResolveProxyUrl("http://LocalHost:3128/", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://u:p@host.wslc.internal"), ResolveProxyUrl("http://u:p@127.0.0.1", loopback));
+        VERIFY_ARE_EQUAL(std::string("https://localhost:3128"), ResolveProxyUrl("https://localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("HTTPS://127.0.0.1:3128"), ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://proxy.example.com:3128"), ResolveProxyUrl("http://proxy.example.com:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://localhost.example.com"), ResolveProxyUrl("http://localhost.example.com", loopback));
+        VERIFY_ARE_EQUAL(std::string("http://localhost:3128"), ResolveProxyUrl("http://localhost:3128", ""));
+
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("socks5://[::1]:1080", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[::1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://[0:0:0:0:0:0:0:1]:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.2:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("https://localhost:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("HTTPS://127.0.0.1:3128", loopback)));
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", "")));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://localhost:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(ResolveProxyUrl("http://127.0.0.1:3128", loopback)));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://proxy.example.com:3128"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://localhost.example.com"));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl("http://[2001:db8::1]:3128"));
+    }
+
+    TEST_METHOD(ProxyEnvironment_SchemelessLoopback)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+        for (const auto* host : {"localhost", "LocalHost", "127.0.0.1"})
+        {
+            for (const auto* suffix : {"", ":3128", ":", ":/path", ":0"})
+            {
+                const auto url = std::format("{}{}", host, suffix);
+                VERIFY_ARE_EQUAL(std::format("{}{}", loopback, suffix), ResolveProxyUrl(url, loopback));
+                VERIFY_IS_TRUE(IsLoopbackProxyUrl(url));
+            }
+        }
+        VERIFY_ARE_EQUAL(std::string("u:p@host.wslc.internal:3128"), ResolveProxyUrl("u:p@localhost:3128", loopback));
+        VERIFY_ARE_EQUAL(std::string("localhost:3128"), ResolveProxyUrl("localhost:3128", ""));
+
+        for (const auto* url : {"[::1]:3128", "[::ffff:127.0.0.1]:3128", "127.0.0.2:3128"})
+        {
+            VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(url));
+        }
+        for (const auto* url : {"", "://localhost:3128", "localhost:65536", "localhost:abc", "[::1", "localhost.example.com:3128"})
+        {
+            VERIFY_ARE_EQUAL(std::string(url), ResolveProxyUrl(url, loopback));
+            VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
+        }
+    }
+
+    TEST_METHOD(ProxyEnvironment_UrlComponents)
+    {
+        constexpr auto loopback = "host.wslc.internal";
+        const std::vector<std::pair<std::string, std::string>> cases{
+            {"socks5h://user:p%40ss@localhost:1080/path?next=localhost#fragment",
+             "socks5h://user:p%40ss@host.wslc.internal:1080/path?next=localhost#fragment"},
+            {"http://localhost:secret@localhost:3128/", "http://localhost:secret@host.wslc.internal:3128/"},
+            {"http://localhost:3128/\xef\xbf\xbd", "http://host.wslc.internal:3128/\xef\xbf\xbd"},
+            {"http://user:p\xc3\xa4ss@127.0.0.1:3128/", "http://user:p\xc3\xa4ss@host.wslc.internal:3128/"}};
+        for (const auto& [url, expected] : cases)
+        {
+            VERIFY_ARE_EQUAL(expected, ResolveProxyUrl(url, loopback));
+        }
+        VERIFY_IS_TRUE(IsLoopbackProxyUrl("http://localhost:secret@localhost:3128/"));
+
+        const std::string invalidAuthority = "http://user:pass@proxy.example.com@localhost:3128";
+        VERIFY_ARE_EQUAL(invalidAuthority, ResolveProxyUrl(invalidAuthority, loopback));
+        VERIFY_IS_FALSE(IsLoopbackProxyUrl(invalidAuthority));
+    }
+
+    TEST_METHOD(ProxyEnvironment_MappedLoopbackClassification)
+    {
+        for (const auto* url :
+             {"http://[::ffff:127.0.0.1]:3128", "https://[::ffff:7f00:1]:3128", "http://[::ffff:127.0.0.2]:3128"})
+        {
+            VERIFY_IS_TRUE(IsLoopbackProxyUrl(ResolveProxyUrl(url, "host.wslc.internal")));
+        }
+        for (const auto* url : {"http://[::ffff:192.0.2.1]:3128", "http://[::ffff:c000:201]:3128"})
+        {
+            VERIFY_IS_FALSE(IsLoopbackProxyUrl(url));
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // session.defaultBindingAddress
+    // -----------------------------------------------------------------------
+
+    // When unset, the default binding address falls back to the empty built-in default.
+    TEST_METHOD(Validation_DefaultBindingAddress_Absent_UsesEmptyDefault)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 4\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+    }
+
+    // A valid IPv4 binding address loads without warnings.
+    TEST_METHOD(Validation_DefaultBindingAddress_ValidValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: 0.0.0.0\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("0.0.0.0"), s.Get<Setting::SessionDefaultBindingAddress>());
+    }
+
+    // "default" magic string uses the built-in (empty) default with no warning.
+    TEST_METHOD(Validation_DefaultBindingAddress_DefaultString)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+    }
+
+    // An invalid address is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_DefaultBindingAddress_InvalidValue_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: not-an-ip\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.defaultBindingAddress"), s.GetWarnings().front().SettingPath);
+    }
+
+    // An IPv6 literal is rejected (the default binding address is IPv4 only) and warns.
+    TEST_METHOD(Validation_DefaultBindingAddress_IPv6Rejected_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  defaultBindingAddress: \"::1\"\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionDefaultBindingAddress>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.defaultBindingAddress", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+    }
+
+    // -----------------------------------------------------------------------
+    // session.storagePath
+    // -----------------------------------------------------------------------
+
+    // When unset, the storage path falls back to the empty built-in default (caller uses %LOCALAPPDATA%).
+    TEST_METHOD(Validation_StoragePath_Absent_UsesEmptyDefault)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(dir / L"settings.yaml", "session:\n  cpuCount: 4\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // A valid absolute path loads without warnings.
+    TEST_METHOD(Validation_StoragePath_AbsoluteValue)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: D:\\wslc\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string("D:\\wslc"), s.Get<Setting::SessionStoragePath>());
+    }
+
+    // "default" magic string uses the built-in (empty) default with no warning.
+    TEST_METHOD(Validation_StoragePath_DefaultString)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: default\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(0u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+    }
+
+    // A relative path is rejected: the default is used and an invalid-value warning emitted.
+    TEST_METHOD(Validation_StoragePath_RelativeValue_UsesDefaultAndWarns)
+    {
+        auto dir = UniqueTempDir();
+        WriteFile(
+            dir / L"settings.yaml",
+            "session:\n"
+            "  storagePath: wslc\\data\n");
+
+        UserSettingsTest s{dir};
+
+        VERIFY_ARE_EQUAL(std::string{}, s.Get<Setting::SessionStoragePath>());
+        VERIFY_ARE_EQUAL(1u, s.GetWarnings().size());
+        VERIFY_ARE_EQUAL(
+            Loc::WSLCUserSettings_Warning_InvalidValue(L"session.storagePath", s.SettingsFilePath().wstring(), 2),
+            s.GetWarnings().front().Message);
+        VERIFY_ARE_EQUAL(std::wstring(L"session.storagePath"), s.GetWarnings().front().SettingPath);
+    }
+};
+
+} // namespace WSLCCLISettingsUnitTests

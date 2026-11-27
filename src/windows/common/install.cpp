@@ -23,11 +23,13 @@ Abstract:
 #include "ConsoleProgressBar.h"
 #include "ExecutionContext.h"
 #include "MsiQuery.h"
+#include "WindowsUpdateIntegration.h"
 
 using winrt::Windows::Foundation::Uri;
 using winrt::Windows::Management::Deployment::DeploymentOptions;
 using wsl::shared::Localization;
 using wsl::windows::common::Context;
+using wsl::windows::common::WindowsUpdateContext;
 using namespace wsl::windows::common::registry;
 using namespace wsl::windows::common::wslutil;
 using namespace wsl::windows::common::install;
@@ -77,6 +79,32 @@ bool PromptForKeyPressWithTimeout()
     return waitResult == std::future_status::ready && future.get();
 }
 
+int UpdateViaWindowsUpdateFallback()
+{
+    PrintMessage(Localization::MessageGitHubRateLimitedFallback());
+
+    int exitCode = -1;
+    try
+    {
+        if (wsl::windows::common::security::IsTokenElevated(wil::open_current_access_token().get()))
+        {
+            exitCode = UpdateViaWindowsUpdate();
+        }
+        else
+        {
+            exitCode = LaunchElevated(WSL_UPDATE_ARG L" " WSL_UPDATE_ARG_WINDOWS_UPDATE_OPTION_LONG);
+        }
+    }
+    CATCH_LOG()
+
+    if (exitCode == 0)
+    {
+        return 0;
+    }
+
+    THROW_HR_WITH_USER_ERROR(WSL_E_GITHUB_RATE_LIMITED, Localization::MessageGitHubRateLimited());
+}
+
 int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
 {
     if (!repair && callerOwnsProcess)
@@ -84,7 +112,30 @@ int UpdatePackageImpl(bool preRelease, bool repair, bool callerOwnsProcess)
         PrintMessage(Localization::MessageCheckingForUpdates());
     }
 
-    auto [version, release] = GetLatestGitHubRelease(preRelease);
+    // Windows Update doesn't offer pre-release versions or repairs and requires elevation, so only fall back for
+    // interactive updates.
+    bool rateLimited = false;
+    std::pair<std::wstring, GitHubReleaseAsset> latestRelease;
+    try
+    {
+        latestRelease = GetLatestGitHubRelease(preRelease);
+    }
+    catch (...)
+    {
+        if (wil::ResultFromCaughtException() != WSL_E_GITHUB_RATE_LIMITED || preRelease || repair || !callerOwnsProcess)
+        {
+            throw;
+        }
+
+        rateLimited = true;
+    }
+
+    if (rateLimited)
+    {
+        return UpdateViaWindowsUpdateFallback();
+    }
+
+    const auto& [version, release] = latestRelease;
 
     if (!repair && ParseWslPackageVersion(version) <= wsl::shared::PackageVersion)
     {
@@ -257,6 +308,7 @@ int wsl::windows::common::install::CallMsiPackage()
         catch (...)
         {
             LOG_CAUGHT_EXCEPTION();
+            const auto installError = wil::ResultFromCaughtException();
 
             // GetMsiPackagePath() will generate a user error if the registry access fails.
             // Save the error from GetMsiPackagePath() to return a proper 'install failed' message.
@@ -267,12 +319,15 @@ int wsl::windows::common::install::CallMsiPackage()
             msiPath = GetMsiPackagePath();
             if (!msiPath.has_value())
             {
+                if (installError == HRESULT_FROM_WIN32(ERROR_INSTALL_ALREADY_RUNNING))
+                {
+                    THROW_HR_WITH_USER_ERROR(installError, wsl::shared::Localization::MessageWindowsInstallerBusy());
+                }
                 // Offer to directly install the MSI package if the MsixInstaller logic fails
                 // This can trigger a UAC so only do it
-                if (IsInteractiveConsole())
+                else if (IsInteractiveConsole())
                 {
-                    auto errorCode = savedError.has_value() ? ErrorToString(savedError.value()).Code
-                                                            : ErrorCodeToString(wil::ResultFromCaughtException());
+                    auto errorCode = savedError.has_value() ? ErrorToString(savedError.value()).Code : ErrorCodeToString(installError);
 
                     EMIT_USER_WARNING(wsl::shared::Localization::MessageInstallationCorrupted(errorCode));
 
@@ -378,6 +433,26 @@ int wsl::windows::common::install::UpdatePackage(bool PreRelease, bool Repair, b
     }
 }
 
+int wsl::windows::common::install::UpdateViaWindowsUpdate()
+{
+    wsl::windows::common::ConsoleProgressBar progressBar;
+    auto clearProgress = wil::scope_exit_log(WI_DIAGNOSTICS_INFO, [&progressBar]() { progressBar.Clear(); });
+
+    WindowsUpdateContext context;
+    context.RunUpdateFlow(WindowsUpdateContext::UpdateOptions::EnsureProductRegistration, [&progressBar](uint32_t percent) {
+        progressBar.Print(percent, 100);
+    });
+
+    clearProgress.reset();
+
+    if (context.GetUpdateCount() == 0)
+    {
+        PrintMessage(Localization::MessageUpdateNotNeeded());
+    }
+
+    return 0;
+}
+
 UINT wsl::windows::common::install::UpgradeViaMsi(
     _In_ LPCWSTR PackageLocation, _In_opt_ LPCWSTR ExtraArgs, _In_opt_ LPCWSTR LogFile, _In_ const std::function<void(INSTALLMESSAGE, LPCWSTR)>& Callback)
 {
@@ -450,16 +525,33 @@ try
 {
     static std::wstring path = wil::GetWindowsDirectoryW<std::wstring>() + L"\\temp\\wsl-install-log.txt";
 
+    WriteInstallLogImpl(path, Content);
+}
+CATCH_LOG();
+
+void wsl::windows::common::install::WriteInstallLogImpl(const std::wstring& Path, const std::string& Content)
+{
     // Wait up to 10 seconds for the log file mutex
     wil::unique_handle mutex{CreateMutex(nullptr, true, L"Global\\WslInstallLog")};
     THROW_LAST_ERROR_IF(!mutex);
 
     THROW_LAST_ERROR_IF(WaitForSingleObject(mutex.get(), 10 * 1000) != WAIT_OBJECT_0);
 
-    wil::unique_handle file{CreateFile(
-        path.c_str(), GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, 0, nullptr)};
+    wil::unique_hfile file{CreateFileW(
+        Path.c_str(), GENERIC_WRITE | FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
 
     THROW_LAST_ERROR_IF(!file);
+
+    BY_HANDLE_FILE_INFORMATION info{};
+    THROW_IF_WIN32_BOOL_FALSE(GetFileInformationByHandle(file.get(), &info));
+
+    THROW_HR_IF_MSG(
+        E_ACCESSDENIED,
+        WI_IsAnyFlagSet(info.dwFileAttributes, FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY) || info.nNumberOfLinks != 1,
+        "Refusing to write to %ls. Attributes: %u, links: %u",
+        Path.c_str(),
+        info.dwFileAttributes,
+        info.nNumberOfLinks);
 
     LARGE_INTEGER size{};
     THROW_IF_WIN32_BOOL_FALSE(GetFileSizeEx(file.get(), &size));
@@ -480,4 +572,3 @@ try
     DWORD bytesWritten{};
     THROW_IF_WIN32_BOOL_FALSE(WriteFile(file.get(), logLine.c_str(), static_cast<DWORD>(logLine.size()), &bytesWritten, nullptr));
 }
-CATCH_LOG();

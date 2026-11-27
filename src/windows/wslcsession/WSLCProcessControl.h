@@ -21,6 +21,7 @@ namespace wsl::windows::service::wslc {
 
 class WSLCVirtualMachine;
 class WSLCContainerImpl;
+struct VMProcessRegistry;
 
 class WSLCProcessControl
 {
@@ -72,7 +73,7 @@ public:
     void SetExitCode(int ExitCode);
 
 private:
-    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, std::uint64_t eventTime);
+    void OnEvent(ContainerEvent Event, std::optional<int> ExitCode, const std::map<std::string, std::string>& Attributes, std::int64_t eventTimeNano);
 
     mutable std::mutex m_lock;
     std::string m_id;
@@ -85,7 +86,7 @@ private:
 class VMProcessControl : public WSLCProcessControl
 {
 public:
-    VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl);
+    VMProcessControl(WSLCVirtualMachine& VirtualMachine, int Pid, wil::unique_socket&& TtyControl, std::weak_ptr<VMProcessRegistry> Registry);
     ~VMProcessControl();
 
     void Signal(int Signal) override;
@@ -100,6 +101,7 @@ private:
     int m_pid{};
     wsl::shared::SocketChannel m_ttyControlChannel;
     WSLCVirtualMachine* m_vm{};
+    std::weak_ptr<VMProcessRegistry> m_registry;
 };
 
 } // namespace wsl::windows::service::wslc

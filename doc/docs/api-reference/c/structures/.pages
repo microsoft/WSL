@@ -11,6 +11,7 @@ nav:
   - wslccontainerportmapping.md
   - wslccontainervolume.md
   - wslccontainernamedvolume.md
+  - wslccontainernetwork.md
   - wslcprocesscallbacks.md
   - wslcimageprogressdetail.md
   - wslcimageprogressmessage.md
@@ -20,4 +21,6 @@ nav:
   - wslcimageinfo.md
   - wslctagimageoptions.md
   - wslcpushimageoptions.md
+  - wslcnetworkinfo.md
+  - wslcnetworksettings.md
   - wslcversion.md

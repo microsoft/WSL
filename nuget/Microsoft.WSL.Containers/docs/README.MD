@@ -1,9 +1,5 @@
 # Microsoft.WSL.Containers
 
-> **⚠️ Preview:** This SDK is currently in preview and is subject to breaking changes
-> in future releases without prior notice. Do not rely on API stability for production
-> workloads.
-
 The WSL Containers SDK provides APIs for creating and managing Linux containers running inside WSL, and MSBuild/CMake integration for building container images as part of your project.
 
 **Supported platforms:** x64 and ARM64.

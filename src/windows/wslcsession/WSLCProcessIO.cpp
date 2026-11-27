@@ -28,6 +28,7 @@ RelayedProcessIO::RelayedProcessIO(std::map<ULONG, TypedHandle>&& fds) : m_relay
 
 TypedHandle RelayedProcessIO::OpenFd(ULONG Fd)
 {
+    auto lock = m_lock.lock_exclusive();
     auto it = m_relayedHandles.find(Fd);
 
     THROW_HR_IF_MSG(E_INVALIDARG, it == m_relayedHandles.end(), "Fd not found in relayed handles: %i", static_cast<int>(Fd));
@@ -42,6 +43,7 @@ TTYProcessIO::TTYProcessIO(TypedHandle&& IoStream) : m_ioStream(std::move(IoStre
 
 TypedHandle TTYProcessIO::OpenFd(ULONG Fd)
 {
+    auto lock = m_lock.lock_exclusive();
     THROW_HR_IF_MSG(E_INVALIDARG, Fd != WSLCFDTty, "Invalid fd type for TTY process: %i", static_cast<int>(Fd));
 
     return std::move(m_ioStream);
@@ -53,6 +55,7 @@ VMProcessIO::VMProcessIO(std::map<ULONG, TypedHandle>&& handles) : m_handles(std
 
 TypedHandle VMProcessIO::OpenFd(ULONG Fd)
 {
+    auto lock = m_lock.lock_exclusive();
     auto it = m_handles.find(Fd);
     THROW_HR_IF_MSG(E_INVALIDARG, it == m_handles.end(), "Invalid fd type for VM process: %i", static_cast<int>(Fd));
 

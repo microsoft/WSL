@@ -11,8 +11,6 @@ STDAPI WslcSetSessionSettingsVhd(_In_ WslcSessionSettings* sessionSettings, _In_
 
 Return value: `HRESULT`.
 
-Header notes:
-
 - `WslcSetSessionSettingsVhd` rejects non-`NONE` flags with `E_INVALIDARG`.
 - `WSLC_VHD_TYPE_FIXED` is only honored by `WslcCreateSessionVhdVolume`.
 

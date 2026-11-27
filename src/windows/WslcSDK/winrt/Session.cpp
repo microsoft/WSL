@@ -37,6 +37,13 @@ namespace {
         return S_OK;
     }
 
+    GUID GetCurrentLogicalThreadId()
+    {
+        GUID logicalThreadId{};
+        winrt::check_hresult(CoGetCurrentLogicalThreadId(&logicalThreadId));
+        return logicalThreadId;
+    }
+
 } // namespace
 
 Session::Session(winrt::Microsoft::WSL::Containers::SessionSettings const& settings) : m_settings(settings)
@@ -404,6 +411,56 @@ IVectorView<winrt::Microsoft::WSL::Containers::ImageInfo> Session::GetImages()
     return winrt::single_threaded_vector(std::move(images)).GetView();
 }
 
+IVectorView<winrt::Microsoft::WSL::Containers::NetworkInfo> Session::GetNetworks()
+{
+    EnsureStarted();
+
+    wil::unique_cotaskmem_array_ptr<WslcNetworkInfo> networksArray;
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcListSessionNetworks(ToHandle(), networksArray.put(), networksArray.size_address<uint32_t>(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    auto networks = std::vector<winrt::Microsoft::WSL::Containers::NetworkInfo>();
+    networks.reserve(networksArray.size());
+    for (uint32_t i = 0; i < networksArray.size(); i++)
+    {
+        networks.push_back(winrt::make<implementation::NetworkInfo>(networksArray[i]));
+    }
+
+    return winrt::single_threaded_vector(std::move(networks)).GetView();
+}
+
+winrt::Microsoft::WSL::Containers::NetworkInfo Session::CreateNetwork(winrt::Microsoft::WSL::Containers::NetworkSettings const& settings)
+{
+    if (!settings)
+    {
+        throw winrt::hresult_error(E_POINTER, L"Network settings cannot be null");
+    }
+
+    EnsureStarted();
+
+    WslcNetworkInfo networkInfo{};
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcCreateSessionNetwork(ToHandle(), GetStructPointer(settings), &networkInfo, errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+
+    return winrt::make<implementation::NetworkInfo>(networkInfo);
+}
+
+void Session::DeleteNetwork(hstring const& nameOrId)
+{
+    if (nameOrId.empty())
+    {
+        throw winrt::hresult_invalid_argument(L"Network name or ID cannot be empty");
+    }
+
+    EnsureStarted();
+
+    wil::unique_cotaskmem_string errorMessage;
+    auto hr = WslcDeleteSessionNetwork(ToHandle(), winrt::to_string(nameOrId).c_str(), errorMessage.put());
+    THROW_MSG_IF_FAILED(hr, errorMessage);
+}
+
 WslcSession Session::ToHandle()
 {
     EnsureStarted();
@@ -412,6 +469,12 @@ WslcSession Session::ToHandle()
 
 void Session::Close()
 {
+    // Close waits for in-flight Terminated handlers, so calling it from one would wait on itself.
+    if (IsInTerminatedHandler())
+    {
+        throw winrt::hresult_illegal_method_call(L"Session cannot be closed from its Terminated handler");
+    }
+
     m_terminationWait.reset();
     m_terminationEvent.reset();
     m_crashDumpSubscription.reset();
@@ -427,6 +490,17 @@ void Session::final_release(std::unique_ptr<Session> self)
     self->Close();
 }
 
+bool Session::IsInTerminatedHandler() const
+{
+    auto lock = m_terminatedHandlerLock.lock_shared();
+    if (m_terminatedHandlerThreadId == 0)
+    {
+        return false;
+    }
+
+    return m_terminatedHandlerThreadId == GetCurrentThreadId() || m_terminatedHandlerLogicalThreadId == GetCurrentLogicalThreadId();
+}
+
 void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID context, PTP_WAIT /* wait */, TP_WAIT_RESULT /* waitResult */) noexcept
 {
     try
@@ -435,6 +509,19 @@ void CALLBACK Session::OnTerminated(PTP_CALLBACK_INSTANCE /* instance */, PVOID 
 
         WslcSessionTerminationReason reason = WSLC_SESSION_TERMINATION_REASON_UNKNOWN;
         LOG_IF_FAILED(WslcGetSessionTerminationReason(session->m_session.get(), &reason));
+
+        const auto logicalThreadId = GetCurrentLogicalThreadId();
+        {
+            auto lock = session->m_terminatedHandlerLock.lock_exclusive();
+            session->m_terminatedHandlerThreadId = GetCurrentThreadId();
+            session->m_terminatedHandlerLogicalThreadId = logicalThreadId;
+        }
+
+        auto clearHandlerThread = wil::scope_exit([session]() {
+            auto lock = session->m_terminatedHandlerLock.lock_exclusive();
+            session->m_terminatedHandlerThreadId = 0;
+            session->m_terminatedHandlerLogicalThreadId = GUID_NULL;
+        });
 
         session->m_terminatedEvent(static_cast<SessionTerminationReason>(reason));
     }

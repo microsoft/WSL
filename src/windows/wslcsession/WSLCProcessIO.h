@@ -13,27 +13,28 @@ Abstract:
 --*/
 
 #pragma once
+#include "HandleIO.h"
 #include "wslc.h"
 
 namespace wsl::windows::service::wslc {
 
 struct TypedHandle
 {
-    wil::unique_handle Handle;
+    common::io::HandleWrapper Handle;
     WSLCHandleType Type = WSLCHandleTypeUnknown;
 
     TypedHandle() = default;
-    TypedHandle(wil::unique_handle&& handle, WSLCHandleType type) : Handle(std::move(handle)), Type(type)
+    TypedHandle(common::io::HandleWrapper&& handle, WSLCHandleType type) : Handle(std::move(handle)), Type(type)
     {
     }
 
     bool is_valid() const noexcept
     {
-        return Handle.is_valid();
+        return Handle.IsValid();
     }
     HANDLE get() const noexcept
     {
-        return Handle.get();
+        return Handle.Get();
     }
 };
 
@@ -52,7 +53,8 @@ public:
     TypedHandle OpenFd(ULONG Fd) override;
 
 private:
-    std::map<ULONG, TypedHandle> m_relayedHandles;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) std::map<ULONG, TypedHandle> m_relayedHandles;
 };
 
 class TTYProcessIO : public WSLCProcessIO
@@ -63,7 +65,8 @@ public:
     TypedHandle OpenFd(ULONG Fd) override;
 
 private:
-    TypedHandle m_ioStream;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) TypedHandle m_ioStream;
 };
 
 class VMProcessIO : public WSLCProcessIO
@@ -73,7 +76,8 @@ public:
     TypedHandle OpenFd(ULONG Fd) override;
 
 private:
-    std::map<ULONG, TypedHandle> m_handles;
+    wil::srwlock m_lock;
+    _Guarded_by_(m_lock) std::map<ULONG, TypedHandle> m_handles;
 };
 
 } // namespace wsl::windows::service::wslc

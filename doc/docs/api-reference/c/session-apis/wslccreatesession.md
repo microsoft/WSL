@@ -12,6 +12,8 @@ STDAPI WslcCreateSession(_In_ WslcSessionSettings* sessionSettings, _Out_ WslcSe
 
 Return value: `HRESULT`.
 
+Returns [`WSLC_E_RUNTIME_UPDATE_NEEDED`](../error-codes.md) if the installed WSL runtime does not support the requested settings, such as host loopback, which requires WSL 3.0.5 or later.
+
 Example:
 
 ```c

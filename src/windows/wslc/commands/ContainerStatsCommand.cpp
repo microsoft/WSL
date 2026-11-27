@@ -14,6 +14,7 @@ Abstract:
 
 #include "ContainerCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "ContainerTasks.h"
 #include "SessionTasks.h"
 #include "Task.h"
@@ -26,7 +27,7 @@ namespace wsl::windows::wslc {
 std::vector<Argument> ContainerStatsCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::ContainerId, false, Limit::Unlimited),
+        Argument::Create(ArgType::ContainerId, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::All),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),
@@ -45,8 +46,9 @@ std::wstring ContainerStatsCommand::LongDescription() const
 
 void ContainerStatsCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context               //
-        << ResolveSession //
-        << ShowContainerStats;
+    context                           //
+        << ResolveSession             //
+        << FormatContainerStatsOutput //
+        << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

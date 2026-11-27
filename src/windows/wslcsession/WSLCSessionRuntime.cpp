@@ -16,19 +16,24 @@ Abstract:
 #include "WSLCSessionRuntime.h"
 #include "WSLCSession.h"
 #include "WSLCSessionDefaults.h"
+#include "WSLCSharedLockGate.h"
+#include "ExecutionContext.h"
+#include "Localization.h"
 
 using wsl::windows::service::wslc::WSLCSessionRuntime;
 
 namespace {
 
-constexpr auto c_containerdStorage = wsl::windows::wslc::ContainerdStorageMountPoint;
 constexpr auto c_dockerdReadyLogLine = "API listen on /var/run/docker.sock";
-constexpr DWORD c_processTerminateTimeoutMs = 30 * 1000;
-constexpr DWORD c_processKillTimeoutMs = 10 * 1000;
 
 // How long a VM lease waits for an announced stop to complete before logging that it is still
 // blocked. Purely diagnostic: the wait itself is unbounded (see VmLease).
 constexpr DWORD c_vmStopWaitLogIntervalMs = 30 * 1000;
+
+// How often an ExistingOnly lease retries the runtime lock while another thread holds it exclusively.
+constexpr DWORD c_existingOnlyLockRetryMs = 10;
+
+constexpr auto c_pendingEventsTimeout = std::chrono::seconds(5);
 
 } // namespace
 
@@ -59,7 +64,7 @@ void WSLCSessionRuntime::Initialize(
     m_idleState->Initialize(idleGrace, [this]() { OnIdleTimer(); });
 
     // Session-scoped: subscriptions must survive VM restarts. Rebound per-VM in InitializeDockerRuntime.
-    m_eventTracker.emplace(*m_session);
+    m_eventTracker.emplace(m_id);
 
     m_initialized = true;
 }
@@ -435,19 +440,46 @@ void WSLCSessionRuntime::StartVmLockHeld()
 
 void WSLCSessionRuntime::InitializeDockerRuntime(const std::filesystem::path& storagePath)
 {
-    // Wait for dockerd to be ready before starting the event tracker.
-    THROW_WIN32_IF_MSG(
-        ERROR_TIMEOUT, !m_dockerdReadyEvent.wait(m_settings->BootTimeoutMs), "Timed out waiting for dockerd to start");
+    const auto exited = m_dockerdProcess->GetExitEvent();
+    const HANDLE handles[] = {m_sessionTerminatingEvent.get(), exited.get(), m_dockerdReadyEvent.get()};
+    const auto result = WaitForMultipleObjects(RTL_NUMBER_OF(handles), handles, FALSE, m_settings->BootTimeoutMs);
+    THROW_LAST_ERROR_IF(result == WAIT_FAILED);
+
+    switch (result)
+    {
+    case WAIT_OBJECT_0:
+        THROW_HR_MSG(E_ABORT, "Session terminated while waiting for Docker Engine to start");
+        break;
+
+    case WAIT_OBJECT_0 + 1:
+        THROW_HR_WITH_USER_ERROR(E_FAIL, wsl::shared::Localization::MessageWslcDockerExitedBeforeReady(m_dockerdProcess->GetExitCode()));
+        break;
+
+    case WAIT_OBJECT_0 + 2:
+        break;
+
+    case WAIT_TIMEOUT:
+        THROW_HR_WITH_USER_ERROR(
+            HRESULT_FROM_WIN32(ERROR_TIMEOUT), wsl::shared::Localization::MessageWslcDockerStartupTimedOut(m_settings->BootTimeoutMs));
+        break;
+
+    default:
+        THROW_HR_MSG(E_UNEXPECTED, "Unexpected Docker Engine startup wait result: %lu", result);
+    }
 
     [[maybe_unused]] auto [pid, ptyMaster, channel] = m_virtualMachine->Fork(WSLC_FORK::Thread);
 
-    m_dockerClient.emplace(std::move(channel), m_virtualMachine->TerminatingEvent(), m_virtualMachine->VmId(), 10 * 1000);
+    m_dockerClient.emplace(
+        std::move(channel),
+        std::vector<HANDLE>{m_virtualMachine->TerminatingEvent(), m_sessionTerminatingEvent.get()},
+        m_virtualMachine->VmId(),
+        10 * 1000);
 
     // (Re)bind the session-scoped event tracker to this VM's docker client and relay. Existing
     // container subscriptions are preserved across restarts.
     m_eventTracker->Connect(m_dockerClient.value(), *m_ioRelay);
 
-    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath);
+    m_volumes.emplace(m_dockerClient.value(), m_virtualMachine.value(), m_eventTracker.value(), storagePath, m_hooks.OnVolumeEvent);
 }
 
 void WSLCSessionRuntime::StopVmLockHeld()
@@ -488,6 +520,19 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
     if (m_vmExitedEvent && m_vmExitedEvent.is_signaled())
     {
         m_vmExited.store(true);
+    }
+
+    // Wait for dockerd to deliver pending events before it is stopped. Teardown only runs on the relay thread when the VM
+    // exits unexpectedly (OnVmExited), where dockerd is already gone and the relay thread could not deliver events while
+    // waiting for them, so skipping the wait there never drops events on a normal VM stop.
+    if (m_dockerClient && m_dockerdProcess.has_value() && !m_vmExited.load() && !m_terminating->load() && m_ioRelay &&
+        !m_ioRelay->IsRelayThread())
+    {
+        try
+        {
+            m_eventTracker->WaitForPendingEvents([&]() { THROW_IF_FAILED(m_dockerdProcess->Get().Signal(WSLCSignalSIGHUP)); }, c_pendingEventsTimeout);
+        }
+        CATCH_LOG();
     }
 
     if (m_hooks.TearDownSessionState)
@@ -548,13 +593,15 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         // N.B. dockerd waits a couple seconds if there are any outstanding HTTP request sockets opened.
         if (m_dockerdProcess.has_value())
         {
-            auto dockerdExitCode = StopProcess(m_dockerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            auto dockerdExitCode =
+                StopProcess(m_dockerdProcess.value(), wsl::windows::wslc::ProcessTerminateTimeoutMs, wsl::windows::wslc::ProcessKillTimeoutMs);
             WSL_LOG("DockerdExit", TraceLoggingValue(dockerdExitCode, "code"));
         }
 
         if (m_containerdProcess.has_value())
         {
-            auto containerdExitCode = StopProcess(m_containerdProcess.value(), c_processTerminateTimeoutMs, c_processKillTimeoutMs);
+            auto containerdExitCode =
+                StopProcess(m_containerdProcess.value(), wsl::windows::wslc::ProcessTerminateTimeoutMs, wsl::windows::wslc::ProcessKillTimeoutMs);
             WSL_LOG("ContainerdExit", TraceLoggingValue(containerdExitCode, "code"));
         }
 
@@ -563,7 +610,7 @@ void WSLCSessionRuntime::TearDownVmLockHeld(bool CaptureTerminationReason)
         {
             try
             {
-                m_virtualMachine->Unmount(c_containerdStorage);
+                m_virtualMachine->Unmount(wsl::windows::wslc::ContainerdStorageMountPoint);
             }
             CATCH_LOG();
         }
@@ -803,7 +850,15 @@ WSLCSessionRuntime::VmLease::VmLease(WSLCSessionRuntime& Runtime, VmLeasePolicy 
             m_runtime->EnsureVmRunning();
         }
 
-        m_lock = m_runtime->m_lock.lock_shared();
+        if (Policy == VmLeasePolicy::ExistingOnly)
+        {
+            m_lock = LockSharedUnlessTerminating(
+                m_runtime->m_lock, m_runtime->m_sessionTerminatingEvent, c_existingOnlyLockRetryMs, *m_runtime->m_terminating);
+        }
+        else
+        {
+            m_lock = m_runtime->m_lock.lock_shared();
+        }
 
         if (m_runtime->m_vmState.load() == VmState::Running)
         {
@@ -949,9 +1004,9 @@ void WSLCSessionRuntime::Shutdown(
 
     // Notify with m_lock dropped, then re-lock for the teardown. The handler may call back into the
     // session (e.g. WSLCCreateProcess) which takes a VM lease and this lock; firing under it would
-    // deadlock. m_terminating is set, so any such reentrant lease fails at EnsureVmRunning's gate
-    // rather than restarting the VM, and the reacquire can't block on it. A throwing handler must not
-    // skip the teardown below -- the session is terminating either way.
+    // deadlock. m_terminating is set, so any such reentrant lease fails (see VmLeasePolicy) rather
+    // than restarting the VM, and the reacquire can't block on it. A throwing handler must not skip
+    // the teardown below -- the session is terminating either way.
     runtimeLock.reset();
     try
     {

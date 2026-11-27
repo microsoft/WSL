@@ -387,8 +387,5 @@ struct Config
 
     // Temporary config value to help root cause the truncated archive errors in SetVersion()
     bool SetVersionDebug = false;
-
-    GUID NatNetworkId() const noexcept;
-    LPCWSTR NatNetworkName() const noexcept;
 };
 } // namespace wsl::core

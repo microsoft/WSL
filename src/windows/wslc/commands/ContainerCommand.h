@@ -26,9 +26,8 @@ struct ContainerCommand final : public Command
     std::wstring ShortDescription() const override;
     std::wstring LongDescription() const override;
 
-    std::vector<std::unique_ptr<Command>> GetCommands() const override;
-
 protected:
+    std::vector<std::unique_ptr<Command>> CreateCommands() const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -59,6 +58,7 @@ struct ContainerCreateCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
@@ -183,6 +183,21 @@ protected:
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 
+// Restart Command
+struct ContainerRestartCommand final : public Command
+{
+    constexpr static std::wstring_view CommandName = L"restart";
+    ContainerRestartCommand(const std::wstring& parent) : Command(CommandName, parent)
+    {
+    }
+    std::vector<Argument> GetArguments() const override;
+    std::wstring ShortDescription() const override;
+    std::wstring LongDescription() const override;
+
+protected:
+    void ExecuteInternal(CLIExecutionContext& context) const override;
+};
+
 // Run Command
 struct ContainerRunCommand final : public Command
 {
@@ -195,6 +210,7 @@ struct ContainerRunCommand final : public Command
     std::wstring LongDescription() const override;
 
 protected:
+    void ValidateArgumentsInternal(ArgMap& execArgs) const override;
     void ExecuteInternal(CLIExecutionContext& context) const override;
 };
 

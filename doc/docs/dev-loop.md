@@ -88,6 +88,8 @@ To deploy on a Hyper-V virtual machine, you can use `powershell tools\deploy\dep
 
 ## Running tests
 
+Before running tests, build the entire project with `cmake --build . -- -m` so that all required binaries and packages are up to date. Run `test.bat` from an elevated terminal (Administrator).
+
 To run unit tests, run: `bin\<platform>\<target>\test.bat`. There's quite a lot of tests so you probably don't want to run everything. Here's a reasonable subset:
 `bin\<platform>\<target>\test.bat /name:*UnitTest*`
 
@@ -143,6 +145,8 @@ Also see:
 Every pull request needs to be clang-formatted before it can be merged.
 
 The code can be manually formatted by running: `powershell .\FormatSource.ps1 -ModifiedOnly $false`.
+
+To only format the files your branch touched (committed and uncommitted), run: `powershell .\FormatSource.ps1 -Branch`. Changes are computed against the local `master` branch; use `-BaseBranch <name>` to compare against a different branch.
 
 To automatically check formatting before each commit, run CMake configure (e.g. `cmake .`) and then: `tools\SetupClangFormat.bat`
 

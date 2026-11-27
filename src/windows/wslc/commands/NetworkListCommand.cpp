@@ -14,6 +14,7 @@ Abstract:
 
 #include "NetworkCommand.h"
 #include "CLIExecutionContext.h"
+#include "CommonTasks.h"
 #include "SessionTasks.h"
 #include "NetworkTasks.h"
 #include "Task.h"
@@ -27,10 +28,10 @@ namespace wsl::windows::wslc {
 std::vector<Argument> NetworkListCommand::GetArguments() const
 {
     return {
-        Argument::Create(ArgType::Filter, false, Limit::Unlimited),
+        Argument::Create(ArgType::Filter, {.Limit = Limit::Unlimited}),
         Argument::Create(ArgType::Format),
         Argument::Create(ArgType::NoTrunc),
-        Argument::Create(ArgType::Quiet, false, std::nullopt, Localization::WSLCCLI_NetworkListQuietArgDesc()),
+        Argument::Create(ArgType::Quiet, {.Desc = Localization::WSLCCLI_NetworkListQuietArgDesc()}),
     };
 }
 
@@ -46,8 +47,9 @@ std::wstring NetworkListCommand::LongDescription() const
 
 void NetworkListCommand::ExecuteInternal(CLIExecutionContext& context) const
 {
-    context << ResolveSession //
-            << GetNetworks    //
-            << ListNetworks;
+    context << ResolveSession      //
+            << GetNetworks         //
+            << FormatNetworkOutput //
+            << PrintFormattedOutput;
 }
 } // namespace wsl::windows::wslc

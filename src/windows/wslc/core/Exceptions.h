@@ -17,6 +17,7 @@ Abstract:
 
 #include <string>
 #include <string_view>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -60,19 +61,41 @@ struct ArgumentException : CommandException
     {
     }
 
+    static ArgumentException CreateUnknownOption(std::wstring_view message, std::wstring_view token)
+    {
+        ArgumentException exception{message};
+        exception.m_unknownOptionToken = token;
+        return exception;
+    }
+
     const std::vector<Argument>& Arguments() const
     {
         return m_arguments;
     }
 
+    const std::optional<std::wstring>& UnknownOptionToken() const
+    {
+        return m_unknownOptionToken;
+    }
+
 private:
     std::vector<Argument> m_arguments;
+    std::optional<std::wstring> m_unknownOptionToken;
 };
 
 // Specific exception for failures after command and argument validation
 struct ExecutionException : CLIException
 {
     ExecutionException(std::wstring_view message) : CLIException(message)
+    {
+    }
+};
+
+// Specific exception for a user declining a confirmation prompt. The requested action is abandoned
+// and the program exits successfully.
+struct TerminateException : CLIException
+{
+    TerminateException() : CLIException(std::wstring_view{})
     {
     }
 };

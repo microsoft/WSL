@@ -84,11 +84,16 @@ namespace {
         FieldDefinition{L"destination", Field::Target, Family::General, false, Support::Supported},
         FieldDefinition{L"readonly", Field::ReadOnly, Family::General, true, Support::Supported},
         FieldDefinition{L"ro", Field::ReadOnly, Family::General, true, Support::Supported},
+        // The WSLC mount transport and Docker request model have no end-to-end consistency setting.
         FieldDefinition{L"consistency", Field::Consistency, Family::General, false, Support::Unsupported},
+        // The WSLC mount transport and Docker request model do not carry Docker bind options.
+        // "enabled" requires no non-default bind behavior and is accepted below.
         FieldDefinition{L"bind-propagation", Field::BindPropagation, Family::Bind, false, Support::Unsupported},
         FieldDefinition{L"bind-nonrecursive", Field::BindNonRecursive, Family::Bind, true, Support::Unsupported},
         FieldDefinition{L"bind-recursive", Field::BindRecursive, Family::Bind, false, Support::ValueDependent},
+        // The mount pipeline relies on Docker's default volume copy-up behavior and does not carry VolumeOptions.
         FieldDefinition{L"volume-nocopy", Field::VolumeNoCopy, Family::Volume, true, Support::Unsupported},
+        // Inline mounts reference volumes by name; the volume creation API owns labels, drivers, and driver options.
         FieldDefinition{L"volume-label", Field::VolumeLabel, Family::Volume, false, Support::Unsupported},
         FieldDefinition{L"volume-driver", Field::VolumeDriver, Family::Volume, false, Support::Unsupported},
         FieldDefinition{L"volume-opt", Field::VolumeOption, Family::Volume, false, Support::Unsupported},
@@ -173,21 +178,14 @@ namespace {
 
     std::optional<uint32_t> ParseDockerTmpfsMode(const std::wstring& value)
     {
-        if (value.empty() || value.front() == L'-')
-        {
-            return std::nullopt;
-        }
-
-        size_t position = value.front() == L'+' ? 1 : 0;
-        if (position == value.size())
+        if (value.empty())
         {
             return std::nullopt;
         }
 
         uint64_t result = 0;
-        for (; position < value.size(); ++position)
+        for (const auto digit : value)
         {
-            const auto digit = value[position];
             if (digit < L'0' || digit > L'7')
             {
                 return std::nullopt;
@@ -214,6 +212,114 @@ namespace {
         }
 
         return std::to_string(sizeBytes);
+    }
+
+    enum class ModeCategory
+    {
+        ReadWrite,
+        Label,
+        Propagation,
+        Copy,
+        Consistency,
+    };
+
+    struct ModeDefinition
+    {
+        std::wstring_view Name;
+        ModeCategory Category;
+    };
+
+    // Keep this table aligned with moby daemon/volume/mounts/linux_parser.go linuxValidMountMode.
+    constexpr std::array c_modeDefinitions{
+        ModeDefinition{L"ro", ModeCategory::ReadWrite},
+        ModeDefinition{L"rw", ModeCategory::ReadWrite},
+        ModeDefinition{L"z", ModeCategory::Label},
+        ModeDefinition{L"Z", ModeCategory::Label},
+        ModeDefinition{L"private", ModeCategory::Propagation},
+        ModeDefinition{L"rprivate", ModeCategory::Propagation},
+        ModeDefinition{L"shared", ModeCategory::Propagation},
+        ModeDefinition{L"rshared", ModeCategory::Propagation},
+        ModeDefinition{L"slave", ModeCategory::Propagation},
+        ModeDefinition{L"rslave", ModeCategory::Propagation},
+        ModeDefinition{L"nocopy", ModeCategory::Copy},
+        ModeDefinition{L"consistent", ModeCategory::Consistency},
+        ModeDefinition{L"cached", ModeCategory::Consistency},
+        ModeDefinition{L"delegated", ModeCategory::Consistency},
+    };
+
+    std::optional<ModeCategory> FindModeCategory(std::wstring_view mode)
+    {
+        const auto found = std::ranges::find_if(c_modeDefinitions, [&](const auto& definition) { return definition.Name == mode; });
+        if (found == c_modeDefinitions.end())
+        {
+            return std::nullopt;
+        }
+
+        return found->Category;
+    }
+
+    void ValidateVolumeModes(const std::vector<std::wstring>& modes)
+    {
+        std::vector<ModeCategory> seen;
+        for (const auto& mode : modes)
+        {
+            const auto category = FindModeCategory(mode);
+            if (!category.has_value() || std::ranges::find(seen, category.value()) != seen.end())
+            {
+                ThrowValidation(Localization::WSLCCLI_MountInvalidModeError(mode));
+            }
+
+            seen.push_back(category.value());
+        }
+
+        for (const auto& mode : modes)
+        {
+            if (FindModeCategory(mode) != ModeCategory::ReadWrite)
+            {
+                ThrowUnsupported(Localization::WSLCCLI_MountOptionUnsupportedError(mode));
+            }
+        }
+    }
+
+    // Returns the code point starting at index and its length in UTF-16 units.
+    std::pair<UChar32, size_t> ReadCodePoint(std::wstring_view value, size_t index)
+    {
+        if (IS_HIGH_SURROGATE(value[index]) && index + 1 < value.size() && IS_LOW_SURROGATE(value[index + 1]))
+        {
+            return {static_cast<UChar32>(U16_GET_SUPPLEMENTARY(value[index], value[index + 1])), 2};
+        }
+
+        return {static_cast<UChar32>(value[index]), 1};
+    }
+
+    bool IsLetter(UChar32 codePoint)
+    {
+        return u_isalpha(codePoint) != 0;
+    }
+
+    // Matches docker/cli internal/volumespec/volumespec.go isFilePath.
+    bool IsVolumeSourceFilePath(std::wstring_view source)
+    {
+        if (source.empty())
+        {
+            return false;
+        }
+
+        switch (source.front())
+        {
+        case L'.':
+        case L'/':
+        case L'~':
+            return true;
+        }
+
+        if (source.starts_with(L"\\\\"))
+        {
+            return true;
+        }
+
+        const auto [first, length] = ReadCodePoint(source, 0);
+        return length < source.size() && IsLetter(first) && source[length] == L':';
     }
 
 } // namespace
@@ -253,7 +359,10 @@ Spec ParseDockerMountString(const std::wstring& value)
         case Family::General:
             break;
         case Family::Bind:
-            mount.HasBindOptions = true;
+            if (definition->Id != Field::BindRecursive || keyValue.Value != L"enabled")
+            {
+                mount.HasBindOptions = true;
+            }
             break;
         case Family::Volume:
             mount.HasVolumeOptions = true;
@@ -417,15 +526,15 @@ Spec ParseDockerMountString(const std::wstring& value)
     Type type;
     if (mount.Type == L"bind")
     {
-        type = Type::Bind;
+        type = WSLCMountTypeBind;
     }
     else if (mount.Type == L"volume")
     {
-        type = Type::Volume;
+        type = WSLCMountTypeVolume;
     }
     else if (mount.Type == L"tmpfs")
     {
-        type = Type::Tmpfs;
+        type = WSLCMountTypeTmpfs;
     }
     else
     {
@@ -447,79 +556,114 @@ Spec ParseDockerMountString(const std::wstring& value)
     };
 }
 
+// Parses left to right following docker/cli internal/volumespec/volumespec.go Parse.
 Spec ParseDockerVolumeString(const std::wstring& value)
 {
-    const auto formatUsage = Localization::WSLCCLI_VolumeFormatUsage();
-    const auto lastColon = value.rfind(L':');
-    if (lastColon == std::wstring::npos)
+    if (value.empty())
     {
-        ThrowParse(Localization::WSLCCLI_VolumeInvalidSpec(value, formatUsage));
-    }
-
-    auto splitColon = lastColon;
-    bool readOnly = false;
-    std::wstring_view lastToken{value.data() + lastColon + 1, value.size() - lastColon - 1};
-    if (lastToken == L"ro" || lastToken == L"rw")
-    {
-        readOnly = lastToken == L"ro";
-        if (lastColon == 0)
-        {
-            ThrowParse(Localization::WSLCCLI_VolumeInvalidSpec(value, formatUsage));
-        }
-
-        splitColon = value.rfind(L':', lastColon - 1);
-        if (splitColon == std::wstring::npos)
-        {
-            ThrowParse(Localization::WSLCCLI_VolumeInvalidSpec(value, formatUsage));
-        }
-    }
-
-    const auto targetEnd = lastToken == L"ro" || lastToken == L"rw" ? lastColon : value.size();
-    const auto target = value.substr(splitColon + 1, targetEnd - splitColon - 1);
-    if (target.empty())
-    {
-        ThrowParse(Localization::WSLCCLI_VolumeContainerPathEmpty(value, formatUsage));
-    }
-
-    if (target.front() != L'/')
-    {
-        ThrowParse(Localization::WSLCCLI_VolumeContainerPathNotAbsolute(value, formatUsage));
-    }
-
-    const auto rawSource = value.substr(0, splitColon);
-    if (rawSource.empty())
-    {
-        ThrowParse(Localization::WSLCCLI_VolumeHostPathEmpty(value, formatUsage));
-    }
-
-    if (IsValidNamedVolumeName(rawSource))
-    {
-        return {
-            .MountType = Type::Volume,
-            .Source = rawSource,
-            .Target = WideToMultiByte(target),
-            .ReadOnly = readOnly,
-        };
+        ThrowParse(Localization::WSLCCLI_VolumeEmptySpecError());
     }
 
     std::wstring source;
-    if (FAILED(wil::GetFullPathNameW(rawSource.c_str(), source)))
+    std::wstring target;
+    std::wstring modes;
+    if (WideToMultiByte(value).size() <= 2)
     {
-        ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalid(value, rawSource));
+        target = value;
+    }
+    else
+    {
+        std::wstring buffer;
+        UChar32 bufferFirst = 0;
+        size_t bufferCodePoints = 0;
+        for (size_t index = 0; index <= value.size();)
+        {
+            const bool endOfSpec = index == value.size();
+            const auto [codePoint, length] = endOfSpec ? std::pair<UChar32, size_t>{0, 1} : ReadCodePoint(value, index);
+            const bool isDriveColon = codePoint == L':' && bufferCodePoints == 1 && IsLetter(bufferFirst);
+            if (isDriveColon || (!endOfSpec && codePoint != L':'))
+            {
+                if (bufferCodePoints == 0)
+                {
+                    bufferFirst = codePoint;
+                }
+
+                buffer.append(value, index, length);
+                ++bufferCodePoints;
+                index += length;
+                continue;
+            }
+
+            index += length;
+            if (buffer.empty())
+            {
+                ThrowParse(Localization::WSLCCLI_VolumeEmptySectionError());
+            }
+
+            if (source.empty() && endOfSpec)
+            {
+                target = std::move(buffer);
+            }
+            else if (source.empty())
+            {
+                source = std::move(buffer);
+            }
+            else if (target.empty())
+            {
+                target = std::move(buffer);
+            }
+            else if (!endOfSpec || buffer.find(L':') != std::wstring::npos)
+            {
+                ThrowParse(Localization::WSLCCLI_VolumeTooManyColonsError());
+            }
+            else
+            {
+                modes = std::move(buffer);
+            }
+
+            buffer.clear();
+            bufferCodePoints = 0;
+        }
     }
 
-    if (GetFileAttributesW(source.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
+    Spec spec{.Target = WideToMultiByte(target)};
+    if (!modes.empty())
     {
-        ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalid(value, rawSource));
+        for (const auto mode : SplitPreserveEmpty<wchar_t>(modes, L','))
+        {
+            if (mode == L"ro" || mode == L"rw")
+            {
+                spec.ReadOnly = mode == L"ro";
+            }
+
+            spec.Modes.emplace_back(mode);
+        }
     }
 
-    return {
-        .MountType = Type::Bind,
-        .Source = std::move(source),
-        .Target = WideToMultiByte(target),
-        .ReadOnly = readOnly,
-        .BindSource = BindSourcePolicy::CreateIfMissing,
-    };
+    if (!IsVolumeSourceFilePath(source))
+    {
+        spec.MountType = WSLCMountTypeVolume;
+        spec.ConfigVolume = source.empty();
+        spec.Source = std::move(source);
+        return spec;
+    }
+
+    std::error_code error;
+    auto canonicalSource = wsl::windows::common::filesystem::GetCanonicalPath(source, error);
+    if (error)
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalidError(source));
+    }
+
+    if (GetFileAttributesW(canonicalSource.c_str()) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_INVALID_NAME)
+    {
+        ThrowParse(Localization::WSLCCLI_VolumeHostPathInvalidError(source));
+    }
+
+    spec.MountType = WSLCMountTypeBind;
+    spec.Source = canonicalSource.wstring();
+    spec.BindSource = BindSourcePolicy::CreateIfMissing;
+    return spec;
 }
 
 Spec ParseDockerTmpfsString(const std::wstring& value)
@@ -529,7 +673,7 @@ Spec ParseDockerTmpfsString(const std::wstring& value)
     const auto options = colon == std::wstring::npos ? std::wstring_view{} : std::wstring_view{value}.substr(colon + 1);
 
     return {
-        .MountType = Type::Tmpfs,
+        .MountType = WSLCMountTypeTmpfs,
         .Target = WideToMultiByte(target),
         .TmpfsOptions = WideToMultiByte(std::wstring{options}),
     };
@@ -537,9 +681,22 @@ Spec ParseDockerTmpfsString(const std::wstring& value)
 
 void ValidateMountSpec(const Spec& mount)
 {
+    ValidateVolumeModes(mount.Modes);
+
     if (mount.Target.empty())
     {
         ThrowValidation(Localization::WSLCCLI_MountTargetRequiredError());
+    }
+
+    if (mount.ConfigVolume)
+    {
+        if (mount.MountType != WSLCMountTypeVolume || !mount.Source.empty() || mount.ReadOnly || !mount.Modes.empty() ||
+            mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value() || mount.TmpfsOptions.has_value())
+        {
+            ThrowValidation(Localization::WSLCCLI_MountVolumeSourceInvalidError());
+        }
+
+        return;
     }
 
     if (!mount.Target.starts_with('/'))
@@ -547,7 +704,8 @@ void ValidateMountSpec(const Spec& mount)
         ThrowValidation(Localization::WSLCCLI_MountTargetAbsoluteError());
     }
 
-    if (mount.MountType != Type::Tmpfs && (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value() || mount.TmpfsOptions.has_value()))
+    if (mount.MountType != WSLCMountTypeTmpfs &&
+        (mount.TmpfsSizeBytes.has_value() || mount.TmpfsMode.has_value() || mount.TmpfsOptions.has_value()))
     {
         ThrowValidation(Localization::WSLCCLI_MountTmpfsOptionsTypeError());
     }
@@ -559,7 +717,7 @@ void ValidateMountSpec(const Spec& mount)
 
     switch (mount.MountType)
     {
-    case Type::Bind:
+    case WSLCMountTypeBind:
         if (mount.Source.empty())
         {
             ThrowValidation(Localization::WSLCCLI_MountSourceRequiredError());
@@ -571,14 +729,14 @@ void ValidateMountSpec(const Spec& mount)
         }
         break;
 
-    case Type::Volume:
+    case WSLCMountTypeVolume:
         if (!mount.Source.empty() && !IsValidNamedVolumeName(mount.Source))
         {
             ThrowValidation(Localization::WSLCCLI_MountVolumeSourceInvalidError());
         }
         break;
 
-    case Type::Tmpfs:
+    case WSLCMountTypeTmpfs:
         if (!mount.Source.empty())
         {
             ThrowValidation(Localization::WSLCCLI_MountTmpfsSourceUnsupportedError());
@@ -597,6 +755,12 @@ void ValidateMountCollection(std::span<const Spec> mounts)
     {
         ValidateMountSpec(mount);
 
+        // Config volumes are skipped at runtime when another mount already owns the destination.
+        if (mount.ConfigVolume)
+        {
+            continue;
+        }
+
         auto destination = NormalizeDestination(mount.Target);
         if (!destinations.emplace(destination).second)
         {
@@ -610,7 +774,7 @@ void ValidateMountCollection(std::span<const Spec> mounts)
 
 std::string FormatTmpfsOptions(const Spec& mount)
 {
-    WI_ASSERT(mount.MountType == Type::Tmpfs);
+    WI_ASSERT(mount.MountType == WSLCMountTypeTmpfs);
 
     if (mount.TmpfsOptions.has_value())
     {
@@ -636,8 +800,6 @@ std::string FormatTmpfsOptions(const Spec& mount)
 
 std::string NormalizeDestination(std::string destination)
 {
-    std::replace(destination.begin(), destination.end(), '\\', '/');
-
     std::vector<std::string> components;
     size_t start = 0;
     while (start <= destination.size())
