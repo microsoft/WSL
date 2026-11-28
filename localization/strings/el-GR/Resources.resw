@@ -217,9 +217,6 @@
 Για να λάβετε μια λίστα με τις έγκυρες διανομές, χρησιμοποιήστε 'wsl.exe --list --online'.</value>
     <comment>{FixedPlaceholder="{}"}{Locked="--list "}{Locked="--online'"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
-  <data name="MessageInstanceTerminated" xml:space="preserve">
-    <value>Η οντότητα του Υποσυστήματος Windows για Linux τερματίστηκε.</value>
-  </data>
   <data name="MessageInvalidCommandLine" xml:space="preserve">
     <value>Μη έγκυρο όρισμα γραμμής εντολών: {}
 Παρακαλώ χρησιμοποιήστε '{} --help' για να λάβετε μια λίστα με τα υποστηριζόμενα ορίσματα.</value>
@@ -823,7 +820,7 @@
   </data>
   <data name="MessageLegacyDistributionVersionArgNotSupported" xml:space="preserve">
     <value>Οι καταχωρήσεις διανομών παλαιού τύπου δεν υποστηρίζουν το όρισμα --version.</value>
-    <comment>{Locked="--version "}Command line arguments, file names and string inserts should not be translated</comment>
+    <comment>{Locked="--version"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDistributionOverridden" xml:space="preserve">
     <value>Η διανομή "{}" παρέχεται από ένα μανιφέστο παράκαμψης (override manifest).</value>
@@ -1108,12 +1105,6 @@
   </data>
   <data name="MessageDnsTunnelingDisabled" xml:space="preserve">
     <value>Λόγω ενός τρέχοντος προβλήματος συμβατότητας με το Global Secure Access Client, η διοχέτευση (Tunneling) DNS είναι απενεργοποιημένη.</value>
-  </data>
-  <data name="MessageSparseVhdDisabled" xml:space="preserve">
-    <value>Η υποστήριξη Sparse VHD είναι επί του παρόντος απενεργοποιημένη λόγω πιθανής καταστροφής δεδομένων.
-Για να εξαναγκάσετε μια διανομή να χρησιμοποιήσει ένα sparse VHD, παρακαλώ εκτελέστε:
-wsl.exe --manage &lt;ΌνομαΔιανομής&gt; --set-sparse true --allow-unsafe</value>
-    <comment>{Locked="--manage "}{Locked="--set-sparse "}{Locked="--allow-unsafe"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
   <data name="MessageDrvfsMountFailed" xml:space="preserve">
     <value>Αποτυχία προσάρτησης του {}, δείτε το dmesg για περισσότερες λεπτομέρειες.</value>
@@ -1683,7 +1674,7 @@ wsl.exe --manage &lt;ΌνομαΔιανομής&gt; --set-sparse true --allow-un
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Αφού εγκαταστήσετε το VS Code, μπορείτε να εγκαταστήσετε την επέκταση Remote WSL από το Τερματικό των Windows:
 
-'code –install-extension ms-vscode-remote.remote-wsl'</value>
+'code –-install-extension ms-vscode-remote.remote-wsl'</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Ανοίξτε ένα Έργο WSL στο Visual Studio Code</value>
