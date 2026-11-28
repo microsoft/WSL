@@ -1145,6 +1145,10 @@ Falling back to NAT networking.</value>
     <value>The distribution failed to start. Error code: {}, failure step: {}</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
+  <data name="MessageHostVolumeLowDiskSpace" xml:space="preserve">
+    <value>Host volume '{}' containing '{}': {} MiB available. If more space is needed, free up space on that volume and try again.</value>
+    <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
+  </data>
   <data name="MessageDiskCorrupted" xml:space="preserve">
     <value>The distribution failed to start because its virtual disk is corrupted.</value>
   </data>

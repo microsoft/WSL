@@ -74,8 +74,13 @@ WslCoreInstance::WslCoreInstance(
         }
         else
         {
-            THROW_HR_WITH_USER_ERROR(
-                E_FAIL, wsl::shared::Localization::MessageDistributionFailedToStart(result.Result, static_cast<int>(result.FailureStep)));
+            auto message = wsl::shared::Localization::MessageDistributionFailedToStart(result.Result, static_cast<int>(result.FailureStep));
+            if (const auto hint = wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint(m_configuration.VhdFilePath.c_str(), E_FAIL))
+            {
+                message += L"\n" + *hint;
+            }
+
+            THROW_HR_WITH_USER_ERROR(E_FAIL, std::move(message));
         }
     }
 

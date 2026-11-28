@@ -1841,3 +1841,61 @@ wil::unique_hfile wsl::windows::common::filesystem::WipeAndOpenDirectory(_In_ LP
 
     return OpenDirectoryHandle(pPath, true);
 }
+
+std::optional<wsl::windows::common::filesystem::HostVolumeDiskSpaceInfo> wsl::windows::common::filesystem::TryGetHostVolumeDiskSpace(_In_opt_ PCWSTR Path) noexcept
+try
+{
+    if (Path == nullptr || Path[0] == L'\0')
+    {
+        return std::nullopt;
+    }
+
+    std::wstring volumePath(wcslen(Path) + MAX_PATH, L'\0');
+    if (!GetVolumePathNameW(Path, volumePath.data(), static_cast<DWORD>(volumePath.size())))
+    {
+        return std::nullopt;
+    }
+
+    volumePath.resize(wcslen(volumePath.c_str()));
+
+    ULARGE_INTEGER freeBytesAvailable{};
+    if (!GetDiskFreeSpaceExW(volumePath.c_str(), &freeBytesAvailable, nullptr, nullptr))
+    {
+        return std::nullopt;
+    }
+
+    return HostVolumeDiskSpaceInfo{std::move(volumePath), freeBytesAvailable.QuadPart};
+}
+catch (...)
+{
+    return std::nullopt;
+}
+
+std::optional<std::wstring> wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint(_In_opt_ PCWSTR DiskPath, _In_ HRESULT FailureResult) noexcept
+{
+    const auto diskSpace = TryGetHostVolumeDiskSpace(DiskPath);
+    if (!diskSpace.has_value())
+    {
+        return std::nullopt;
+    }
+
+    return TryBuildLowHostDiskSpaceHint(DiskPath, FailureResult, *diskSpace);
+}
+
+std::optional<std::wstring> wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint(
+    _In_ PCWSTR DiskPath, _In_ HRESULT FailureResult, _In_ const HostVolumeDiskSpaceInfo& DiskSpace) noexcept
+try
+{
+    const bool isDiskFullError = (FailureResult == HRESULT_FROM_WIN32(ERROR_DISK_FULL));
+    if (!isDiskFullError && DiskSpace.FreeBytesAvailable >= c_lowHostDiskSpaceThresholdBytes)
+    {
+        return std::nullopt;
+    }
+
+    const auto freeMiB = std::format(L"{:.1f}", static_cast<double>(DiskSpace.FreeBytesAvailable) / (1024.0 * 1024.0));
+    return wsl::shared::Localization::MessageHostVolumeLowDiskSpace(DiskSpace.VolumePath, DiskPath, freeMiB);
+}
+catch (...)
+{
+    return std::nullopt;
+}

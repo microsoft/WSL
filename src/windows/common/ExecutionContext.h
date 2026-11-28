@@ -138,6 +138,8 @@ public:
 
     void CollectErrorImpl(HRESULT result, ULONGLONG context, std::optional<std::wstring>&& message, std::optional<std::wstring>&& source);
 
+    // Enrich an already recorded error that a same-context or parent-context rethrow would preserve.
+    bool TryAppendErrorMessage(HRESULT result, const std::wstring& detail) noexcept;
     const std::optional<Error>& ReportedError() const noexcept;
 
     void SetErrorStringImpl(std::wstring&& string, std::wstring&& source);

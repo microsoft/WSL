@@ -922,5 +922,79 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"one"}, ReadFileContent(root.Path() / L"gathered" / L"first.txt"));
         VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"gathered" / L"second.txt"));
     }
+
+    TEST_METHOD(TryGetHostVolumeDiskSpace_ValidAndInvalidPaths)
+    {
+        using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
+        using wsl::windows::common::filesystem::TryGetHostVolumeDiskSpace;
+
+        VERIFY_IS_FALSE(TryGetHostVolumeDiskSpace(nullptr).has_value());
+        VERIFY_IS_FALSE(TryGetHostVolumeDiskSpace(L"").has_value());
+
+        const auto nonExistentVhd = ExistingFile().parent_path() / L"ext4.vhdx";
+        const auto info = TryGetHostVolumeDiskSpace(nonExistentVhd.c_str());
+        VERIFY_IS_TRUE(info.has_value());
+        VERIFY_IS_FALSE(info->VolumePath.empty());
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(nullptr, HRESULT_FROM_WIN32(ERROR_DISK_FULL)).has_value());
+        VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(nonExistentVhd.c_str(), HRESULT_FROM_WIN32(ERROR_DISK_FULL)).has_value());
+    }
+
+    TEST_METHOD(TryBuildLowHostDiskSpaceHint_RespectsThresholdAndDiskFullError)
+    {
+        using wsl::windows::common::filesystem::c_lowHostDiskSpaceThresholdBytes;
+        using wsl::windows::common::filesystem::HostVolumeDiskSpaceInfo;
+        using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
+
+        constexpr auto diskPath = LR"(D:\Distro\ext4.vhdx)";
+        HostVolumeDiskSpaceInfo info{LR"(D:\)", 0};
+
+        const auto emptyVolumeHint = TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).value_or(L"");
+        VERIFY_IS_TRUE(emptyVolumeHint.find(info.VolumePath) != std::wstring::npos);
+        VERIFY_IS_TRUE(emptyVolumeHint.find(diskPath) != std::wstring::npos);
+        VERIFY_IS_TRUE(emptyVolumeHint.find(L"0.0") != std::wstring::npos);
+
+        info.FreeBytesAvailable = c_lowHostDiskSpaceThresholdBytes - 1;
+        VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
+
+        info.FreeBytesAvailable = c_lowHostDiskSpaceThresholdBytes;
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
+
+        info.FreeBytesAvailable = 2 * c_lowHostDiskSpaceThresholdBytes;
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
+        VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(diskPath, HRESULT_FROM_WIN32(ERROR_DISK_FULL), info).has_value());
+    }
+
+    TEST_METHOD(LowHostDiskSpaceHintSurvivesAttachErrorRethrow)
+    {
+        using wsl::windows::common::Context;
+        using wsl::windows::common::ExecutionContext;
+        using wsl::windows::common::filesystem::HostVolumeDiskSpaceInfo;
+        using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
+
+        constexpr auto result = HRESULT_FROM_WIN32(ERROR_DISK_FULL);
+        const auto hint =
+            TryBuildLowHostDiskSpaceHint(LR"(D:\Distro\ext4.vhdx)", result, HostVolumeDiskSpaceInfo{LR"(D:\)", 0}).value_or(L"");
+        VERIFY_IS_FALSE(hint.empty());
+
+        ExecutionContext root(Context::CreateInstance);
+        ExecutionContext context(Context::MountDisk);
+        const auto mountContext = context.CurrentContext();
+        VERIFY_IS_FALSE(context.TryAppendErrorMessage(result, hint));
+
+        const auto backendContext = mountContext | Context::HCS;
+        root.CollectErrorImpl(result, root.CurrentContext() | Context::AttachDisk, L"Unrelated attach error", L"Other caller");
+        VERIFY_IS_FALSE(context.TryAppendErrorMessage(result, hint));
+
+        root.CollectErrorImpl(result, backendContext, L"Original attach error", L"Backend");
+        VERIFY_IS_FALSE(context.TryAppendErrorMessage(E_FAIL, hint));
+        VERIFY_IS_TRUE(context.TryAppendErrorMessage(result, hint));
+
+        root.CollectErrorImpl(result, mountContext, L"Outer attach error", L"Caller");
+        const auto& reported = root.ReportedError().value();
+        VERIFY_ARE_EQUAL(result, reported.Code);
+        VERIFY_ARE_EQUAL(backendContext, reported.Context);
+        VERIFY_ARE_EQUAL(std::wstring(L"Backend"), reported.Source.value_or(L""));
+        VERIFY_ARE_EQUAL(L"Original attach error\n" + hint, reported.Message.value_or(L""));
+    }
 };
 } // namespace FilesystemUnitTests
