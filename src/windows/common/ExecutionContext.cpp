@@ -199,6 +199,24 @@ ExecutionContext& ExecutionContext::RootContext()
     }
 }
 
+bool ExecutionContext::TryAppendErrorMessage(HRESULT result, const std::wstring& detail) noexcept
+try
+{
+    auto& error = RootContext().m_error;
+    const auto context = CurrentContext();
+    if (!error || error->Code != result || (context & error->Context) != context || !error->Message)
+    {
+        return false;
+    }
+
+    error->Message->append(L"\n" + detail);
+    return true;
+}
+catch (...)
+{
+    return false;
+}
+
 const std::optional<wsl::windows::common::Error>& ExecutionContext::ReportedError() const noexcept
 {
     if (!m_error.has_value() && m_parent != nullptr)

@@ -963,5 +963,38 @@ class FilesystemUnitTests
         VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
         VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(diskPath, HRESULT_FROM_WIN32(ERROR_DISK_FULL), info).has_value());
     }
+
+    TEST_METHOD(LowHostDiskSpaceHintSurvivesAttachErrorRethrow)
+    {
+        using wsl::windows::common::Context;
+        using wsl::windows::common::ExecutionContext;
+        using wsl::windows::common::filesystem::HostVolumeDiskSpaceInfo;
+        using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
+
+        constexpr auto result = HRESULT_FROM_WIN32(ERROR_DISK_FULL);
+        const auto hint =
+            TryBuildLowHostDiskSpaceHint(LR"(D:\Distro\ext4.vhdx)", result, HostVolumeDiskSpaceInfo{LR"(D:\)", 0}).value_or(L"");
+        VERIFY_IS_FALSE(hint.empty());
+
+        ExecutionContext root(Context::CreateInstance);
+        ExecutionContext context(Context::MountDisk);
+        const auto mountContext = context.CurrentContext();
+        VERIFY_IS_FALSE(context.TryAppendErrorMessage(result, hint));
+
+        const auto backendContext = mountContext | Context::HCS;
+        root.CollectErrorImpl(result, root.CurrentContext() | Context::AttachDisk, L"Unrelated attach error", L"Other caller");
+        VERIFY_IS_FALSE(context.TryAppendErrorMessage(result, hint));
+
+        root.CollectErrorImpl(result, backendContext, L"Original attach error", L"Backend");
+        VERIFY_IS_FALSE(context.TryAppendErrorMessage(E_FAIL, hint));
+        VERIFY_IS_TRUE(context.TryAppendErrorMessage(result, hint));
+
+        root.CollectErrorImpl(result, mountContext, L"Outer attach error", L"Caller");
+        const auto& reported = root.ReportedError().value();
+        VERIFY_ARE_EQUAL(result, reported.Code);
+        VERIFY_ARE_EQUAL(backendContext, reported.Context);
+        VERIFY_ARE_EQUAL(std::wstring(L"Backend"), reported.Source.value_or(L""));
+        VERIFY_ARE_EQUAL(L"Original attach error\n" + hint, reported.Message.value_or(L""));
+    }
 };
 } // namespace FilesystemUnitTests
