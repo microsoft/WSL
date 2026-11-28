@@ -925,6 +925,7 @@ class FilesystemUnitTests
 
     TEST_METHOD(TryGetHostVolumeDiskSpace_ValidAndInvalidPaths)
     {
+        using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
         using wsl::windows::common::filesystem::TryGetHostVolumeDiskSpace;
 
         VERIFY_IS_FALSE(TryGetHostVolumeDiskSpace(nullptr).has_value());
@@ -934,30 +935,33 @@ class FilesystemUnitTests
         const auto info = TryGetHostVolumeDiskSpace(nonExistentVhd.c_str());
         VERIFY_IS_TRUE(info.has_value());
         VERIFY_IS_FALSE(info->VolumePath.empty());
-        VERIFY_IS_TRUE(info->FreeBytesAvailable > 0);
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(nullptr, HRESULT_FROM_WIN32(ERROR_DISK_FULL)).has_value());
+        VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(nonExistentVhd.c_str(), HRESULT_FROM_WIN32(ERROR_DISK_FULL)).has_value());
     }
 
     TEST_METHOD(TryBuildLowHostDiskSpaceHint_RespectsThresholdAndDiskFullError)
     {
         using wsl::windows::common::filesystem::c_lowHostDiskSpaceThresholdBytes;
+        using wsl::windows::common::filesystem::HostVolumeDiskSpaceInfo;
         using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
-        using wsl::windows::common::filesystem::TryGetHostVolumeDiskSpace;
 
-        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(nullptr, HRESULT_FROM_WIN32(ERROR_DISK_FULL)).has_value());
+        constexpr auto diskPath = LR"(D:\Distro\ext4.vhdx)";
+        HostVolumeDiskSpaceInfo info{LR"(D:\)", 0};
 
-        const auto nonExistentVhd = ExistingFile().parent_path() / L"ext4.vhdx";
-        const auto info = TryGetHostVolumeDiskSpace(nonExistentVhd.c_str());
-        VERIFY_IS_TRUE(info.has_value());
+        const auto emptyVolumeHint = TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).value_or(L"");
+        VERIFY_IS_TRUE(emptyVolumeHint.find(info.VolumePath) != std::wstring::npos);
+        VERIFY_IS_TRUE(emptyVolumeHint.find(diskPath) != std::wstring::npos);
+        VERIFY_IS_TRUE(emptyVolumeHint.find(L"0.0") != std::wstring::npos);
 
-        if (info->FreeBytesAvailable >= c_lowHostDiskSpaceThresholdBytes)
-        {
-            VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(nonExistentVhd.c_str(), E_FAIL).has_value());
-        }
+        info.FreeBytesAvailable = c_lowHostDiskSpaceThresholdBytes - 1;
+        VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
 
-        const auto diskFullHint = TryBuildLowHostDiskSpaceHint(nonExistentVhd.c_str(), HRESULT_FROM_WIN32(ERROR_DISK_FULL));
-        VERIFY_IS_TRUE(diskFullHint.has_value());
-        VERIFY_IS_TRUE(diskFullHint->find(info->VolumePath) != std::wstring::npos);
-        VERIFY_IS_TRUE(diskFullHint->find(nonExistentVhd.wstring()) != std::wstring::npos);
+        info.FreeBytesAvailable = c_lowHostDiskSpaceThresholdBytes;
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
+
+        info.FreeBytesAvailable = 2 * c_lowHostDiskSpaceThresholdBytes;
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(diskPath, E_FAIL, info).has_value());
+        VERIFY_IS_TRUE(TryBuildLowHostDiskSpaceHint(diskPath, HRESULT_FROM_WIN32(ERROR_DISK_FULL), info).has_value());
     }
 };
 } // namespace FilesystemUnitTests

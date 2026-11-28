@@ -324,6 +324,7 @@ std::optional<HostVolumeDiskSpaceInfo> TryGetHostVolumeDiskSpace(_In_opt_ PCWSTR
 /// when the host volume containing DiskPath has less than c_lowHostDiskSpaceThresholdBytes free.
 /// </summary>
 std::optional<std::wstring> TryBuildLowHostDiskSpaceHint(_In_opt_ PCWSTR DiskPath, _In_ HRESULT FailureResult) noexcept;
+std::optional<std::wstring> TryBuildLowHostDiskSpaceHint(_In_ PCWSTR DiskPath, _In_ HRESULT FailureResult, _In_ const HostVolumeDiskSpaceInfo& DiskSpace) noexcept;
 
 std::wstring UnquotePath(_In_ LPCWSTR Path);
 
