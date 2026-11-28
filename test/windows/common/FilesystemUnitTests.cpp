@@ -922,5 +922,42 @@ class FilesystemUnitTests
         VERIFY_ARE_EQUAL(std::string{"one"}, ReadFileContent(root.Path() / L"gathered" / L"first.txt"));
         VERIFY_ARE_EQUAL(std::string{"two"}, ReadFileContent(root.Path() / L"gathered" / L"second.txt"));
     }
+
+    TEST_METHOD(TryGetHostVolumeDiskSpace_ValidAndInvalidPaths)
+    {
+        using wsl::windows::common::filesystem::TryGetHostVolumeDiskSpace;
+
+        VERIFY_IS_FALSE(TryGetHostVolumeDiskSpace(nullptr).has_value());
+        VERIFY_IS_FALSE(TryGetHostVolumeDiskSpace(L"").has_value());
+
+        const auto nonExistentVhd = ExistingFile().parent_path() / L"ext4.vhdx";
+        const auto info = TryGetHostVolumeDiskSpace(nonExistentVhd.c_str());
+        VERIFY_IS_TRUE(info.has_value());
+        VERIFY_IS_FALSE(info->VolumePath.empty());
+        VERIFY_IS_TRUE(info->FreeBytesAvailable > 0);
+    }
+
+    TEST_METHOD(TryBuildLowHostDiskSpaceHint_RespectsThresholdAndDiskFullError)
+    {
+        using wsl::windows::common::filesystem::c_lowHostDiskSpaceThresholdBytes;
+        using wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint;
+        using wsl::windows::common::filesystem::TryGetHostVolumeDiskSpace;
+
+        VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(nullptr, HRESULT_FROM_WIN32(ERROR_DISK_FULL)).has_value());
+
+        const auto nonExistentVhd = ExistingFile().parent_path() / L"ext4.vhdx";
+        const auto info = TryGetHostVolumeDiskSpace(nonExistentVhd.c_str());
+        VERIFY_IS_TRUE(info.has_value());
+
+        if (info->FreeBytesAvailable >= c_lowHostDiskSpaceThresholdBytes)
+        {
+            VERIFY_IS_FALSE(TryBuildLowHostDiskSpaceHint(nonExistentVhd.c_str(), E_FAIL).has_value());
+        }
+
+        const auto diskFullHint = TryBuildLowHostDiskSpaceHint(nonExistentVhd.c_str(), HRESULT_FROM_WIN32(ERROR_DISK_FULL));
+        VERIFY_IS_TRUE(diskFullHint.has_value());
+        VERIFY_IS_TRUE(diskFullHint->find(info->VolumePath) != std::wstring::npos);
+        VERIFY_IS_TRUE(diskFullHint->find(nonExistentVhd.wstring()) != std::wstring::npos);
+    }
 };
 } // namespace FilesystemUnitTests

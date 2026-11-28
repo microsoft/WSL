@@ -1077,8 +1077,16 @@ ULONG WslCoreVm::AttachDiskLockHeld(
     catch (...)
     {
         const auto result = wil::ResultFromCaughtException();
-        THROW_HR_WITH_USER_ERROR(
-            result, Localization::MessageFailedToAttachDisk(Disk, wsl::windows::common::wslutil::GetSystemErrorString(result)));
+        auto message = Localization::MessageFailedToAttachDisk(Disk, wsl::windows::common::wslutil::GetSystemErrorString(result));
+        if (Type == DiskType::VHD)
+        {
+            if (const auto hint = wsl::windows::common::filesystem::TryBuildLowHostDiskSpaceHint(Disk, result))
+            {
+                message += L"\n" + *hint;
+            }
+        }
+
+        THROW_HR_WITH_USER_ERROR(result, std::move(message));
     }
 }
 

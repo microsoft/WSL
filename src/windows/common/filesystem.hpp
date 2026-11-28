@@ -305,6 +305,26 @@ void SetInformationFile(_In_ HANDLE Handle, _In_ T& Buffer, _In_ FILE_INFORMATIO
 
 std::optional<std::filesystem::path> TryGetPathFromFileUrl(const std::wstring& Url);
 
+struct HostVolumeDiskSpaceInfo
+{
+    std::wstring VolumePath;
+    ULONGLONG FreeBytesAvailable = 0;
+};
+
+constexpr ULONGLONG c_lowHostDiskSpaceThresholdBytes = 64ull * 1024 * 1024;
+
+/// <summary>
+/// Best-effort query for the host volume path and available free bytes for the given filesystem path.
+/// Returns std::nullopt if the volume or free space cannot be determined.
+/// </summary>
+std::optional<HostVolumeDiskSpaceInfo> TryGetHostVolumeDiskSpace(_In_opt_ PCWSTR Path) noexcept;
+
+/// <summary>
+/// Builds a localized diagnostic hint when a disk operation fails due to ERROR_DISK_FULL or
+/// when the host volume containing DiskPath has less than c_lowHostDiskSpaceThresholdBytes free.
+/// </summary>
+std::optional<std::wstring> TryBuildLowHostDiskSpaceHint(_In_opt_ PCWSTR DiskPath, _In_ HRESULT FailureResult) noexcept;
+
 std::wstring UnquotePath(_In_ LPCWSTR Path);
 
 /// <summary>
