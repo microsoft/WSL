@@ -472,6 +472,8 @@
 
             --resize &lt;ΣυμβολοσειράΜνήμης&gt;
                 Αλλαγή μεγέθους του δίσκου της διανομής στο καθορισμένο μέγεθος.
+            --compact
+                Σμίκρυνση του αρχείου VHDX μιας διανομής WSL 2.
 
     --mount &lt;Δίσκος&gt;
         Συνδέει και προσαρτά έναν φυσικό ή εικονικό δίσκο σε όλες τις διανομές WSL 2.
@@ -1086,7 +1088,8 @@
   </data>
   <data name="MessageErrorCode" xml:space="preserve">
     <value>{}
-Κωδικός σφάλματος: {}</value>
+Κωδικός σφάλματος: {}
+Αν το σφάλμα είναι μη αναμενόμενο, δοκιμάστε να αναζητήσετε για υπάρχοντα ζητήματα ή συμπληρώστε ένα νέο στο https://github.com/microsoft/WSL/issues</value>
     <comment>{FixedPlaceholder="{}"}Command line arguments, file names and string inserts should not be translated</comment>
   </data>
     <data name="MessageInvalidJson" xml:space="preserve">
