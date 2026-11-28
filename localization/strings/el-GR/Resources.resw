@@ -1674,7 +1674,7 @@
   <data name="Settings_OOBEVSCodeIntegration_VSCodeInstallSample.Text" xml:space="preserve">
     <value>Αφού εγκαταστήσετε το VS Code, μπορείτε να εγκαταστήσετε την επέκταση Remote WSL από το Τερματικό των Windows:
 
-'code –-install-extension ms-vscode-remote.remote-wsl'</value>
+'code --install-extension ms-vscode-remote.remote-wsl'</value>
   </data>
   <data name="Settings_OOBEVSCodeIntegration_VSCodeOpenProjectTitle.Text" xml:space="preserve">
     <value>Ανοίξτε ένα Έργο WSL στο Visual Studio Code</value>
